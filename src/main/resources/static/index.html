@@ -875,7 +875,7 @@
 
 			async function loadSlots() {
 				try {
-					const slots = await fetch('/ai/api/termine').then((r) => {
+					const slots = await fetch('/ai-expert/api/termine').then((r) => {
 						if (!r.ok) throw new Error('HTTP ' + r.status);
 						return r.json();
 					});
@@ -967,9 +967,9 @@
 				const submit = bookingForm.querySelector('button[type="submit"]');
 				submit.disabled = true;
 				try {
-					await fetch('/ai/api/csrf', { credentials: 'same-origin' });
+					await fetch('/ai-expert/api/csrf', { credentials: 'same-origin' });
 					const token = decodeURIComponent((document.cookie.match(/(?:^|; )XSRF-TOKEN=([^;]*)/) || [])[1] || '');
-					const res = await fetch('/ai/api/termine', {
+					const res = await fetch('/ai-expert/api/termine', {
 						method: 'POST',
 						credentials: 'same-origin',
 						headers: { 'Content-Type': 'application/json', 'X-XSRF-TOKEN': token },
@@ -1031,14 +1031,14 @@
 			}
 		}
 
-		loadSection('/ai/api/leistungen', 'leistungen', 'leistungen-liste', (l) =>
+		loadSection('/ai-expert/api/leistungen', 'leistungen', 'leistungen-liste', (l) =>
 			`<div class="card"><h3>${esc(l.titel)}</h3><p>${esc(l.text)}</p></div>`);
 
-		loadSection('/ai/api/produkte', 'produkte', 'produkte-liste', (p) =>
+		loadSection('/ai-expert/api/produkte', 'produkte', 'produkte-liste', (p) =>
 			`<div class="card"><h3>${esc(p.name)}</h3><p>${esc(p.beschreibung)}</p>` +
 			`<p class="price">${p.preis ? esc(p.preis) : 'Preis auf Anfrage'}</p></div>`);
 
-		loadSection('/ai/api/experten', 'experten', 'experten-liste', (e) =>
+		loadSection('/ai-expert/api/experten', 'experten', 'experten-liste', (e) =>
 			`<article class="card expert-card"><img src="${esc(e.bild)}" ` +
 			`alt="Profilbild von ${esc(e.name)}" loading="lazy"><h3>${esc(e.name)}</h3>` +
 			`<p class="role">${esc(e.rolle)}</p><p>${esc(e.beschreibung)}</p></article>`);
