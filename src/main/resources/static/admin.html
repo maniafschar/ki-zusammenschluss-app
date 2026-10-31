@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="de">
+
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>Admin | KI-Experten</title>
+	<style>
+		body {
+			font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+			background: #f7fbf9;
+			color: #1d2b3a;
+			margin: 0;
+			padding: 32px;
+		}
+
+		h1 {
+			margin-bottom: 16px;
+		}
+
+		.tabs {
+			display: flex;
+			gap: 8px;
+			margin-bottom: 24px;
+		}
+
+		.tabs button.active {
+			background: #0f9d7a;
+			color: #fff;
+		}
+
+		button {
+			font: inherit;
+			padding: 10px 18px;
+			border-radius: 8px;
+			border: 1px solid #0f9d7a;
+			background: #fff;
+			color: #0f9d7a;
+			cursor: pointer;
+		}
+
+		button.danger {
+			border-color: #b42318;
+			color: #b42318;
+		}
+
+		[hidden] {
+			display: none !important;
+		}
+
+		.layout {
+			display: grid;
+			grid-template-columns: 1fr 1fr;
+			gap: 32px;
+			align-items: start;
+		}
+
+		ul {
+			list-style: none;
+			padding: 0;
+			display: grid;
+			gap: 10px;
+			margin-top: 16px;
+		}
+
+		li {
+			background: #fff;
+			border: 1px solid #d9ece6;
+			border-radius: 10px;
+			padding: 12px 16px;
+			display: flex;
+			justify-content: space-between;
+			align-items: center;
+			gap: 8px;
+		}
+
+		li span {
+			flex: 1;
+			font-weight: 600;
+		}
+
+		li img {
+			width: 56px;
+			height: 56px;
+			border-radius: 50%;
+			object-fit: cover;
+		}
+
+		li button {
+			padding: 6px 12px;
+		}
+
+		form {
+			background: #fff;
+			border: 1px solid #d9ece6;
+			border-radius: 14px;
+			padding: 24px;
+			display: grid;
+			gap: 14px;
+		}
+
+		label {
+			display: grid;
+			gap: 6px;
+			font-weight: 600;
+			font-size: 0.95rem;
+		}
+
+		input,
+		textarea {
+			font: inherit;
+			font-weight: 400;
+			padding: 10px;
+			border: 1px solid #c9dcd5;
+			border-radius: 8px;
+		}
+
+		.actions {
+			display: flex;
+			gap: 8px;
+		}
+
+		#message {
+			min-height: 1.5em;
+			margin: 0;
+			font-weight: 600;
+		}
+
+		@media (max-width: 800px) {
+			.layout {
+				grid-template-columns: 1fr;
+			}
+		}
+	</style>
+</head>
+
+<body>
+
+	<h1>Inhalte verwalten</h1>
+
+	<nav class="tabs">
+		<button type="button" data-type="leistungen" class="active">Leistungen</button>
+		<button type="button" data-type="produkte">Produkte</button>
+		<button type="button" data-type="experten">Experten</button>
+		<button type="button" data-type="termine">Termine</button>
+	</nav>
+
+	<section id="termine-panel" hidden>
+		<p>Gebuchte Termine. Mit „Stornieren“ wird der Zeitslot wieder frei.</p>
+		<ul id="termine-list"></ul>
+		<p id="termine-message" role="status"></p>
+	</section>
+
+	<div class="layout" id="content-layout">
+		<div>
+			<button type="button" id="new-btn">+ Neu anlegen</button>
+			<ul id="list"></ul>
+		</div>
+
+		<form id="form">
+			<h2 id="form-title">Neu anlegen</h2>
+			<div id="fields"></div>
+			<p id="message" role="status"></p>
+			<div class="actions">
+				<button type="submit" class="active">Speichern</button>
+				<button type="button" id="cancel-btn">Abbrechen</button>
+			</div>
+		</form>
+	</div>
+
+	<script>
+		const TYPES = {
+			leistungen: {
+				base: '/api/admin/leistungen',
+				public: '/api/leistungen',
+				titleField: 'titel',
+				fields: [
+					{ name: 'titel', label: 'Titel', type: 'text', required: true },
+					{ name: 'text', label: 'Beschreibung', type: 'textarea', required: true },
+					{ name: 'position', label: 'Reihenfolge', type: 'number' }
+				]
+			},
+			produkte: {
+				base: '/api/admin/produkte',
+				public: '/api/produkte',
+				titleField: 'name',
+				fields: [
+					{ name: 'name', label: 'Name', type: 'text', required: true },
+					{ name: 'beschreibung', label: 'Beschreibung', type: 'textarea', required: true },
+					{ name: 'preis', label: 'Preis (leer = "Preis auf Anfrage")', type: 'text' },
+					{ name: 'position', label: 'Reihenfolge', type: 'number' }
+				]
+			},
+			experten: {
+				base: '/api/admin/experten',
+				public: '/api/experten',
+				titleField: 'name',
+				fields: [
+					{ name: 'name', label: 'Name', type: 'text', required: true },
+					{ name: 'rolle', label: 'Rolle / Fachgebiet', type: 'text', required: true },
+					{ name: 'beschreibung', label: 'Profilbeschreibung', type: 'textarea', required: true },
+					{ name: 'position', label: 'Reihenfolge', type: 'number' },
+					{ name: 'bild', label: 'Profilbild (PNG, JPEG oder GIF, max. 5 MB)', type: 'file', required: true }
+				]
+			}
+		};
+
+		let current = 'leistungen';
+		let editingId = null;
+
+		const $ = (id) => document.getElementById(id);
+		const form = $('form');
+
+		function getCookie(name) {
+			const m = document.cookie.match(new RegExp('(^|; )' + name + '=([^;]*)'));
+			return m ? decodeURIComponent(m[2]) : '';
+		}
+
+		async function api(url, options = {}) {
+			const method = options.method || 'GET';
+			const headers = {};
+			if (!(options.body instanceof FormData)) headers['Content-Type'] = 'application/json';
+			if (method !== 'GET') headers['X-XSRF-TOKEN'] = getCookie('XSRF-TOKEN');
+			const res = await fetch(url, { ...options, method, headers, credentials: 'same-origin' });
+			if (!res.ok) throw new Error(`Anfrage fehlgeschlagen (HTTP ${res.status}). Bitte Eingaben prüfen.`);
+			return res.status === 204 ? null : res.json();
+		}
+
+		function message(text, isError = false) {
+			$('message').textContent = text;
+			$('message').style.color = isError ? '#b42318' : '#0f9d7a';
+		}
+
+		function renderFields() {
+			const box = $('fields');
+			box.innerHTML = '';
+			TYPES[current].fields.forEach((f) => {
+				const label = document.createElement('label');
+				label.textContent = f.label;
+				const input = f.type === 'textarea' ? document.createElement('textarea') : document.createElement('input');
+				if (f.type === 'textarea') {
+					input.rows = 4;
+				} else {
+					input.type = f.type;
+				}
+				if (f.type === 'number') input.min = 0;
+				if (f.type === 'file') input.accept = 'image/png,image/jpeg,image/gif';
+				input.name = f.name;
+				input.required = !!f.required;
+				label.appendChild(input);
+				box.appendChild(label);
+			});
+		}
+
+		function resetForm() {
+			editingId = null;
+			form.reset();
+			$('form-title').textContent = 'Neu anlegen';
+			updateRequiredFields();
+			message('');
+		}
+
+		function startEdit(item) {
+			editingId = item.id;
+			TYPES[current].fields.forEach((f) => {
+				if (f.type !== 'file') form.elements[f.name].value = item[f.name] ?? '';
+			});
+			$('form-title').textContent = 'Bearbeiten';
+			updateRequiredFields();
+			message('');
+		}
+
+		function updateRequiredFields() {
+			TYPES[current].fields.forEach((f) => {
+				form.elements[f.name].required = !!f.required && (f.type !== 'file' || !editingId);
+			});
+		}
+
+		function makeButton(text, onClick, className = '') {
+			const b = document.createElement('button');
+			b.type = 'button';
+			b.textContent = text;
+			if (className) b.className = className;
+			b.addEventListener('click', onClick);
+			return b;
+		}
+
+		async function loadList() {
+			const cfg = TYPES[current];
+			const items = await api(cfg.public);
+			const list = $('list');
+			list.innerHTML = '';
+			items.forEach((item) => {
+				const li = document.createElement('li');
+				if (current === 'experten') {
+					const image = document.createElement('img');
+					image.src = item.bild;
+					image.alt = `Profilbild von ${item.name}`;
+					image.loading = 'lazy';
+					li.appendChild(image);
+				}
+				const title = document.createElement('span');
+				title.textContent = item[cfg.titleField];
+				li.append(
+					title,
+					makeButton('Bearbeiten', () => startEdit(item)),
+					makeButton('Löschen', () => remove(item), 'danger')
+				);
+				list.appendChild(li);
+			});
+		}
+
+		async function remove(item) {
+			const cfg = TYPES[current];
+			if (!confirm(`"${item[cfg.titleField]}" wirklich löschen?`)) return;
+			try {
+				await api(`${cfg.base}/${item.id}`, { method: 'DELETE' });
+				if (editingId === item.id) resetForm();
+				message('Gelöscht.');
+				await loadList();
+			} catch (err) {
+				message(err.message, true);
+			}
+		}
+
+		form.addEventListener('submit', async (e) => {
+			e.preventDefault();
+			const cfg = TYPES[current];
+			let body;
+			if (current === 'experten') {
+				body = new FormData(form);
+				if (!body.get('position')) body.set('position', '0');
+			} else {
+				body = {};
+				cfg.fields.forEach((f) => {
+					const value = form.elements[f.name].value;
+					body[f.name] = f.type === 'number' ? Number(value || 0) : value;
+				});
+				body = JSON.stringify(body);
+			}
+			try {
+				const url = editingId ? `${cfg.base}/${editingId}` : cfg.base;
+				await api(url, { method: editingId ? 'PUT' : 'POST', body });
+				resetForm();
+				message('Gespeichert.');
+				await loadList();
+			} catch (err) {
+				message(err.message, true);
+			}
+		});
+
+		async function loadTermine() {
+			const list = $('termine-list');
+			list.innerHTML = '';
+			const items = await api('/api/admin/termine');
+			if (!items.length) {
+				const li = document.createElement('li');
+				li.textContent = 'Noch keine Buchungen.';
+				list.appendChild(li);
+			}
+			items.forEach((t) => {
+				const li = document.createElement('li');
+				const when = new Date(t.start).toLocaleString('de-DE',
+					{ weekday: 'short', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+				const text = document.createElement('span');
+				text.textContent = `${when} Uhr${t.status === 'BESTAETIGT' ? '' : ` [${t.status === 'ANGEFRAGT' ? 'unbestätigt' : 'abgelaufen'}]`} – ${t.name} (${t.email})` + (t.telefon ? ` – Tel. ${t.telefon}` : '') + (t.nachricht ? ` – ${t.nachricht}` : '');
+				li.append(text, makeButton('Stornieren', async () => {
+					if (!confirm('Termin wirklich stornieren? Der Slot wird wieder frei.')) return;
+					try {
+						await api(`/api/admin/termine/${t.id}`, { method: 'DELETE' });
+						await loadTermine();
+					} catch (err) {
+						$('termine-message').textContent = err.message;
+					}
+				}, 'danger'));
+				list.appendChild(li);
+			});
+		}
+
+		document.querySelectorAll('.tabs button').forEach((btn) => {
+			btn.addEventListener('click', async () => {
+				document.querySelectorAll('.tabs button').forEach((b) => b.classList.toggle('active', b === btn));
+				const isTermine = btn.dataset.type === 'termine';
+				$('termine-panel').hidden = !isTermine;
+				$('content-layout').hidden = isTermine;
+				if (isTermine) {
+					try { await loadTermine(); } catch (err) { $('termine-message').textContent = err.message; }
+					return;
+				}
+				current = btn.dataset.type;
+				renderFields();
+				resetForm();
+				await loadList();
+			});
+		});
+
+		$('new-btn').addEventListener('click', resetForm);
+		$('cancel-btn').addEventListener('click', resetForm);
+
+		(async () => {
+			await api('/api/csrf');
+			renderFields();
+			await loadList();
+		})().catch((err) => message(err.message, true));
+	</script>
+
+</body>
+
+</html>

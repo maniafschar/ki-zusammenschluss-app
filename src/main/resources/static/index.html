@@ -1,0 +1,1059 @@
+<!DOCTYPE html>
+<html lang="de">
+
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>KI-Experten Zusammenschluss | KI inhouse</title>
+	<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/vis-network@9.1.9/styles/vis-network.min.css">
+	<style>
+		:root {
+			--bg: #f7fbf9;
+			--surface: #ffffff;
+			--accent: #0f9d7a;
+			--text: #1d2b3a;
+			--muted: #5b6b7d;
+			--radius: 14px;
+		}
+
+		* {
+			box-sizing: border-box;
+			margin: 0;
+			padding: 0;
+		}
+
+		body {
+			font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+			background: var(--bg);
+			color: var(--text);
+			line-height: 1.6;
+		}
+
+		header,
+		section {
+			padding: 88px 8%;
+		}
+
+		section[hidden] {
+			display: none;
+		}
+
+		header {
+			min-height: 100vh;
+			background: linear-gradient(160deg, #e3f7f0 0%, #fff7ec 100%);
+			display: flex;
+			flex-direction: column;
+			justify-content: center;
+		}
+
+		nav {
+			position: fixed;
+			top: 0;
+			left: 0;
+			right: 0;
+			display: flex;
+			justify-content: space-between;
+			align-items: center;
+			padding: 16px 8%;
+			background: rgba(247, 251, 249, 0.92);
+			backdrop-filter: blur(8px);
+			z-index: 10;
+		}
+
+		nav strong {
+			color: var(--accent);
+		}
+
+		nav a {
+			color: var(--muted);
+			text-decoration: none;
+			margin-left: 24px;
+			font-size: 0.95rem;
+		}
+
+		nav a:hover {
+			color: var(--text);
+		}
+
+		h1 {
+			font-size: clamp(2.2rem, 5vw, 3.6rem);
+			line-height: 1.15;
+			max-width: 900px;
+		}
+
+		h2 {
+			font-size: 2rem;
+			margin-bottom: 24px;
+		}
+
+		.spider-heading {
+			font-size: 1.5rem;
+			margin: 8px 0 0;
+			color: var(--text);
+		}
+
+		.spider {
+			width: 100%;
+			margin: 4px 0 0;
+		}
+
+		.spider-network {
+			width: 100%;
+			height: 390px;
+			border-radius: 18px;
+		}
+
+		.spider-fallback {
+			display: grid;
+			grid-template-columns: repeat(2, minmax(0, 1fr));
+			gap: 10px;
+		}
+
+		.spider-fallback strong {
+			grid-column: 1 / -1;
+			justify-self: center;
+			padding: 12px 24px;
+			border-radius: 999px;
+			background: var(--accent);
+			color: #ffffff;
+		}
+
+		.spider-fallback-benefit {
+			display: grid;
+			place-content: center;
+			min-height: 72px;
+			border: 1px solid #d9ece6;
+			border-radius: 12px;
+			background: #ffffff;
+			box-shadow: 0 5px 16px rgba(29, 43, 58, 0.07);
+			text-align: center;
+			font-size: 0.92rem;
+			font-weight: 650;
+		}
+
+		.lead {
+			color: var(--muted);
+			font-size: 1.2rem;
+			max-width: 720px;
+			margin: 20px 0 36px;
+		}
+
+		.btn {
+			display: inline-block;
+			background: var(--accent);
+			color: #ffffff;
+			box-shadow: 0 8px 20px rgba(15, 157, 122, 0.25);
+			padding: 14px 28px;
+			border-radius: 999px;
+			font-weight: 600;
+			text-decoration: none;
+			width: fit-content;
+		}
+
+		.pillars {
+			display: grid;
+			grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+			gap: 24px;
+		}
+
+		.card {
+			background: var(--surface);
+			border-radius: var(--radius);
+			padding: 32px;
+			border: 1px solid #d9ece6;
+			box-shadow: 0 6px 24px rgba(29, 43, 58, 0.06);
+		}
+
+		.card .icon {
+			font-size: 2rem;
+			margin-bottom: 12px;
+		}
+
+		.card h3 {
+			margin-bottom: 10px;
+			color: var(--accent);
+		}
+
+		.card p {
+			color: var(--muted);
+		}
+
+		.card .price {
+			color: var(--text);
+			font-weight: 600;
+			margin-top: 16px;
+		}
+
+		.expert-card {
+			text-align: center;
+		}
+
+		.expert-card img {
+			width: 144px;
+			height: 144px;
+			border-radius: 50%;
+			object-fit: cover;
+			margin-bottom: 20px;
+		}
+
+		.expert-card h3 {
+			margin-bottom: 4px;
+		}
+
+		.expert-card .role {
+			color: var(--accent);
+			font-weight: 600;
+			margin-bottom: 12px;
+		}
+
+		.alt {
+			background: #eaf6f1;
+		}
+
+		.steps {
+			list-style: none;
+			counter-reset: s;
+			display: grid;
+			gap: 16px;
+			max-width: 760px;
+		}
+
+		.steps li {
+			counter-increment: s;
+			padding-left: 56px;
+			position: relative;
+			color: var(--muted);
+		}
+
+		.steps li::before {
+			content: counter(s);
+			position: absolute;
+			left: 0;
+			top: 0;
+			width: 36px;
+			height: 36px;
+			border-radius: 50%;
+			background: var(--accent);
+			color: #ffffff;
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			font-weight: 700;
+		}
+
+		.contact form {
+			display: grid;
+			gap: 14px;
+			max-width: 560px;
+		}
+
+		.booking-intro {
+			margin: 0 0 18px;
+		}
+
+		.booking {
+			display: grid;
+			grid-template-columns: minmax(280px, 380px) 1fr;
+			gap: 28px;
+			align-items: start;
+		}
+
+		.calendar,
+		.slots-panel {
+			background: var(--surface);
+			border: 1px solid #d9ece6;
+			border-radius: 14px;
+			padding: 18px;
+		}
+
+		.cal-head {
+			display: flex;
+			align-items: center;
+			justify-content: space-between;
+			margin-bottom: 10px;
+		}
+
+		.cal-head button {
+			border: 1px solid #d9ece6;
+			background: #ffffff;
+			border-radius: 8px;
+			width: 36px;
+			height: 36px;
+			font-size: 1.2rem;
+			cursor: pointer;
+		}
+
+		.cal-head button:disabled {
+			opacity: 0.35;
+			cursor: not-allowed;
+		}
+
+		.cal-grid {
+			display: grid;
+			grid-template-columns: repeat(7, 1fr);
+			gap: 4px;
+			text-align: center;
+		}
+
+		.cal-weekdays span {
+			color: var(--muted);
+			font-size: 0.8rem;
+			padding: 4px 0;
+		}
+
+		.cal-day {
+			border: 1px solid transparent;
+			background: transparent;
+			border-radius: 8px;
+			padding: 9px 0;
+			font: inherit;
+			color: var(--muted);
+		}
+
+		.cal-day.available {
+			background: #eaf6f1;
+			color: var(--text);
+			font-weight: 600;
+			cursor: pointer;
+		}
+
+		.cal-day.available:hover {
+			border-color: var(--accent);
+		}
+
+		.cal-day.selected {
+			background: var(--accent);
+			color: #ffffff;
+		}
+
+		.slots {
+			display: grid;
+			grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+			gap: 8px;
+			margin-bottom: 16px;
+		}
+
+		.slot {
+			border: 1px solid #a9d8cb;
+			background: #ffffff;
+			border-radius: 8px;
+			padding: 10px 0;
+			font: inherit;
+			cursor: pointer;
+		}
+
+		.slot:hover:not(:disabled) {
+			border-color: var(--accent);
+		}
+
+		.slot.selected {
+			background: var(--accent);
+			color: #ffffff;
+			border-color: var(--accent);
+		}
+
+		.slot:disabled {
+			background: #f0f0f0;
+			color: #9aa5b1;
+			border-color: #e2e5e9;
+			text-decoration: line-through;
+			cursor: not-allowed;
+		}
+
+		#booking-form[hidden] {
+			display: none;
+		}
+
+		.booking-selected {
+			font-weight: 600;
+			margin: 0;
+		}
+
+		.booking-hint {
+			margin: 8px 0 0;
+			font-size: 0.9rem;
+			color: var(--muted);
+		}
+
+		.booking-hint.error {
+			color: #b42318;
+		}
+
+		.booking-hint.ok {
+			color: var(--accent);
+		}
+
+		@media (max-width: 760px) {
+			.booking {
+				grid-template-columns: 1fr;
+			}
+		}
+
+		input,
+		textarea {
+			background: var(--surface);
+			border: 1px solid #d9ece6;
+			color: var(--text);
+			padding: 14px;
+			border-radius: 10px;
+			font: inherit;
+		}
+
+		footer {
+			text-align: center;
+			color: var(--muted);
+			padding: 32px;
+			font-size: 0.9rem;
+		}
+
+		.risks {
+			text-align: center;
+			overflow: hidden;
+		}
+
+		.cloud {
+			font-size: 4.5rem;
+			display: inline-block;
+			animation: float 4s ease-in-out infinite;
+		}
+
+		@keyframes float {
+
+			0%,
+			100% {
+				transform: translateY(0);
+			}
+
+			50% {
+				transform: translateY(-14px);
+			}
+		}
+
+		.risk-list {
+			display: grid;
+			grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+			gap: 24px;
+			margin-top: 40px;
+			text-align: left;
+		}
+
+		.risk {
+			opacity: 0;
+			transform: translateY(30px);
+			transition: opacity 0.7s ease, transform 0.7s ease;
+		}
+
+		.risk.visible {
+			opacity: 1;
+			transform: none;
+		}
+
+		.risk:nth-child(2) {
+			transition-delay: 0.3s;
+		}
+
+		.risk:nth-child(3) {
+			transition-delay: 0.6s;
+		}
+
+		.risk h3 {
+			color: #c2410c;
+		}
+
+		@media (prefers-reduced-motion: reduce) {
+			.cloud {
+				animation: none;
+			}
+
+			.risk {
+				opacity: 1;
+				transform: none;
+				transition: none;
+			}
+		}
+
+		@media (max-width: 640px) {
+			nav a {
+				margin-left: 12px;
+				font-size: 0.85rem;
+			}
+
+			header,
+			section {
+				padding: 72px 6%;
+			}
+
+			.spider-network {
+				height: 560px;
+			}
+		}
+	</style>
+</head>
+
+<body>
+
+	<nav>
+		<strong>KI-Experten</strong>
+		<div>
+			<a href="#leistungen">Leistungen</a>
+			<a href="#produkte">Produkte</a>
+			<a href="#experten">Experten</a>
+			<a href="#ablauf">Ablauf</a>
+			<a href="#kontakt">Kontakt</a>
+		</div>
+	</nav>
+
+	<header>
+		<p style="color: var(--accent); font-weight: 600; margin-bottom: 12px;">Wir sind freiberufliche KI-Experten. Aus
+			Überzeugung.</p>
+		<h1>KI, in House?</h1>
+		<h2>Warum es die beste Lösung für KMU Unternehmen ist:</h2>
+		<div class="spider">
+			<div id="spider-network" class="spider-network" role="img"
+				aria-label="Interaktive Grafik: In House mit Vorteilen rundherum" hidden></div>
+			<div id="spider-fallback" class="spider-fallback" role="list" aria-label="Vorteile von KI in House">
+				<strong>KI, in House</strong>
+				<div class="spider-fallback-benefit" role="listitem">🔒 Ihre Daten bleiben bei Ihnen</div>
+				<div class="spider-fallback-benefit" role="listitem">💶 Planbare Kosten</div>
+				<div class="spider-fallback-benefit" role="listitem">🛡️ Volle Datenkontrolle</div>
+				<div class="spider-fallback-benefit" role="listitem">🔓 Unabhängig von Cloud-Anbietern</div>
+				<div class="spider-fallback-benefit" role="listitem">🧩 Auf Ihre Abläufe zugeschnitten</div>
+				<div class="spider-fallback-benefit" role="listitem">⚡ Schnell und jederzeit verfügbar</div>
+			</div>
+		</div>
+		<a class="btn" href="#kontakt">Gemeinsam starten</a>
+	</header>
+
+	<section id="pillars" class="alt">
+		<h2>Warum Sie mit uns sicher planen können</h2>
+		<div class="pillars">
+			<div class="card">
+				<div class="icon">💶</div>
+				<h3>Kostenkontrolle</h3>
+				<p>Eine feste Investition statt überraschender Cloud-Rechnungen. Sie wissen von Anfang an, womit Sie
+					rechnen können.</p>
+			</div>
+			<div class="card">
+				<div class="icon">🔒</div>
+				<h3>Daten bleiben bei Ihnen</h3>
+				<p>Ihre Dokumente und Kundendaten verlassen Ihr Haus nicht. Vertrauen, das Sie selbst bestimmen.</p>
+			</div>
+			<div class="card">
+				<div class="icon">🔭</div>
+				<h3>Gut für morgen</h3>
+				<p>Offene Modelle und flexible Bausteine. Neue Entwicklungen lassen sich einfach integrieren.</p>
+			</div>
+		</div>
+	</section>
+
+	<section class="risks">
+		<div class="cloud">☁️</div>
+		<h2>Warum KI in der Cloud riskant ist</h2>
+		<div class="risk-list">
+			<div class="card risk">
+				<div class="icon">📈</div>
+				<h3>Kosten können explodieren</h3>
+				<p>Nutzungsabhängige Gebühren steigen mit jeder Anfrage und sind kaum planbar.</p>
+			</div>
+			<div class="card risk">
+				<div class="icon">🧭</div>
+				<h3>Abhängigkeit von Anbietern</h3>
+				<p>Dienste können aus politischen Gründen eingestellt oder verteuert werden.</p>
+			</div>
+			<div class="card risk">
+				<div class="icon">👁️</div>
+				<h3>Daten können ausgewertet werden</h3>
+				<p>Ihre Anfragen und Dokumente liegen auf fremden Servern, außerhalb Ihrer Kontrolle.</p>
+			</div>
+		</div>
+	</section>
+
+	<section id="leistungen">
+		<h2>Was wir für Sie tun</h2>
+		<div class="pillars" id="leistungen-liste"></div>
+	</section>
+
+	<section id="produkte" hidden>
+		<h2>Unsere eigenen KI-Produkte</h2>
+		<div class="pillars" id="produkte-liste"></div>
+	</section>
+
+	<section id="experten" class="alt" hidden>
+		<h2>Unsere Experten</h2>
+		<div class="pillars" id="experten-liste"></div>
+	</section>
+
+	<section id="ablauf" class="alt">
+		<h2>So einfach starten wir</h2>
+		<ol class="steps">
+			<li><strong style="color: var(--text);">Kennenlernen:</strong> Wir hören zu und besprechen Ihre Ziele.</li>
+			<li><strong style="color: var(--text);">Klarer Plan:</strong> Sie erhalten ein transparentes
+				Festpreis-Angebot.</li>
+			<li><strong style="color: var(--text);">Umsetzung:</strong> Wir bauen Ihre Lösung auf und schulen Ihr Team.
+			</li>
+			<li><strong style="color: var(--text);">Rundum betreut:</strong> Wir kümmern uns um Wartung, Updates und
+				Ihre Fragen.</li>
+		</ol>
+	</section>
+
+	<section id="kontakt" class="contact">
+		<h2>Lassen Sie uns über Ihre Idee sprechen</h2>
+		<p class="booking-intro">Buchen Sie ein kostenloses Kennenlerngespräch von 30 Minuten (Mo–Fr, 10–16 Uhr).</p>
+		<div class="booking">
+			<div class="calendar" aria-label="Terminkalender">
+				<div class="cal-head">
+					<button type="button" id="cal-prev" aria-label="Voriger Monat">‹</button>
+					<strong id="cal-title"></strong>
+					<button type="button" id="cal-next" aria-label="Nächster Monat">›</button>
+				</div>
+				<div class="cal-grid cal-weekdays">
+					<span>Mo</span><span>Di</span><span>Mi</span><span>Do</span><span>Fr</span><span>Sa</span><span>So</span>
+				</div>
+				<div class="cal-grid" id="cal-days"></div>
+				<p id="cal-status" class="booking-hint" role="status"></p>
+			</div>
+			<div class="slots-panel">
+				<h3 id="slots-title">Bitte wählen Sie einen Tag</h3>
+				<div id="slots" class="slots"></div>
+				<form id="booking-form" hidden>
+					<p id="booking-selected" class="booking-selected"></p>
+					<input type="text" name="name" placeholder="Name" maxlength="120" required>
+					<input type="email" name="email" placeholder="E-Mail" maxlength="200" required>
+					<input type="tel" name="telefon" placeholder="Telefonnummer (optional)" maxlength="40"
+						pattern="[0-9+()/\-. ]{5,40}" title="Nur Ziffern, Leerzeichen und + ( ) / - .">
+					<textarea name="nachricht" rows="3" maxlength="2000"
+						placeholder="Erzählen Sie uns, was Sie vorhaben (optional)"></textarea>
+					<button class="btn" type="submit" style="border: none; cursor: pointer;">Termin buchen</button>
+					<p id="booking-message" class="booking-hint" role="status"></p>
+				</form>
+			</div>
+		</div>
+	</section>
+
+	<footer>
+		<p>&copy; KI-Experten Zusammenschluss · <a href="#" style="color: var(--muted);">Impressum</a> · <a href="#"
+				style="color: var(--muted);">Datenschutz</a></p>
+	</footer>
+
+	<script src="https://cdn.jsdelivr.net/npm/vis-network@9.1.9/standalone/umd/vis-network.min.js" defer></script>
+	<script>
+		const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({
+			'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+		}[c]));
+
+		function startSpider() {
+			const container = document.getElementById('spider-network');
+			const fallback = document.getElementById('spider-fallback');
+
+			const benefits = [
+				{ id: 'privacy', label: '🔒  Daten bleiben bei Ihnen', x: -1, y: -1 },
+				{ id: 'costs', label: '💶  Planbare Kosten', x: 1, y: -1 },
+				{ id: 'control', label: '🛡️  Volle Datenkontrolle', x: -1, y: 0 },
+				{ id: 'independence', label: '🔓  Unabhängig von Cloud-Anbietern', x: 1, y: 0 },
+				{ id: 'tailored', label: '🧩  Auf Ihre Abläufe zugeschnitten', x: -1, y: 1 },
+				{ id: 'availability', label: '⚡  Schnell und jederzeit verfügbar', x: 1, y: 1 }
+			];
+			const nodes = new window.vis.DataSet([{
+				id: 'in-house',
+				label: 'IN HOUSE',
+				x: 0,
+				y: 0,
+				fixed: true,
+				shape: 'box',
+				margin: 18,
+				physics: false,
+				color: { background: '#0f9d7a', border: '#ffffff' },
+				borderWidth: 3,
+				font: { color: '#ffffff', size: 22, face: 'system-ui', bold: true }
+			}]);
+			const edges = new window.vis.DataSet();
+			const network = new window.vis.Network(container, { nodes, edges }, {
+				autoResize: true,
+				interaction: {
+					dragNodes: true,
+					dragView: true,
+					zoomView: false,
+					hover: true,
+					tooltipDelay: 200
+				},
+				physics: { enabled: false },
+				nodes: {
+					shape: 'box',
+					margin: { top: 24, right: 28, bottom: 24, left: 28 },
+					widthConstraint: { maximum: 220 },
+					borderWidth: 1,
+					borderWidthSelected: 2,
+					color: { background: 'transparent', border: 'none', highlight: { background: '#eaf6f1' } },
+					font: { color: '#1d2b3a', size: 16, face: 'system-ui', multi: true },
+					shadow: { enabled: true, color: 'rgba(29, 43, 58, 0.12)', size: 12, x: 0, y: 5 }
+				},
+				edges: {
+					color: { color: '#8bcbbb', highlight: '#0f9d7a' },
+					width: 2,
+					smooth: { enabled: true, type: 'continuous' }
+				}
+			});
+
+			function positionFor(benefit) {
+				const mobile = window.matchMedia('(max-width: 640px)').matches;
+				const width = container.clientWidth;
+				const height = container.clientHeight;
+				return {
+					x: benefit.x * width * (mobile ? 0.39 : 0.34),
+					y: benefit.y * height * (mobile ? 0.31 : 0.34)
+				};
+			}
+
+			function addBenefit(benefit) {
+				const position = positionFor(benefit);
+				nodes.add({
+					id: benefit.id,
+					label: benefit.label,
+					x: position.x,
+					y: position.y,
+					physics: false,
+					shape: 'box',
+					margin: { top: 24, right: 28, bottom: 24, left: 28 },
+					widthConstraint: {
+						maximum: window.matchMedia('(max-width: 640px)').matches ? 150 : 220
+					},
+					font: {
+						color: '#1d2b3a',
+						size: window.matchMedia('(max-width: 640px)').matches ? 14 : 16,
+						face: 'system-ui'
+					},
+					color: { background: '#ffffff', border: '#a9d8cb' }
+				});
+				edges.add({ from: 'in-house', to: benefit.id });
+
+				if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+					nodes.update({ id: benefit.id, margin: { top: 24, right: 28, bottom: 24, left: 28 }, font: { size: 16 } });
+					return;
+				}
+
+				const start = performance.now();
+				const duration = 360;
+				function pop(now) {
+					const progress = Math.min((now - start) / duration, 1);
+					const eased = 1 - Math.pow(1 - progress, 3);
+					nodes.update({
+						id: benefit.id,
+						font: {
+							size: Math.round(2
+								+ (window.matchMedia('(max-width: 640px)').matches ? 12 : 14) * eased)
+						}
+					});
+					if (progress < 1) requestAnimationFrame(pop);
+				}
+				requestAnimationFrame(pop);
+			}
+
+			// Level one = the fitted view with "In House" at the center; zoom-out stops here.
+			let minScale = null;
+			let bounds = null;
+			let clamping = false;
+
+			function settleView() {
+				// Symmetric fit around (0,0) so "In House" ends up exactly in the middle.
+				let halfW = 1;
+				let halfH = 1;
+				nodes.getIds().forEach((id) => {
+					const box = network.getBoundingBox(id);
+					halfW = Math.max(halfW, Math.abs(box.left), Math.abs(box.right));
+					halfH = Math.max(halfH, Math.abs(box.top), Math.abs(box.bottom));
+				});
+				minScale = Math.min(
+					container.clientWidth / (2 * halfW * 1.08),
+					container.clientHeight / (2 * halfH * 1.08)
+				);
+				network.moveTo({ position: { x: 0, y: 0 }, scale: minScale, animation: false });
+				bounds = {
+					x: container.clientWidth / (2 * minScale),
+					y: container.clientHeight / (2 * minScale)
+				};
+			}
+
+			function clampView() {
+				if (minScale === null || clamping) return;
+				clamping = true;
+				const scale = Math.max(network.getScale(), minScale);
+				const pos = network.getViewPosition();
+				const maxX = Math.max(bounds.x - container.clientWidth / (2 * scale), 0);
+				const maxY = Math.max(bounds.y - container.clientHeight / (2 * scale), 0);
+				const x = Math.min(Math.max(pos.x, -maxX), maxX);
+				const y = Math.min(Math.max(pos.y, -maxY), maxY);
+				if (scale !== network.getScale() || x !== pos.x || y !== pos.y) {
+					network.moveTo({ position: { x, y }, scale, animation: false });
+				}
+				clamping = false;
+			}
+
+			function clampNodes(ids) {
+				if (minScale === null) return;
+				const positions = network.getPositions(ids);
+				ids.forEach((id) => {
+					if (id === 'in-house' || !positions[id]) return;
+					const box = network.getBoundingBox(id);
+					const halfW = (box.right - box.left) / 2;
+					const halfH = (box.bottom - box.top) / 2;
+					const x = Math.min(Math.max(positions[id].x, -bounds.x + halfW), bounds.x - halfW);
+					const y = Math.min(Math.max(positions[id].y, -bounds.y + halfH), bounds.y - halfH);
+					if (x !== positions[id].x || y !== positions[id].y) network.moveNode(id, x, y);
+				});
+			}
+
+			network.on('zoom', clampView);
+			// Clamp every frame so nothing can be dragged or panned out of the box.
+			network.on('afterDrawing', () => {
+				if (minScale === null) return;
+				const before = JSON.stringify(network.getViewPosition());
+				clampNodes(nodes.getIds());
+				clampView();
+				if (before !== JSON.stringify(network.getViewPosition())) network.redraw();
+			});
+			window.addEventListener('resize', () => {
+				if (minScale !== null) window.setTimeout(settleView, 200);
+			});
+
+			container.hidden = false;
+			fallback.style.display = 'none';
+			// The network was created while hidden, so re-measure and center it before the animation starts.
+			network.setSize('100%', container.clientHeight + 'px');
+			network.redraw();
+			{
+				const w = container.clientWidth;
+				const h = container.clientHeight;
+				const spanX = Math.max(...benefits.map((b) => Math.abs(positionFor(b).x))) + 120;
+				const spanY = Math.max(...benefits.map((b) => Math.abs(positionFor(b).y))) + 40;
+				network.moveTo({
+					position: { x: 0, y: 0 },
+					scale: Math.min(w / (2 * spanX * 1.08), h / (2 * spanY * 1.08)),
+					animation: false
+				});
+			}
+			let index = 0;
+			function revealNext() {
+				if (index >= benefits.length) {
+					settleView();
+					return;
+				}
+				addBenefit(benefits[index]);
+				index += 1;
+				window.setTimeout(revealNext, index < benefits.length ? 1500 : 600);
+			}
+
+			if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+				benefits.forEach(addBenefit);
+				settleView();
+			} else {
+				window.setTimeout(revealNext, 1500);
+			}
+		}
+
+		function startBooking() {
+			const MONTHS = ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August',
+				'September', 'Oktober', 'November', 'Dezember'];
+			const el = (id) => document.getElementById(id);
+			const bookingForm = el('booking-form');
+			const pad = (n) => String(n).padStart(2, '0');
+			const dateKey = (y, m, d) => `${y}-${pad(m + 1)}-${pad(d)}`;
+
+			let slotsByDay = {};
+			let firstMonth = null;
+			let lastMonth = null;
+			let view = null;
+			let selectedDay = null;
+			let selectedSlot = null;
+
+			const monthIndex = (key) => Number(key.slice(0, 4)) * 12 + Number(key.slice(5, 7)) - 1;
+
+			function setMessage(text, kind = '') {
+				const box = el('booking-message');
+				box.textContent = text;
+				box.className = 'booking-hint ' + kind;
+			}
+
+			async function loadSlots() {
+				try {
+					const slots = await fetch('/api/termine').then((r) => {
+						if (!r.ok) throw new Error('HTTP ' + r.status);
+						return r.json();
+					});
+					slotsByDay = {};
+					slots.forEach((s) => {
+						const day = s.start.slice(0, 10);
+						(slotsByDay[day] ||= []).push(s);
+					});
+					const days = Object.keys(slotsByDay).sort();
+					if (!days.length) {
+						el('cal-status').textContent = 'Aktuell sind keine Termine verfügbar.';
+						return;
+					}
+					firstMonth = monthIndex(days[0]);
+					lastMonth = monthIndex(days[days.length - 1]);
+					if (view === null || view < firstMonth || view > lastMonth) view = firstMonth;
+					el('cal-status').textContent = '';
+					renderCalendar();
+					if (selectedDay) renderSlots();
+				} catch (err) {
+					el('cal-status').textContent = 'Termine konnten nicht geladen werden.';
+					console.error(err);
+				}
+			}
+
+			function renderCalendar() {
+				const year = Math.floor(view / 12);
+				const month = view % 12;
+				el('cal-title').textContent = `${MONTHS[month]} ${year}`;
+				el('cal-prev').disabled = view <= firstMonth;
+				el('cal-next').disabled = view >= lastMonth;
+
+				const grid = el('cal-days');
+				grid.innerHTML = '';
+				const offset = (new Date(year, month, 1).getDay() + 6) % 7;
+				for (let i = 0; i < offset; i += 1) grid.appendChild(document.createElement('span'));
+				const daysInMonth = new Date(year, month + 1, 0).getDate();
+				for (let d = 1; d <= daysInMonth; d += 1) {
+					const key = dateKey(year, month, d);
+					const free = (slotsByDay[key] || []).some((s) => s.frei);
+					const btn = document.createElement('button');
+					btn.type = 'button';
+					btn.textContent = d;
+					btn.className = 'cal-day' + (free ? ' available' : '') + (key === selectedDay ? ' selected' : '');
+					btn.disabled = !free;
+					if (free) {
+						btn.addEventListener('click', () => {
+							selectedDay = key;
+							selectedSlot = null;
+							bookingForm.hidden = true;
+							renderCalendar();
+							renderSlots();
+						});
+					}
+					grid.appendChild(btn);
+				}
+			}
+
+			function renderSlots() {
+				const box = el('slots');
+				box.innerHTML = '';
+				const day = new Date(selectedDay + 'T00:00:00');
+				el('slots-title').textContent = day.toLocaleDateString('de-DE',
+					{ weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+				(slotsByDay[selectedDay] || []).forEach((s) => {
+					const btn = document.createElement('button');
+					btn.type = 'button';
+					btn.textContent = s.start.slice(11, 16) + ' Uhr';
+					btn.className = 'slot' + (s.start === selectedSlot ? ' selected' : '');
+					btn.disabled = !s.frei;
+					btn.addEventListener('click', () => {
+						selectedSlot = s.start;
+						el('booking-selected').textContent =
+							`Ihr Termin: ${day.toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long' })}, ${s.start.slice(11, 16)} Uhr (30 Minuten)`;
+						bookingForm.hidden = false;
+						setMessage('');
+						renderSlots();
+					});
+					box.appendChild(btn);
+				});
+			}
+
+			el('cal-prev').addEventListener('click', () => { view -= 1; renderCalendar(); });
+			el('cal-next').addEventListener('click', () => { view += 1; renderCalendar(); });
+
+			bookingForm.addEventListener('submit', async (e) => {
+				e.preventDefault();
+				if (!selectedSlot) return;
+				const submit = bookingForm.querySelector('button[type="submit"]');
+				submit.disabled = true;
+				try {
+					await fetch('/api/csrf', { credentials: 'same-origin' });
+					const token = decodeURIComponent((document.cookie.match(/(?:^|; )XSRF-TOKEN=([^;]*)/) || [])[1] || '');
+					const res = await fetch('/api/termine', {
+						method: 'POST',
+						credentials: 'same-origin',
+						headers: { 'Content-Type': 'application/json', 'X-XSRF-TOKEN': token },
+						body: JSON.stringify({
+							start: selectedSlot,
+							name: bookingForm.elements.name.value,
+							email: bookingForm.elements.email.value,
+							telefon: bookingForm.elements.telefon.value,
+							nachricht: bookingForm.elements.nachricht.value
+						})
+					});
+					if (res.status === 409) {
+						setMessage('Dieser Termin wurde gerade vergeben. Bitte wählen Sie einen anderen.', 'error');
+						selectedSlot = null;
+						await loadSlots();
+						return;
+					}
+					if (!res.ok) throw new Error('HTTP ' + res.status);
+					bookingForm.reset();
+					bookingForm.hidden = true;
+					selectedSlot = null;
+					await loadSlots();
+					el('slots-title').textContent = 'Fast geschafft!';
+					setMessage('', '');
+					bookingForm.hidden = true;
+					el('slots').innerHTML = '<p class="booking-hint ok">Wir haben Ihnen eine E-Mail mit einem Bestätigungslink geschickt. '
+						+ 'Bitte bestätigen Sie Ihre Adresse innerhalb von 10 Minuten, sonst wird der Termin wieder freigegeben.</p>';
+				} catch (err) {
+					setMessage('Die Buchung hat nicht geklappt. Bitte versuchen Sie es erneut.', 'error');
+					console.error(err);
+				} finally {
+					submit.disabled = false;
+				}
+			});
+
+			loadSlots().then(() => {
+				const result = new URLSearchParams(window.location.search).get('termin');
+				const texts = {
+					bestaetigt: ['Vielen Dank! Ihr Termin ist bestätigt.', 'ok'],
+					abgelaufen: ['Der Bestätigungslink ist abgelaufen. Bitte buchen Sie erneut.', 'error'],
+					ungueltig: ['Der Bestätigungslink ist ungültig.', 'error']
+				};
+				if (texts[result]) {
+					el('slots-title').textContent = texts[result][0];
+					el('slots-title').className = 'booking-hint ' + texts[result][1];
+				}
+			});
+		}
+
+		async function loadSection(url, sectionId, listId, render) {
+			const section = document.getElementById(sectionId);
+			try {
+				const items = await fetch(url).then((r) => r.json());
+				section.hidden = items.length === 0;
+				document.getElementById(listId).innerHTML = items.map(render).join('');
+			} catch (err) {
+				section.hidden = true;
+				console.error(err);
+			}
+		}
+
+		loadSection('/api/leistungen', 'leistungen', 'leistungen-liste', (l) =>
+			`<div class="card"><h3>${esc(l.titel)}</h3><p>${esc(l.text)}</p></div>`);
+
+		loadSection('/api/produkte', 'produkte', 'produkte-liste', (p) =>
+			`<div class="card"><h3>${esc(p.name)}</h3><p>${esc(p.beschreibung)}</p>` +
+			`<p class="price">${p.preis ? esc(p.preis) : 'Preis auf Anfrage'}</p></div>`);
+
+		loadSection('/api/experten', 'experten', 'experten-liste', (e) =>
+			`<article class="card expert-card"><img src="${esc(e.bild)}" ` +
+			`alt="Profilbild von ${esc(e.name)}" loading="lazy"><h3>${esc(e.name)}</h3>` +
+			`<p class="role">${esc(e.rolle)}</p><p>${esc(e.beschreibung)}</p></article>`);
+
+		startBooking();
+		window.addEventListener('load', startSpider, { once: true });
+
+		const observer = new IntersectionObserver((entries) => {
+			entries.forEach((e) => {
+				if (e.isIntersecting) e.target.classList.add('visible');
+			});
+		}, { threshold: 0.3 });
+		document.querySelectorAll('.risk').forEach((el) => observer.observe(el));
+	</script>
+
+</body>
+
+</html>

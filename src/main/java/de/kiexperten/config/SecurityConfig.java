@@ -1,0 +1,53 @@
+package de.kiexperten.config;
+
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.security.config.Customizer;
+import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.core.userdetails.User;
+import org.springframework.security.core.userdetails.UserDetailsService;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.provisioning.InMemoryUserDetailsManager;
+import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
+import org.springframework.security.web.csrf.CsrfTokenRequestAttributeHandler;
+
+@Configuration
+@EnableWebSecurity
+public class SecurityConfig {
+
+	@Bean
+	SecurityFilterChain securityFilterChain(final HttpSecurity http) throws Exception {
+		// Plain handler: the X-XSRF-TOKEN header carries the raw cookie value (SPA
+		// setup).
+		final CsrfTokenRequestAttributeHandler csrfRequestHandler = new CsrfTokenRequestAttributeHandler();
+		csrfRequestHandler.setCsrfRequestAttributeName(null);
+
+		http.authorizeHttpRequests(auth -> auth
+				.requestMatchers("/", "/index.html", "/admin.html", "/api/leistungen", "/api/produkte", "/api/experten",
+						"/api/csrf", "/api/termine", "/api/termine/bestaetigen", "/error")
+				.permitAll()
+				.anyRequest().authenticated())
+				.httpBasic(Customizer.withDefaults())
+				.csrf(csrf -> csrf
+						.csrfTokenRepository(CookieCsrfTokenRepository.withHttpOnlyFalse())
+						.csrfTokenRequestHandler(csrfRequestHandler));
+		return http.build();
+	}
+
+	@Bean
+	UserDetailsService userDetailsService(@Value("${app.admin.username}") final String username,
+			@Value("${app.admin.password}") final String password,
+			final PasswordEncoder encoder) {
+		return new InMemoryUserDetailsManager(
+				User.withUsername(username).password(encoder.encode(password)).roles("ADMIN").build());
+	}
+
+	@Bean
+	PasswordEncoder passwordEncoder() {
+		return new BCryptPasswordEncoder();
+	}
+}
