@@ -171,8 +171,8 @@
 	<script>
 		const TYPES = {
 			leistungen: {
-				base: '/api/admin/leistungen',
-				public: '/api/leistungen',
+				base: '/ai/api/admin/leistungen',
+				public: '/ai/api/leistungen',
 				titleField: 'titel',
 				fields: [
 					{ name: 'titel', label: 'Titel', type: 'text', required: true },
@@ -181,8 +181,8 @@
 				]
 			},
 			produkte: {
-				base: '/api/admin/produkte',
-				public: '/api/produkte',
+				base: '/ai/api/admin/produkte',
+				public: '/ai/api/produkte',
 				titleField: 'name',
 				fields: [
 					{ name: 'name', label: 'Name', type: 'text', required: true },
@@ -192,8 +192,8 @@
 				]
 			},
 			experten: {
-				base: '/api/admin/experten',
-				public: '/api/experten',
+				base: '/ai/api/admin/experten',
+				public: '/ai/api/experten',
 				titleField: 'name',
 				fields: [
 					{ name: 'name', label: 'Name', type: 'text', required: true },
@@ -352,7 +352,7 @@
 		async function loadTermine() {
 			const list = $('termine-list');
 			list.innerHTML = '';
-			const items = await api('/api/admin/termine');
+			const items = await api('/ai/api/admin/termine');
 			if (!items.length) {
 				const li = document.createElement('li');
 				li.textContent = 'Noch keine Buchungen.';
@@ -367,7 +367,7 @@
 				li.append(text, makeButton('Stornieren', async () => {
 					if (!confirm('Termin wirklich stornieren? Der Slot wird wieder frei.')) return;
 					try {
-						await api(`/api/admin/termine/${t.id}`, { method: 'DELETE' });
+						await api(`/ai/api/admin/termine/${t.id}`, { method: 'DELETE' });
 						await loadTermine();
 					} catch (err) {
 						$('termine-message').textContent = err.message;
@@ -398,7 +398,7 @@
 		$('cancel-btn').addEventListener('click', resetForm);
 
 		(async () => {
-			await api('/api/csrf');
+			await api('/ai/api/csrf');
 			renderFields();
 			await loadList();
 		})().catch((err) => message(err.message, true));
