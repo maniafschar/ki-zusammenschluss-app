@@ -28,13 +28,17 @@ public class SecurityConfig {
 
 		http.authorizeHttpRequests(auth -> auth
 				.requestMatchers("/", "/index.html", "/admin.html", "/api/leistungen", "/api/produkte", "/api/experten",
-						"/api/csrf", "/api/termine", "/api/termine/bestaetigen", "/error")
+						"/api/csrf", "/api/termine", "/api/termine/bestaetigen", "/api/r/*", "/error")
 				.permitAll()
 				.anyRequest().authenticated())
 				.httpBasic(Customizer.withDefaults())
 				.csrf(csrf -> csrf
 						.csrfTokenRepository(CookieCsrfTokenRepository.withHttpOnlyFalse())
-						.csrfTokenRequestHandler(csrfRequestHandler));
+						.csrfTokenRequestHandler(csrfRequestHandler)
+						// Script clients (curl etc.) send this header instead of a CSRF token. Browsers cannot add
+						// custom headers cross-site without a CORS preflight, which this app does not allow.
+						.ignoringRequestMatchers(request -> request.getHeader("X-API-Client") != null
+								&& request.getHeader("Authorization") != null));
 		return http.build();
 	}
 

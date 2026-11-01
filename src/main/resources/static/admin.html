@@ -127,6 +127,23 @@
 			font-weight: 600;
 		}
 
+		.int-info {
+			display: grid;
+			grid-template-columns: max-content 1fr;
+			gap: 4px 16px;
+			margin: 0;
+			font-size: 0.9rem;
+		}
+
+		.int-info dt {
+			font-weight: 600;
+		}
+
+		.int-info dd {
+			margin: 0;
+			word-break: break-all;
+		}
+
 		.log-row {
 			cursor: pointer;
 		}
@@ -258,6 +275,7 @@
 		<button type="button" data-type="produkte">Produkte</button>
 		<button type="button" data-type="experten">Experten</button>
 		<button type="button" data-type="termine">Termine</button>
+		<button type="button" data-type="interessenten">Interessenten</button>
 		<button type="button" data-type="logs">Logs</button>
 		<button type="button" id="script-btn" style="margin-left:auto">Bauen</button>
 	</nav>
@@ -267,6 +285,32 @@
 		<p>Gebuchte Termine. Mit „Stornieren“ wird der Zeitslot wieder frei.</p>
 		<ul id="termine-list"></ul>
 		<p id="termine-message" role="status"></p>
+	</section>
+
+	<section id="int-panel" hidden>
+		<div class="layout">
+			<div>
+				<button type="button" id="int-new">+ Neu anlegen</button>
+				<ul id="int-list"></ul>
+			</div>
+			<form id="int-form">
+				<h2 id="int-title">Neu anlegen</h2>
+				<label>Anrede (Herr / Frau / leer)<input name="anrede" maxlength="40"></label>
+				<label>Vorname<input name="vorname" maxlength="120"></label>
+				<label>Name<input name="name" maxlength="120"></label>
+				<label>Firmenname<input name="firmenname" maxlength="200"></label>
+				<label>E-Mail<input name="email" type="email" required maxlength="200"></label>
+				<label>URL<input name="url" type="url" maxlength="500"></label>
+				<label>Text der E-Mail<textarea name="text" rows="8" maxlength="10000"></textarea></label>
+				<dl id="int-info" class="int-info" hidden></dl>
+				<p id="int-message" role="status"></p>
+				<div class="actions">
+					<button type="submit" class="active">Speichern</button>
+					<button type="button" id="int-send" hidden>E-Mail senden</button>
+					<button type="button" id="int-delete" class="danger" hidden>Löschen</button>
+				</div>
+			</form>
+		</div>
 	</section>
 
 	<section id="logs-panel" hidden>
@@ -366,6 +410,7 @@
 				const res = await fetch(url, { ...options, method, headers, credentials: 'same-origin' });
 				if (!res.ok) {
 					const err = new Error(`Anfrage fehlgeschlagen (HTTP ${res.status}). Bitte Eingaben prüfen.`);
+					err.status = res.status;
 					err.body = await res.json().catch(() => null);
 					throw err;
 				}
@@ -612,14 +657,123 @@
 			loadLogs().catch((err) => { $('log-message').textContent = err.message; });
 		});
 
+		let intId = null;
+		const intForm = $('int-form');
+		const fmt = (v) => v ? new Date(v).toLocaleString('de-DE') : '–';
+
+		function intMessage(text, isError = false) {
+			$('int-message').textContent = text;
+			$('int-message').style.color = isError ? '#b42318' : '#0f9d7a';
+		}
+
+		function intReset() {
+			intId = null;
+			intForm.reset();
+			$('int-title').textContent = 'Neu anlegen';
+			$('int-info').hidden = true;
+			$('int-send').hidden = true;
+			$('int-delete').hidden = true;
+			intMessage('');
+		}
+
+		function intEdit(item) {
+			intId = item.id;
+			['anrede', 'vorname', 'name', 'firmenname', 'email', 'url', 'text']
+				.forEach((k) => { intForm.elements[k].value = item[k] ?? ''; });
+			$('int-title').textContent = 'Bearbeiten';
+			const info = $('int-info');
+			info.innerHTML = '';
+			[['Angelegt', fmt(item.createdAt)], ['Gesendet am', fmt(item.gesendetAm)],
+			['Klicks', String(item.klickAnzahl)], ['Erster Klick', fmt(item.ersterKlick)],
+			['Letzter Klick', fmt(item.letzterKlick)], ['Link', item.link]].forEach(([k, v]) => {
+				const dt = document.createElement('dt');
+				dt.textContent = k;
+				const dd = document.createElement('dd');
+				dd.textContent = v;
+				info.append(dt, dd);
+			});
+			info.hidden = false;
+			$('int-send').hidden = false;
+			$('int-send').textContent = item.gesendetAm ? 'E-Mail erneut senden' : 'E-Mail senden';
+			$('int-delete').hidden = false;
+			intMessage('');
+		}
+
+		async function loadInteressenten() {
+			const items = await api('/ai-expert/api/admin/interessenten');
+			const list = $('int-list');
+			list.innerHTML = '';
+			if (!items.length) {
+				const li = document.createElement('li');
+				li.textContent = 'Noch keine Interessenten.';
+				list.appendChild(li);
+			}
+			items.forEach((i) => {
+				const li = document.createElement('li');
+				const text = document.createElement('span');
+				const who = [i.vorname, i.name].filter(Boolean).join(' ') || i.email;
+				text.textContent = who + (i.firmenname ? ` (${i.firmenname})` : '')
+					+ (i.gesendetAm ? ` – gesendet ${fmt(i.gesendetAm)}` : ' – noch nicht gesendet')
+					+ (i.klickAnzahl ? ` – ${i.klickAnzahl}× geklickt, zuletzt ${fmt(i.letzterKlick)}` : '');
+				li.append(text, makeButton('Details', () => intEdit(i)));
+				list.appendChild(li);
+			});
+		}
+
+		$('int-new').addEventListener('click', intReset);
+		intForm.addEventListener('submit', async (e) => {
+			e.preventDefault();
+			const body = {};
+			['anrede', 'vorname', 'name', 'firmenname', 'email', 'url', 'text']
+				.forEach((k) => { body[k] = intForm.elements[k].value; });
+			try {
+				const saved = await api(intId ? `/ai-expert/api/admin/interessenten/${intId}` : '/ai-expert/api/admin/interessenten',
+					{ method: intId ? 'PUT' : 'POST', body: JSON.stringify(body) });
+				await loadInteressenten();
+				intEdit(saved);
+				intMessage('Gespeichert.');
+			} catch (err) {
+				intMessage(err.message, true);
+			}
+		});
+		$('int-send').addEventListener('click', async () => {
+			if (!confirm('E-Mail jetzt an diesen Interessenten senden? Ungespeicherte Änderungen gehen dabei nicht mit.')) return;
+			try {
+				const sent = await api(`/ai-expert/api/admin/interessenten/${intId}/senden`, { method: 'POST' });
+				await loadInteressenten();
+				intEdit(sent);
+				intMessage('E-Mail gesendet.');
+			} catch (err) {
+				intMessage(err.status === 503 ? 'Kein SMTP-Server konfiguriert (spring.mail.host).'
+					: err.status === 502 ? 'Die E-Mail konnte nicht gesendet werden.'
+					: err.status === 400 ? 'Bitte zuerst einen Text eintragen.' : err.message, true);
+			}
+		});
+		$('int-delete').addEventListener('click', async () => {
+			if (!confirm('Interessent wirklich löschen?')) return;
+			try {
+				await api(`/ai-expert/api/admin/interessenten/${intId}`, { method: 'DELETE' });
+				intReset();
+				await loadInteressenten();
+			} catch (err) {
+				intMessage(err.message, true);
+			}
+		});
+
 		document.querySelectorAll('.tabs button[data-type]').forEach((btn) => {
 			btn.addEventListener('click', async () => {
 				document.querySelectorAll('.tabs button[data-type]').forEach((b) => b.classList.toggle('active', b === btn));
 				const isTermine = btn.dataset.type === 'termine';
 				const isLogs = btn.dataset.type === 'logs';
+				const isInt = btn.dataset.type === 'interessenten';
+				$('int-panel').hidden = !isInt;
 				$('termine-panel').hidden = !isTermine;
 				$('logs-panel').hidden = !isLogs;
-				$('content-layout').hidden = isTermine || isLogs;
+				$('content-layout').hidden = isTermine || isLogs || isInt;
+				if (isInt) {
+					try { intReset(); await loadInteressenten(); } catch (err) { intMessage(err.message, true); }
+					return;
+				}
 				if (isLogs) {
 					try { await loadLogs(); } catch (err) { $('log-message').textContent = err.message; }
 					return;
