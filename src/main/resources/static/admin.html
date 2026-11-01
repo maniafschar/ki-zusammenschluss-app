@@ -285,6 +285,11 @@
 			$('progress').hidden = pending <= 0;
 		}
 
+		document.addEventListener('click', (e) => {
+			const btn = e.target.closest('button');
+			if (btn && btn.id !== 'script-btn') $('script-output').hidden = true;
+		});
+
 		$('script-btn').addEventListener('click', async () => {
 			if (!confirm('Skript auf dem Server jetzt ausführen?')) return;
 			const out = $('script-output');
