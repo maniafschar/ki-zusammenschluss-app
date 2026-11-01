@@ -300,6 +300,7 @@
 				<label>Name<input name="name" maxlength="120"></label>
 				<label>Firmenname<input name="firmenname" maxlength="200"></label>
 				<label>E-Mail<input name="email" type="email" required maxlength="200"></label>
+				<label>Betreuer (Experte, wird beim Senden in die E-Mail aufgenommen)<select name="betreuerId"><option value="">– keiner –</option></select></label>
 				<label>Telefon<input name="telefon" type="tel" maxlength="40"></label>
 				<label>URL<input name="url" type="url" maxlength="500"></label>
 				<label>Text der E-Mail<textarea name="text" rows="8" maxlength="10000"></textarea></label>
@@ -680,12 +681,12 @@
 
 		function intEdit(item) {
 			intId = item.id;
-			['anrede', 'vorname', 'name', 'firmenname', 'email', 'telefon', 'url', 'text']
+			['anrede', 'vorname', 'name', 'firmenname', 'email', 'telefon', 'url', 'text', 'betreuerId']
 				.forEach((k) => { intForm.elements[k].value = item[k] ?? ''; });
 			$('int-title').textContent = 'Bearbeiten';
 			const info = $('int-info');
 			info.innerHTML = '';
-			[['Angelegt', fmt(item.createdAt)], ['Gesendet am', fmt(item.gesendetAm)],
+			[['Betreuer', item.betreuerName || '–'], ['Angelegt', fmt(item.createdAt)], ['Gesendet am', fmt(item.gesendetAm)],
 			['Klicks', String(item.klickAnzahl)], ['Erster Klick', fmt(item.ersterKlick)],
 			['Letzter Klick', fmt(item.letzterKlick)], ['Link', item.link]].forEach(([k, v]) => {
 				const dt = document.createElement('dt');
@@ -702,6 +703,12 @@
 		}
 
 		async function loadInteressenten() {
+			const experts = await api('/ai-expert/api/experten');
+			const sel = intForm.elements.betreuerId;
+			const chosen = sel.value;
+			sel.length = 1;
+			experts.forEach((x) => sel.add(new Option(`${x.name} (${x.rolle})`, x.id)));
+			sel.value = chosen;
 			const items = await api('/ai-expert/api/admin/interessenten');
 			const list = $('int-list');
 			list.innerHTML = '';
@@ -728,6 +735,7 @@
 			const body = {};
 			['anrede', 'vorname', 'name', 'firmenname', 'email', 'telefon', 'url', 'text']
 				.forEach((k) => { body[k] = intForm.elements[k].value; });
+			body.betreuerId = intForm.elements.betreuerId.value ? Number(intForm.elements.betreuerId.value) : null;
 			try {
 				const saved = await api(intId ? `/ai-expert/api/admin/interessenten/${intId}` : '/ai-expert/api/admin/interessenten',
 					{ method: intId ? 'PUT' : 'POST', body: JSON.stringify(body) });

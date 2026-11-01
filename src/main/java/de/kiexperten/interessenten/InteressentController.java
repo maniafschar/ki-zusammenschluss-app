@@ -19,6 +19,8 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 
 import de.kiexperten.Zeit;
+import de.kiexperten.content.Experte;
+import de.kiexperten.content.ExperteRepository;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
@@ -32,8 +34,11 @@ public class InteressentController {
 
 	private final InteressentRepository repository;
 	private final InteressentenMailService mail;
+	private final ExperteRepository experten;
 
-	public InteressentController(final InteressentRepository repository, final InteressentenMailService mail) {
+	public InteressentController(final InteressentRepository repository, final InteressentenMailService mail,
+			final ExperteRepository experten) {
+		this.experten = experten;
 		this.repository = repository;
 		this.mail = mail;
 	}
@@ -46,11 +51,12 @@ public class InteressentController {
 			@Pattern(regexp = "^$|^[0-9+()/\\-. ]{5,40}$") String telefon,
 			@Size(max = 500) String url,
 			@Size(max = 40) String anrede,
+			Long betreuerId,
 			@Size(max = 10000) String text) {
 	}
 
 	record InteressentAnsicht(Long id, String vorname, String name, String firmenname, String email, String telefon, String url,
-			String anrede, String text, Instant createdAt, Instant gesendetAm, String link, int klickAnzahl,
+			String anrede, Long betreuerId, String betreuerName, String text, Instant createdAt, Instant gesendetAm, String link, int klickAnzahl,
 			Instant ersterKlick, Instant letzterKlick) {
 	}
 
@@ -95,7 +101,7 @@ public class InteressentController {
 		if (i.getText() == null || i.getText().isBlank()) {
 			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Bitte zuerst einen Text eintragen.");
 		}
-		this.mail.send(i);
+		this.mail.send(i, betreuer(i));
 		i.setGesendetAm(Zeit.nowUtc());
 		return view(this.repository.save(i));
 	}
@@ -108,6 +114,10 @@ public class InteressentController {
 		return ResponseEntity.status(HttpStatus.SEE_OTHER).location(URI.create(this.mail.landingUrl())).build();
 	}
 
+	private Experte betreuer(final Interessent i) {
+		return i.getBetreuerId() == null ? null : this.experten.findById(i.getBetreuerId()).orElse(null);
+	}
+
 	private Interessent find(final Long id) {
 		return this.repository.findById(id).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
 	}
@@ -118,6 +128,7 @@ public class InteressentController {
 		i.setFirmenname(clean(r.firmenname()));
 		i.setEmail(r.email().trim());
 		i.setTelefon(clean(r.telefon()));
+		i.setBetreuerId(r.betreuerId());
 		i.setUrl(clean(r.url()));
 		i.setAnrede(clean(r.anrede()));
 		i.setText(r.text() == null || r.text().isBlank() ? null : r.text().strip());
@@ -135,7 +146,8 @@ public class InteressentController {
 
 	private InteressentAnsicht view(final Interessent i) {
 		return new InteressentAnsicht(i.getId(), i.getVorname(), i.getName(), i.getFirmenname(), i.getEmail(),
-				i.getTelefon(), i.getUrl(), i.getAnrede(), i.getText(), Zeit.instant(i.getCreatedAt()), Zeit.instant(i.getGesendetAm()),
+				i.getTelefon(), i.getUrl(), i.getAnrede(), betreuer(i) == null ? null : i.getBetreuerId(),
+				betreuer(i) == null ? null : betreuer(i).getName(), i.getText(), Zeit.instant(i.getCreatedAt()), Zeit.instant(i.getGesendetAm()),
 				this.mail.trackedLink(i), i.getKlickAnzahl(), Zeit.instant(i.getErsterKlick()),
 				Zeit.instant(i.getLetzterKlick()));
 	}

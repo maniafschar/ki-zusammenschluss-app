@@ -40,6 +40,9 @@ public class Interessent {
 	@Column(length = 40)
 	private String telefon;
 
+	// Id of an Experte; no foreign key, a deleted expert simply resolves to no Betreuer.
+	private Long betreuerId;
+
 	@Column(length = 500)
 	private String url;
 

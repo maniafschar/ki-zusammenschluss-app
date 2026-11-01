@@ -4,6 +4,7 @@ import java.nio.charset.StandardCharsets;
 
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
+import de.kiexperten.content.Experte;
 import org.springframework.http.HttpStatus;
 import org.springframework.mail.MailException;
 import org.springframework.mail.javamail.JavaMailSender;
@@ -41,7 +42,7 @@ public class InteressentenMailService {
 	}
 
 	/** Throws if the mail could not be sent, so the caller must not mark it as sent. */
-	public void send(final Interessent i) {
+	public void send(final Interessent i, final Experte betreuer) {
 		final JavaMailSender sender = this.mailSender.getIfAvailable();
 		if (sender == null) {
 			throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE,
@@ -50,7 +51,14 @@ public class InteressentenMailService {
 		final String link = trackedLink(i);
 		final String greeting = greeting(i);
 		final String body = i.getText() == null ? "" : i.getText().strip();
-		final String plain = greeting + "\n\n" + body + "\n\n" + link + "\n";
+		final String contact = betreuer == null ? null
+				: "Ihr Ansprechpartner: " + betreuer.getName() + ", " + betreuer.getRolle();
+		final String plain = greeting + "\n\n" + body + "\n\n" + link + "\n"
+				+ (contact == null ? "" : "\n" + contact + "\n");
+		final String contactHtml = contact == null ? ""
+				: "<p style=\"margin:0 0 16px;font-size:15px;color:#1d2b3a;\"><strong>Ihr Ansprechpartner</strong><br>"
+						+ HtmlUtils.htmlEscape(betreuer.getName()) + " &middot; "
+						+ HtmlUtils.htmlEscape(betreuer.getRolle()) + "</p>";
 		final String html = """
 				<!DOCTYPE html>
 				<html lang="de"><body style="margin:0;padding:0;background:#f7fbf9;">
@@ -63,10 +71,11 @@ public class InteressentenMailService {
 				<p style="margin:0 0 24px;font-size:16px;line-height:1.6;">%s</p>
 				<table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 0 24px;"><tr><td style="background:#0f9d7a;border-radius:8px;">
 				<a href="%s" style="display:inline-block;padding:14px 28px;color:#ffffff;font-size:16px;font-weight:600;text-decoration:none;">Mehr erfahren</a></td></tr></table>
+				%s
 				<p style="margin:0;font-size:13px;color:#5b6b7d;">Funktioniert der Button nicht? <a href="%s" style="color:#0f9d7a;word-break:break-all;">%s</a></p>
 				</td></tr></table></td></tr></table></body></html>
 				""".formatted(HtmlUtils.htmlEscape(greeting), HtmlUtils.htmlEscape(body).replace("\n", "<br>"),
-				HtmlUtils.htmlEscape(link), HtmlUtils.htmlEscape(link), HtmlUtils.htmlEscape(link));
+				HtmlUtils.htmlEscape(link), contactHtml, HtmlUtils.htmlEscape(link), HtmlUtils.htmlEscape(link));
 		try {
 			final MimeMessage mail = sender.createMimeMessage();
 			final MimeMessageHelper helper = new MimeMessageHelper(mail, true, StandardCharsets.UTF_8.name());
