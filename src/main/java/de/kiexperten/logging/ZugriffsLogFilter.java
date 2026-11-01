@@ -1,6 +1,8 @@
 package de.kiexperten.logging;
 
 import java.io.IOException;
+import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
@@ -12,6 +14,7 @@ import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
+import org.springframework.web.servlet.DispatcherServlet;
 import org.springframework.web.util.ContentCachingResponseWrapper;
 
 import jakarta.servlet.FilterChain;
@@ -41,17 +44,25 @@ public class ZugriffsLogFilter extends OncePerRequestFilter {
 			final FilterChain chain) throws ServletException, IOException {
 		final long start = System.nanoTime();
 		final ContentCachingResponseWrapper wrapped = new ContentCachingResponseWrapper(response);
+		Throwable failure = null;
 		try {
 			chain.doFilter(request, wrapped);
+		} catch (final ServletException | IOException | RuntimeException | Error e) {
+			failure = e;
+			throw e;
 		} finally {
+			// Exceptions handled inside Spring MVC only show up as a request attribute.
+			if (failure == null && request.getAttribute(DispatcherServlet.class.getName() + ".EXCEPTION") instanceof final Throwable t) {
+				failure = t;
+			}
 			final long bytes = wrapped.getContentSize();
 			wrapped.copyBodyToResponse();
-			write(request, wrapped, bytes, (System.nanoTime() - start) / 1_000_000);
+			write(request, wrapped, bytes, (System.nanoTime() - start) / 1_000_000, failure);
 		}
 	}
 
 	private void write(final HttpServletRequest req, final HttpServletResponse res, final long bytes,
-			final long durationMs) {
+			final long durationMs, final Throwable failure) {
 		try {
 			final ZugriffsLog log = new ZugriffsLog();
 			log.setZeitpunkt(LocalDateTime.now(ZONE));
@@ -68,11 +79,18 @@ public class ZugriffsLogFilter extends OncePerRequestFilter {
 			log.setSprache(cut(req.getHeader("Accept-Language"), 100));
 			log.setContentType(cut(res.getContentType(), 100));
 			log.setAntwortBytes(bytes);
+			log.setFehler(failure == null ? null : cut(stackTrace(failure), 4000));
 			this.repository.save(log);
 		} catch (final RuntimeException e) {
 			// Logging must never break the actual request.
 			LOG.warn("Zugriff konnte nicht protokolliert werden: {}", e.toString());
 		}
+	}
+
+	private static String stackTrace(final Throwable t) {
+		final StringWriter out = new StringWriter();
+		t.printStackTrace(new PrintWriter(out));
+		return out.toString();
 	}
 
 	private static String basicUser(final String header) {

@@ -63,4 +63,7 @@ public class ZugriffsLog {
 	private String contentType;
 
 	private long antwortBytes;
+
+	@Column(length = 4000)
+	private String fehler;
 }

@@ -155,6 +155,7 @@
 		.log-detail dd {
 			margin: 0;
 			word-break: break-all;
+			white-space: pre-wrap;
 		}
 
 		[hidden] {
@@ -585,7 +586,8 @@
 				const dl = document.createElement('dl');
 				[['Antwortgröße', `${e.antwortBytes} Bytes`], ['Benutzer', e.benutzer || '–'],
 				['Browser', e.userAgent || '–'], ['Referer', e.referer || '–'],
-				['Sprache', e.sprache || '–'], ['Content-Type', e.contentType || '–']].forEach(([k, v]) => {
+				['Sprache', e.sprache || '–'], ['Content-Type', e.contentType || '–'],
+				...(e.fehler ? [['Fehler', e.fehler]] : [])].forEach(([k, v]) => {
 					const dt = document.createElement('dt');
 					dt.textContent = k;
 					const dd = document.createElement('dd');

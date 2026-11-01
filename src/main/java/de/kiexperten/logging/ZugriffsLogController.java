@@ -47,7 +47,7 @@ public class ZugriffsLogController {
 					final String like = "%" + word.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%";
 					final List<Predicate> any = new ArrayList<>();
 					for (final String col : List.of("methode", "pfad", "query", "ip", "weitergeleitetVon", "benutzer",
-							"userAgent", "referer", "sprache", "contentType")) {
+							"userAgent", "referer", "sprache", "contentType", "fehler")) {
 						any.add(cb.like(cb.lower(cb.coalesce(root.<String>get(col), "")), like, '\\'));
 					}
 					any.add(cb.like(root.get("status").as(String.class), like, '\\'));
