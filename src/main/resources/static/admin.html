@@ -44,6 +44,42 @@
 			color: #b42318;
 		}
 
+		#progress {
+			position: fixed;
+			top: 0;
+			left: 0;
+			right: 0;
+			height: 4px;
+			background: #d9ece6;
+			overflow: hidden;
+			z-index: 100;
+		}
+
+		#progress::before {
+			content: "";
+			position: absolute;
+			top: 0;
+			bottom: 0;
+			width: 40%;
+			background: #0f9d7a;
+			animation: progress-slide 1s ease-in-out infinite;
+		}
+
+		@keyframes progress-slide {
+			from { left: -40%; }
+			to { left: 100%; }
+		}
+
+		#script-output {
+			background: #1d2b3a;
+			color: #e3f7f0;
+			padding: 12px 16px;
+			border-radius: 8px;
+			max-height: 240px;
+			overflow: auto;
+			white-space: pre-wrap;
+		}
+
 		[hidden] {
 			display: none !important;
 		}
@@ -136,6 +172,7 @@
 
 <body>
 
+	<div id="progress" role="progressbar" aria-label="Daten werden übertragen" hidden></div>
 	<h1>Inhalte verwalten</h1>
 
 	<nav class="tabs">
@@ -143,7 +180,9 @@
 		<button type="button" data-type="produkte">Produkte</button>
 		<button type="button" data-type="experten">Experten</button>
 		<button type="button" data-type="termine">Termine</button>
+		<button type="button" id="script-btn" style="margin-left:auto">Skript ausführen</button>
 	</nav>
+	<pre id="script-output" hidden></pre>
 
 	<section id="termine-panel" hidden>
 		<p>Gebuchte Termine. Mit „Stornieren“ wird der Zeitslot wieder frei.</p>
@@ -221,10 +260,41 @@
 			const headers = {};
 			if (!(options.body instanceof FormData)) headers['Content-Type'] = 'application/json';
 			if (method !== 'GET') headers['X-XSRF-TOKEN'] = getCookie('XSRF-TOKEN');
-			const res = await fetch(url, { ...options, method, headers, credentials: 'same-origin' });
-			if (!res.ok) throw new Error(`Anfrage fehlgeschlagen (HTTP ${res.status}). Bitte Eingaben prüfen.`);
-			return res.status === 204 ? null : res.json();
+			busy(1);
+			try {
+				const res = await fetch(url, { ...options, method, headers, credentials: 'same-origin' });
+				if (!res.ok) {
+					const err = new Error(`Anfrage fehlgeschlagen (HTTP ${res.status}). Bitte Eingaben prüfen.`);
+					err.body = await res.json().catch(() => null);
+					throw err;
+				}
+				return res.status === 204 ? null : await res.json();
+			} finally {
+				busy(-1);
+			}
 		}
+
+		let pending = 0;
+		function busy(delta) {
+			pending += delta;
+			$('progress').hidden = pending <= 0;
+		}
+
+		$('script-btn').addEventListener('click', async () => {
+			if (!confirm('Skript auf dem Server jetzt ausführen?')) return;
+			const out = $('script-output');
+			out.hidden = false;
+			out.textContent = 'Läuft …';
+			$('script-btn').disabled = true;
+			try {
+				const r = await api('/ai-expert/api/admin/script/run', { method: 'POST' });
+				out.textContent = `Beendet mit Exit-Code ${r.exitCode}\n\n${r.output}`;
+			} catch (e) {
+				out.textContent = e.body && e.body.output ? e.body.output : e.message;
+			} finally {
+				$('script-btn').disabled = false;
+			}
+		});
 
 		function message(text, isError = false) {
 			$('message').textContent = text;
@@ -377,9 +447,9 @@
 			});
 		}
 
-		document.querySelectorAll('.tabs button').forEach((btn) => {
+		document.querySelectorAll('.tabs button[data-type]').forEach((btn) => {
 			btn.addEventListener('click', async () => {
-				document.querySelectorAll('.tabs button').forEach((b) => b.classList.toggle('active', b === btn));
+				document.querySelectorAll('.tabs button[data-type]').forEach((b) => b.classList.toggle('active', b === btn));
 				const isTermine = btn.dataset.type === 'termine';
 				$('termine-panel').hidden = !isTermine;
 				$('content-layout').hidden = isTermine;
