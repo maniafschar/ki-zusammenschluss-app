@@ -1011,6 +1011,7 @@
 					el('slots-title').textContent = 'Fast geschafft!';
 					setMessage('', '');
 					bookingForm.hidden = true;
+					el('slots').classList.remove('slots');
 					el('slots').innerHTML = '<p class="booking-hint ok">Wir haben Ihnen eine E-Mail mit einem Bestätigungslink geschickt. '
 						+ 'Bitte bestätigen Sie Ihre Adresse innerhalb von 10 Minuten, sonst wird der Termin wieder freigegeben.</p>';
 				} catch (err) {
