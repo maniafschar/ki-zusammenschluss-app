@@ -85,6 +85,48 @@
 			white-space: pre-wrap;
 		}
 
+		.log-filter {
+			grid-template-columns: auto auto 1fr auto auto;
+			align-items: end;
+			margin-bottom: 12px;
+		}
+
+		.table-wrap {
+			overflow: auto;
+			max-height: 65vh;
+			background: #fff;
+			border: 1px solid #d9ece6;
+			border-radius: 10px;
+		}
+
+		#log-table {
+			border-collapse: collapse;
+			width: 100%;
+			font-size: 0.85rem;
+		}
+
+		#log-table th,
+		#log-table td {
+			padding: 6px 10px;
+			text-align: left;
+			border-bottom: 1px solid #eef5f2;
+			white-space: nowrap;
+			max-width: 320px;
+			overflow: hidden;
+			text-overflow: ellipsis;
+		}
+
+		#log-table th {
+			position: sticky;
+			top: 0;
+			background: #e3f7f0;
+		}
+
+		#log-table td.err {
+			color: #b42318;
+			font-weight: 600;
+		}
+
 		[hidden] {
 			display: none !important;
 		}
@@ -185,6 +227,7 @@
 		<button type="button" data-type="produkte">Produkte</button>
 		<button type="button" data-type="experten">Experten</button>
 		<button type="button" data-type="termine">Termine</button>
+		<button type="button" data-type="logs">Logs</button>
 		<button type="button" id="script-btn" style="margin-left:auto">Bauen</button>
 	</nav>
 	<pre id="script-output" hidden></pre>
@@ -193,6 +236,29 @@
 		<p>Gebuchte Termine. Mit „Stornieren“ wird der Zeitslot wieder frei.</p>
 		<ul id="termine-list"></ul>
 		<p id="termine-message" role="status"></p>
+	</section>
+
+	<section id="logs-panel" hidden>
+		<form id="log-form" class="log-filter">
+			<label>Von <input type="datetime-local" name="von"></label>
+			<label>Bis <input type="datetime-local" name="bis"></label>
+			<label class="grow">Freitext (Pfad, IP, Benutzer, Browser, Status …)
+				<input type="search" name="text" placeholder="z. B. 404 admin Safari"></label>
+			<button type="submit" class="active">Suchen</button>
+			<button type="button" id="log-reset">Zurücksetzen</button>
+		</form>
+		<p id="log-message" role="status"></p>
+		<div class="table-wrap">
+			<table id="log-table">
+				<thead>
+					<tr>
+						<th>Zeit</th><th>Methode</th><th>Pfad</th><th>Status</th><th>ms</th><th>Bytes</th>
+						<th>IP</th><th>Benutzer</th><th>Browser</th><th>Referer</th>
+					</tr>
+				</thead>
+				<tbody></tbody>
+			</table>
+		</div>
 	</section>
 
 	<div class="layout" id="content-layout">
@@ -457,12 +523,57 @@
 			});
 		}
 
+		async function loadLogs() {
+			const params = new URLSearchParams();
+			const f = $('log-form');
+			if (f.von.value) params.set('von', f.von.value + ':00');
+			if (f.bis.value) params.set('bis', f.bis.value + ':59');
+			if (f.text.value.trim()) params.set('text', f.text.value.trim());
+			const r = await api('/ai-expert/api/admin/logs?' + params);
+			const body = document.querySelector('#log-table tbody');
+			body.innerHTML = '';
+			r.eintraege.forEach((e) => {
+				const tr = document.createElement('tr');
+				const cells = [
+					new Date(e.zeitpunkt).toLocaleString('de-DE'), e.methode,
+					e.pfad + (e.query ? '?' + e.query : ''), e.status, e.dauerMs, e.antwortBytes,
+					e.ip + (e.weitergeleitetVon ? ` (${e.weitergeleitetVon})` : ''), e.benutzer || '',
+					e.userAgent || '', e.referer || ''
+				];
+				cells.forEach((c, i) => {
+					const td = document.createElement('td');
+					td.textContent = c;
+					td.title = String(c);
+					if (i === 3 && e.status >= 400) td.className = 'err';
+					tr.appendChild(td);
+				});
+				body.appendChild(tr);
+			});
+			$('log-message').textContent = r.gesamt === 0 ? 'Keine Einträge gefunden.'
+				: `${r.gesamt} Einträge gefunden` + (r.abgeschnitten ? ` – angezeigt werden die neuesten ${r.eintraege.length}. Bitte Filter eingrenzen.` : '.');
+		}
+
+		$('log-form').addEventListener('submit', (e) => {
+			e.preventDefault();
+			loadLogs().catch((err) => { $('log-message').textContent = err.message; });
+		});
+		$('log-reset').addEventListener('click', () => {
+			$('log-form').reset();
+			loadLogs().catch((err) => { $('log-message').textContent = err.message; });
+		});
+
 		document.querySelectorAll('.tabs button[data-type]').forEach((btn) => {
 			btn.addEventListener('click', async () => {
 				document.querySelectorAll('.tabs button[data-type]').forEach((b) => b.classList.toggle('active', b === btn));
 				const isTermine = btn.dataset.type === 'termine';
+				const isLogs = btn.dataset.type === 'logs';
 				$('termine-panel').hidden = !isTermine;
-				$('content-layout').hidden = isTermine;
+				$('logs-panel').hidden = !isLogs;
+				$('content-layout').hidden = isTermine || isLogs;
+				if (isLogs) {
+					try { await loadLogs(); } catch (err) { $('log-message').textContent = err.message; }
+					return;
+				}
 				if (isTermine) {
 					try { await loadTermine(); } catch (err) { $('termine-message').textContent = err.message; }
 					return;
