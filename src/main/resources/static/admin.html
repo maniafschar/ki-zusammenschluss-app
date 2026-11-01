@@ -300,6 +300,7 @@
 				<label>Name<input name="name" maxlength="120"></label>
 				<label>Firmenname<input name="firmenname" maxlength="200"></label>
 				<label>E-Mail<input name="email" type="email" required maxlength="200"></label>
+				<label>Telefon<input name="telefon" type="tel" maxlength="40"></label>
 				<label>URL<input name="url" type="url" maxlength="500"></label>
 				<label>Text der E-Mail<textarea name="text" rows="8" maxlength="10000"></textarea></label>
 				<dl id="int-info" class="int-info" hidden></dl>
@@ -679,7 +680,7 @@
 
 		function intEdit(item) {
 			intId = item.id;
-			['anrede', 'vorname', 'name', 'firmenname', 'email', 'url', 'text']
+			['anrede', 'vorname', 'name', 'firmenname', 'email', 'telefon', 'url', 'text']
 				.forEach((k) => { intForm.elements[k].value = item[k] ?? ''; });
 			$('int-title').textContent = 'Bearbeiten';
 			const info = $('int-info');
@@ -725,7 +726,7 @@
 		intForm.addEventListener('submit', async (e) => {
 			e.preventDefault();
 			const body = {};
-			['anrede', 'vorname', 'name', 'firmenname', 'email', 'url', 'text']
+			['anrede', 'vorname', 'name', 'firmenname', 'email', 'telefon', 'url', 'text']
 				.forEach((k) => { body[k] = intForm.elements[k].value; });
 			try {
 				const saved = await api(intId ? `/ai-expert/api/admin/interessenten/${intId}` : '/ai-expert/api/admin/interessenten',

@@ -37,6 +37,9 @@ public class Interessent {
 	@Column(nullable = false, length = 200)
 	private String email;
 
+	@Column(length = 40)
+	private String telefon;
+
 	@Column(length = 500)
 	private String url;
 

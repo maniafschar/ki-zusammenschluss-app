@@ -22,6 +22,7 @@ import de.kiexperten.Zeit;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 
 @RestController
@@ -42,12 +43,13 @@ public class InteressentController {
 			@Size(max = 120) String name,
 			@Size(max = 200) String firmenname,
 			@NotBlank @Email @Size(max = 200) String email,
+			@Pattern(regexp = "^$|^[0-9+()/\\-. ]{5,40}$") String telefon,
 			@Size(max = 500) String url,
 			@Size(max = 40) String anrede,
 			@Size(max = 10000) String text) {
 	}
 
-	record InteressentAnsicht(Long id, String vorname, String name, String firmenname, String email, String url,
+	record InteressentAnsicht(Long id, String vorname, String name, String firmenname, String email, String telefon, String url,
 			String anrede, String text, Instant createdAt, Instant gesendetAm, String link, int klickAnzahl,
 			Instant ersterKlick, Instant letzterKlick) {
 	}
@@ -115,6 +117,7 @@ public class InteressentController {
 		i.setName(clean(r.name()));
 		i.setFirmenname(clean(r.firmenname()));
 		i.setEmail(r.email().trim());
+		i.setTelefon(clean(r.telefon()));
 		i.setUrl(clean(r.url()));
 		i.setAnrede(clean(r.anrede()));
 		i.setText(r.text() == null || r.text().isBlank() ? null : r.text().strip());
@@ -132,7 +135,7 @@ public class InteressentController {
 
 	private InteressentAnsicht view(final Interessent i) {
 		return new InteressentAnsicht(i.getId(), i.getVorname(), i.getName(), i.getFirmenname(), i.getEmail(),
-				i.getUrl(), i.getAnrede(), i.getText(), Zeit.instant(i.getCreatedAt()), Zeit.instant(i.getGesendetAm()),
+				i.getTelefon(), i.getUrl(), i.getAnrede(), i.getText(), Zeit.instant(i.getCreatedAt()), Zeit.instant(i.getGesendetAm()),
 				this.mail.trackedLink(i), i.getKlickAnzahl(), Zeit.instant(i.getErsterKlick()),
 				Zeit.instant(i.getLetzterKlick()));
 	}
