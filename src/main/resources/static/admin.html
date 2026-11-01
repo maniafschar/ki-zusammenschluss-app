@@ -127,6 +127,36 @@
 			font-weight: 600;
 		}
 
+		.log-row {
+			cursor: pointer;
+		}
+
+		.log-row:hover {
+			background: #f0faf6;
+		}
+
+		#log-table td.log-detail {
+			white-space: normal;
+			max-width: none;
+			background: #f7fbf9;
+		}
+
+		.log-detail dl {
+			display: grid;
+			grid-template-columns: max-content 1fr;
+			gap: 4px 16px;
+			margin: 0;
+		}
+
+		.log-detail dt {
+			font-weight: 600;
+		}
+
+		.log-detail dd {
+			margin: 0;
+			word-break: break-all;
+		}
+
 		[hidden] {
 			display: none !important;
 		}
@@ -252,8 +282,7 @@
 			<table id="log-table">
 				<thead>
 					<tr>
-						<th>Zeit</th><th>Methode</th><th>Pfad</th><th>Status</th><th>ms</th><th>Bytes</th>
-						<th>IP</th><th>Benutzer</th><th>Browser</th><th>Referer</th>
+						<th>Zeit</th><th>Methode</th><th>Pfad</th><th>Status</th><th>ms</th><th>IP</th>
 					</tr>
 				</thead>
 				<tbody></tbody>
@@ -536,9 +565,8 @@
 				const tr = document.createElement('tr');
 				const cells = [
 					new Date(e.zeitpunkt).toLocaleString('de-DE'), e.methode,
-					e.pfad + (e.query ? '?' + e.query : ''), e.status, e.dauerMs, e.antwortBytes,
-					e.ip + (e.weitergeleitetVon ? ` (${e.weitergeleitetVon})` : ''), e.benutzer || '',
-					e.userAgent || '', e.referer || ''
+					e.pfad + (e.query ? '?' + e.query : ''), e.status, e.dauerMs,
+					e.ip + (e.weitergeleitetVon ? ` (${e.weitergeleitetVon})` : '')
 				];
 				cells.forEach((c, i) => {
 					const td = document.createElement('td');
@@ -547,7 +575,27 @@
 					if (i === 3 && e.status >= 400) td.className = 'err';
 					tr.appendChild(td);
 				});
-				body.appendChild(tr);
+				tr.className = 'log-row';
+				tr.title = 'Klicken für Details';
+				const detail = document.createElement('tr');
+				detail.hidden = true;
+				const dtd = document.createElement('td');
+				dtd.colSpan = cells.length;
+				dtd.className = 'log-detail';
+				const dl = document.createElement('dl');
+				[['Antwortgröße', `${e.antwortBytes} Bytes`], ['Benutzer', e.benutzer || '–'],
+				['Browser', e.userAgent || '–'], ['Referer', e.referer || '–'],
+				['Sprache', e.sprache || '–'], ['Content-Type', e.contentType || '–']].forEach(([k, v]) => {
+					const dt = document.createElement('dt');
+					dt.textContent = k;
+					const dd = document.createElement('dd');
+					dd.textContent = v;
+					dl.append(dt, dd);
+				});
+				dtd.appendChild(dl);
+				detail.appendChild(dtd);
+				tr.addEventListener('click', () => { detail.hidden = !detail.hidden; });
+				body.append(tr, detail);
 			});
 			$('log-message').textContent = r.gesamt === 0 ? 'Keine Einträge gefunden.'
 				: `${r.gesamt} Einträge gefunden` + (r.abgeschnitten ? ` – angezeigt werden die neuesten ${r.eintraege.length}. Bitte Filter eingrenzen.` : '.');
