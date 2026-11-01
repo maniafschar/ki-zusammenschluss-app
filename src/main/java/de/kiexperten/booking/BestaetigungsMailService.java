@@ -1,6 +1,7 @@
 package de.kiexperten.booking;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
+import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.Locale;
 
@@ -23,7 +24,7 @@ public class BestaetigungsMailService {
 
 	private static final Logger LOG = LoggerFactory.getLogger(BestaetigungsMailService.class);
 	private static final DateTimeFormatter FORMAT = DateTimeFormatter
-			.ofPattern("EEEE, dd.MM.yyyy 'um' HH:mm 'Uhr'", Locale.GERMANY);
+			.ofPattern("EEEE, dd.MM.yyyy 'um' HH:mm 'Uhr' (zzz)", Locale.GERMANY);
 
 	private final ObjectProvider<JavaMailSender> mailSender;
 	private final String publicUrl;
@@ -37,15 +38,15 @@ public class BestaetigungsMailService {
 		this.from = from;
 	}
 
-	public void send(final String to, final String name, final LocalDateTime start, final String token,
-			final int minutesValid) {
+	public void send(final String to, final String name, final Instant start, final ZoneId zone,
+			final String token, final int minutesValid) {
 		final String link = this.publicUrl + "/api/termine/bestaetigen?token=" + token;
 		final JavaMailSender sender = this.mailSender.getIfAvailable();
 		if (sender == null) {
 			LOG.warn("Kein SMTP-Server konfiguriert (spring.mail.host). Bestätigungslink für {}: {}", to, link);
 			return;
 		}
-		final String when = FORMAT.format(start);
+		final String when = FORMAT.format(start.atZone(zone));
 		final String text = "Hallo " + name + ",\n\n"
 				+ "Sie haben einen Termin (30 Minuten) für " + when + " angefragt.\n"
 				+ "Bitte bestätigen Sie Ihre E-Mail-Adresse innerhalb von " + minutesValid + " Minuten:\n\n"

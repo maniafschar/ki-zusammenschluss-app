@@ -1,6 +1,12 @@
 package de.kiexperten.logging;
 
+import java.time.Instant;
 import java.time.LocalDateTime;
+
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonProperty;
+
+import de.kiexperten.Zeit;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -25,6 +31,8 @@ public class ZugriffsLog {
 	@GeneratedValue(strategy = GenerationType.IDENTITY)
 	private Long id;
 
+	// Stored as UTC; the API exposes it as an Instant (see getZeitpunktUtc).
+	@JsonIgnore
 	@Column(nullable = false)
 	private LocalDateTime zeitpunkt;
 
@@ -63,6 +71,11 @@ public class ZugriffsLog {
 	private String contentType;
 
 	private long antwortBytes;
+
+	@JsonProperty("zeitpunkt")
+	public Instant getZeitpunktUtc() {
+		return Zeit.instant(this.zeitpunkt);
+	}
 
 	@Column(length = 4000)
 	private String fehler;

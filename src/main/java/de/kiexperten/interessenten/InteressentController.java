@@ -2,8 +2,7 @@ package de.kiexperten.interessenten;
 
 import java.net.URI;
 import java.security.SecureRandom;
-import java.time.LocalDateTime;
-import java.time.ZoneId;
+import java.time.Instant;
 import java.util.Base64;
 import java.util.List;
 
@@ -19,6 +18,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 
+import de.kiexperten.Zeit;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
@@ -27,7 +27,6 @@ import jakarta.validation.constraints.Size;
 @RestController
 public class InteressentController {
 
-	private static final ZoneId ZONE = ZoneId.of("Europe/Berlin");
 	private static final SecureRandom RANDOM = new SecureRandom();
 
 	private final InteressentRepository repository;
@@ -49,8 +48,8 @@ public class InteressentController {
 	}
 
 	record InteressentAnsicht(Long id, String vorname, String name, String firmenname, String email, String url,
-			String anrede, String text, LocalDateTime createdAt, LocalDateTime gesendetAm, String link, int klickAnzahl,
-			LocalDateTime ersterKlick, LocalDateTime letzterKlick) {
+			String anrede, String text, Instant createdAt, Instant gesendetAm, String link, int klickAnzahl,
+			Instant ersterKlick, Instant letzterKlick) {
 	}
 
 	@GetMapping("/api/admin/interessenten")
@@ -68,7 +67,7 @@ public class InteressentController {
 	@PostMapping("/api/admin/interessenten")
 	ResponseEntity<InteressentAnsicht> create(@Valid @RequestBody final InteressentRequest request) {
 		final Interessent i = new Interessent();
-		i.setCreatedAt(LocalDateTime.now(ZONE));
+		i.setCreatedAt(Zeit.nowUtc());
 		i.setMarker(newMarker());
 		apply(i, request);
 		return ResponseEntity.status(HttpStatus.CREATED).body(view(this.repository.save(i)));
@@ -95,7 +94,7 @@ public class InteressentController {
 			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Bitte zuerst einen Text eintragen.");
 		}
 		this.mail.send(i);
-		i.setGesendetAm(LocalDateTime.now(ZONE));
+		i.setGesendetAm(Zeit.nowUtc());
 		return view(this.repository.save(i));
 	}
 
@@ -103,7 +102,7 @@ public class InteressentController {
 	@Transactional
 	@GetMapping("/api/r/{marker}")
 	ResponseEntity<Void> click(@PathVariable final String marker) {
-		this.repository.registerClick(marker, LocalDateTime.now(ZONE));
+		this.repository.registerClick(marker, Zeit.nowUtc());
 		return ResponseEntity.status(HttpStatus.SEE_OTHER).location(URI.create(this.mail.landingUrl())).build();
 	}
 
@@ -133,7 +132,8 @@ public class InteressentController {
 
 	private InteressentAnsicht view(final Interessent i) {
 		return new InteressentAnsicht(i.getId(), i.getVorname(), i.getName(), i.getFirmenname(), i.getEmail(),
-				i.getUrl(), i.getAnrede(), i.getText(), i.getCreatedAt(), i.getGesendetAm(), this.mail.trackedLink(i),
-				i.getKlickAnzahl(), i.getErsterKlick(), i.getLetzterKlick());
+				i.getUrl(), i.getAnrede(), i.getText(), Zeit.instant(i.getCreatedAt()), Zeit.instant(i.getGesendetAm()),
+				this.mail.trackedLink(i), i.getKlickAnzahl(), Zeit.instant(i.getErsterKlick()),
+				Zeit.instant(i.getLetzterKlick()));
 	}
 }

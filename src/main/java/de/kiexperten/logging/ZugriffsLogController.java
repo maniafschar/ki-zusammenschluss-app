@@ -1,6 +1,6 @@
 package de.kiexperten.logging;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import de.kiexperten.Zeit;
 import jakarta.persistence.criteria.Predicate;
 
 @RestController
@@ -30,16 +31,16 @@ public class ZugriffsLogController {
 
 	@GetMapping("/api/admin/logs")
 	LogSeite search(
-			@RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) final LocalDateTime von,
-			@RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) final LocalDateTime bis,
+			@RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) final Instant von,
+			@RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) final Instant bis,
 			@RequestParam(required = false) final String text) {
 		final Specification<ZugriffsLog> spec = (root, query, cb) -> {
 			final List<Predicate> all = new ArrayList<>();
 			if (von != null) {
-				all.add(cb.greaterThanOrEqualTo(root.get("zeitpunkt"), von));
+				all.add(cb.greaterThanOrEqualTo(root.get("zeitpunkt"), Zeit.utc(von)));
 			}
 			if (bis != null) {
-				all.add(cb.lessThanOrEqualTo(root.get("zeitpunkt"), bis));
+				all.add(cb.lessThanOrEqualTo(root.get("zeitpunkt"), Zeit.utc(bis)));
 			}
 			if (text != null && !text.isBlank()) {
 				// Every word must appear in at least one text column.

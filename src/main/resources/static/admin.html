@@ -601,8 +601,9 @@
 		async function loadLogs() {
 			const params = new URLSearchParams();
 			const f = $('log-form');
-			if (f.von.value) params.set('von', f.von.value + ':00');
-			if (f.bis.value) params.set('bis', f.bis.value + ':59');
+			// datetime-local is in the browser's time zone; the server expects UTC.
+			if (f.von.value) params.set('von', new Date(f.von.value + ':00').toISOString());
+			if (f.bis.value) params.set('bis', new Date(f.bis.value + ':59').toISOString());
 			if (f.text.value.trim()) params.set('text', f.text.value.trim());
 			const r = await api('/ai-expert/api/admin/logs?' + params);
 			const body = document.querySelector('#log-table tbody');

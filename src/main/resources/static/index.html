@@ -879,6 +879,7 @@
 			let selectedDay = null;
 			let selectedSlot = null;
 
+			const timeOf = (iso) => new Date(iso).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
 			const monthIndex = (key) => Number(key.slice(0, 4)) * 12 + Number(key.slice(5, 7)) - 1;
 
 			function setMessage(text, kind = '') {
@@ -895,8 +896,8 @@
 					});
 					slotsByDay = {};
 					slots.forEach((s) => {
-						const day = s.start.slice(0, 10);
-						(slotsByDay[day] ||= []).push(s);
+						const d = new Date(s.start);
+						(slotsByDay[dateKey(d.getFullYear(), d.getMonth(), d.getDate())] ||= []).push(s);
 					});
 					const days = Object.keys(slotsByDay).sort();
 					if (!days.length) {
@@ -957,13 +958,13 @@
 				(slotsByDay[selectedDay] || []).forEach((s) => {
 					const btn = document.createElement('button');
 					btn.type = 'button';
-					btn.textContent = s.start.slice(11, 16) + ' Uhr';
+					btn.textContent = timeOf(s.start) + ' Uhr';
 					btn.className = 'slot' + (s.start === selectedSlot ? ' selected' : '');
 					btn.disabled = !s.frei;
 					btn.addEventListener('click', () => {
 						selectedSlot = s.start;
 						el('booking-selected').textContent =
-							`Ihr Termin: ${day.toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long' })}, ${s.start.slice(11, 16)} Uhr (30 Minuten)`;
+							`Ihr Termin: ${day.toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long' })}, ${timeOf(s.start)} Uhr (30 Minuten)`;
 						bookingForm.hidden = false;
 						setMessage('');
 						renderSlots();
@@ -989,6 +990,7 @@
 						headers: { 'Content-Type': 'application/json', 'X-XSRF-TOKEN': token },
 						body: JSON.stringify({
 							start: selectedSlot,
+							zeitzone: Intl.DateTimeFormat().resolvedOptions().timeZone,
 							name: bookingForm.elements.name.value,
 							email: bookingForm.elements.email.value,
 							telefon: bookingForm.elements.telefon.value,

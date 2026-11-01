@@ -2,9 +2,11 @@ package de.kiexperten.booking;
 
 import java.time.DayOfWeek;
 import java.time.LocalDate;
+import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.ZoneId;
+import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -25,6 +27,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 
+import de.kiexperten.Zeit;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
@@ -41,21 +44,22 @@ public class TerminController {
 	static final int SLOT_MINUTES = 30;
 	static final int DAYS_AHEAD = 60;
 
-	public record Slot(LocalDateTime start, boolean frei) {
+	public record Slot(Instant start, boolean frei) {
 	}
 
 	public record BuchungRequest(
-			@NotNull LocalDateTime start,
+			@NotNull Instant start,
+			@Size(max = 64) String zeitzone,
 			@NotBlank @Size(max = 120) String name,
 			@NotBlank @Email @Size(max = 200) String email,
 			@Pattern(regexp = "^$|^[0-9+()/\\-. ]{5,40}$") String telefon,
 			@Size(max = 2000) String nachricht) {
 	}
 
-	public record BuchungAntwort(LocalDateTime start) {
+	public record BuchungAntwort(Instant start) {
 	}
 
-	public record TerminAnsicht(Long id, LocalDateTime start, String name, String email, String telefon,
+	public record TerminAnsicht(Long id, Instant start, String name, String email, String telefon,
 			String nachricht, String status) {
 	}
 
@@ -82,13 +86,16 @@ public class TerminController {
 
 	@GetMapping("/api/termine")
 	List<Slot> slots() {
-		final LocalDateTime now = LocalDateTime.now(ZONE);
-		final LocalDate firstDay = now.toLocalDate();
+		final LocalDateTime now = Zeit.nowUtc();
+		final Instant nowInstant = Zeit.instant(now);
+		// Opening hours are Berlin business hours; only the stored/transferred values are UTC.
+		final LocalDate firstDay = LocalDate.now(ZONE);
 		final LocalDate lastDay = firstDay.plusDays(DAYS_AHEAD);
-		final Set<LocalDateTime> booked = new HashSet<>();
-		this.termine.findByStartZeitGreaterThanEqualAndStartZeitLessThan(firstDay.atStartOfDay(),
-				lastDay.plusDays(1).atStartOfDay()).stream().filter(t -> !isExpired(t, now))
-				.forEach(t -> booked.add(t.getStartZeit()));
+		final Set<Instant> booked = new HashSet<>();
+		this.termine.findByStartZeitGreaterThanEqualAndStartZeitLessThan(
+				Zeit.utc(firstDay.atStartOfDay(ZONE).toInstant()),
+				Zeit.utc(lastDay.plusDays(1).atStartOfDay(ZONE).toInstant())).stream().filter(t -> !isExpired(t, now))
+				.forEach(t -> booked.add(Zeit.instant(t.getStartZeit())));
 
 		final List<Slot> result = new ArrayList<>();
 		for (LocalDate day = firstDay; !day.isAfter(lastDay); day = day.plusDays(1)) {
@@ -96,8 +103,8 @@ public class TerminController {
 				continue;
 			}
 			for (LocalTime time = FIRST_SLOT; !time.isAfter(LAST_SLOT); time = time.plusMinutes(SLOT_MINUTES)) {
-				final LocalDateTime start = day.atTime(time);
-				if (start.isAfter(now)) {
+				final Instant start = day.atTime(time).atZone(ZONE).toInstant();
+				if (start.isAfter(nowInstant)) {
 					result.add(new Slot(start, !booked.contains(start)));
 				}
 			}
@@ -107,10 +114,12 @@ public class TerminController {
 
 	@PostMapping("/api/termine")
 	ResponseEntity<BuchungAntwort> book(@Valid @RequestBody final BuchungRequest request) {
-		final LocalDateTime start = request.start();
-		final LocalDateTime now = LocalDateTime.now(ZONE);
-		if (!isValidSlot(start) || !start.isAfter(now)
-				|| start.toLocalDate().isAfter(now.toLocalDate().plusDays(DAYS_AHEAD))) {
+		final Instant startInstant = request.start();
+		final ZonedDateTime berlin = startInstant.atZone(ZONE);
+		final LocalDateTime start = Zeit.utc(startInstant);
+		final LocalDateTime now = Zeit.nowUtc();
+		if (!isValidSlot(berlin) || !startInstant.isAfter(Zeit.instant(now))
+				|| berlin.toLocalDate().isAfter(LocalDate.now(ZONE).plusDays(DAYS_AHEAD))) {
 			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Ungültiger Zeitraum");
 		}
 
@@ -135,17 +144,18 @@ public class TerminController {
 			throw new ResponseStatusException(HttpStatus.CONFLICT, "Termin bereits vergeben");
 		}
 		try {
-			this.mail.send(termin.getEmail(), termin.getName(), start, termin.getBestaetigungsToken(), CONFIRM_MINUTES);
+			this.mail.send(termin.getEmail(), termin.getName(), startInstant, zone(request.zeitzone()),
+					termin.getBestaetigungsToken(), CONFIRM_MINUTES);
 		} catch (final RuntimeException e) {
 			this.termine.delete(termin);
 			throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "E-Mail konnte nicht gesendet werden");
 		}
-		return ResponseEntity.status(HttpStatus.CREATED).body(new BuchungAntwort(start));
+		return ResponseEntity.status(HttpStatus.CREATED).body(new BuchungAntwort(startInstant));
 	}
 
 	@GetMapping("/api/termine/bestaetigen")
 	ResponseEntity<Void> confirm(@RequestParam final String token) {
-		final LocalDateTime now = LocalDateTime.now(ZONE);
+		final LocalDateTime now = Zeit.nowUtc();
 		final Optional<Termin> found = this.termine.findByBestaetigungsToken(token);
 		String result = "ungueltig";
 		if (found.isPresent()) {
@@ -167,8 +177,8 @@ public class TerminController {
 	@GetMapping("/api/admin/termine")
 	List<TerminAnsicht> all() {
 		return this.termine.findAllByOrderByStartZeitAsc().stream()
-				.map(t -> new TerminAnsicht(t.getId(), t.getStartZeit(), t.getName(), t.getEmail(), t.getTelefon(),
-						t.getNachricht(), isExpired(t, LocalDateTime.now(ZONE)) ? "ABGELAUFEN" : t.getStatus()))
+				.map(t -> new TerminAnsicht(t.getId(), Zeit.instant(t.getStartZeit()), t.getName(), t.getEmail(), t.getTelefon(),
+						t.getNachricht(), isExpired(t, Zeit.nowUtc()) ? "ABGELAUFEN" : t.getStatus()))
 				.toList();
 	}
 
@@ -186,7 +196,16 @@ public class TerminController {
 		return day.getDayOfWeek() != DayOfWeek.SATURDAY && day.getDayOfWeek() != DayOfWeek.SUNDAY;
 	}
 
-	private static boolean isValidSlot(final LocalDateTime start) {
+	// Unknown or missing zone ids fall back to the business time zone.
+	private static ZoneId zone(final String id) {
+		try {
+			return id == null || id.isBlank() ? ZONE : ZoneId.of(id);
+		} catch (final java.time.DateTimeException e) {
+			return ZONE;
+		}
+	}
+
+	private static boolean isValidSlot(final ZonedDateTime start) {
 		final LocalTime time = start.toLocalTime();
 		return isWorkday(start.toLocalDate())
 				&& start.getSecond() == 0 && start.getNano() == 0

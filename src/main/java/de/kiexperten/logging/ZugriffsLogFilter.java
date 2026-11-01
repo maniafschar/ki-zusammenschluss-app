@@ -4,8 +4,6 @@ import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.nio.charset.StandardCharsets;
-import java.time.LocalDateTime;
-import java.time.ZoneId;
 import java.util.Base64;
 
 import org.slf4j.Logger;
@@ -17,6 +15,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
 import org.springframework.web.servlet.DispatcherServlet;
 import org.springframework.web.util.ContentCachingResponseWrapper;
 
+import de.kiexperten.Zeit;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -31,7 +30,6 @@ import jakarta.servlet.http.HttpServletResponse;
 public class ZugriffsLogFilter extends OncePerRequestFilter {
 
 	private static final Logger LOG = LoggerFactory.getLogger(ZugriffsLogFilter.class);
-	private static final ZoneId ZONE = ZoneId.of("Europe/Berlin");
 
 	private final ZugriffsLogRepository repository;
 
@@ -65,7 +63,7 @@ public class ZugriffsLogFilter extends OncePerRequestFilter {
 			final long durationMs, final Throwable failure) {
 		try {
 			final ZugriffsLog log = new ZugriffsLog();
-			log.setZeitpunkt(LocalDateTime.now(ZONE));
+			log.setZeitpunkt(Zeit.nowUtc());
 			log.setMethode(cut(req.getMethod(), 10));
 			log.setPfad(cut(req.getRequestURI(), 500));
 			log.setQuery(cut(maskSecrets(req.getQueryString()), 1000));
