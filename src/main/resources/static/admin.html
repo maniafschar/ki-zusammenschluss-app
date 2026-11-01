@@ -300,7 +300,9 @@
 				<label>Name<input name="name" maxlength="120"></label>
 				<label>Firmenname<input name="firmenname" maxlength="200"></label>
 				<label>E-Mail<input name="email" type="email" required maxlength="200"></label>
-				<label>Betreuer (Experte, wird beim Senden in die E-Mail aufgenommen)<select name="betreuerId"><option value="">– keiner –</option></select></label>
+				<label>Betreuer (Experte, wird beim Senden in die E-Mail aufgenommen)<select name="betreuerId">
+						<option value="">– keiner –</option>
+					</select></label>
 				<label>Telefon<input name="telefon" type="tel" maxlength="40"></label>
 				<label>URL<input name="url" type="url" maxlength="500"></label>
 				<label>Text der E-Mail<textarea name="text" rows="8" maxlength="10000"></textarea></label>
@@ -329,7 +331,12 @@
 			<table id="log-table">
 				<thead>
 					<tr>
-						<th>Zeit</th><th>Methode</th><th>Pfad</th><th>Status</th><th>ms</th><th>IP</th>
+						<th>Zeit</th>
+						<th>Methode</th>
+						<th>Pfad</th>
+						<th>Status</th>
+						<th>ms</th>
+						<th>IP</th>
 					</tr>
 				</thead>
 				<tbody></tbody>
@@ -615,7 +622,7 @@
 				const cells = [
 					new Date(e.zeitpunkt).toLocaleString('de-DE'), e.methode,
 					e.pfad + (e.query ? '?' + e.query : ''), e.status, e.dauerMs,
-					e.ip + (e.weitergeleitetVon ? ` (${e.weitergeleitetVon})` : '')
+					e.weitergeleitetVon ? e.weitergeleitetVon : e.ip
 				];
 				cells.forEach((c, i) => {
 					const td = document.createElement('td');
@@ -756,7 +763,7 @@
 			} catch (err) {
 				intMessage(err.status === 503 ? 'Kein SMTP-Server konfiguriert (spring.mail.host).'
 					: err.status === 502 ? 'Die E-Mail konnte nicht gesendet werden.'
-					: err.status === 400 ? 'Bitte zuerst einen Text eintragen.' : err.message, true);
+						: err.status === 400 ? 'Bitte zuerst einen Text eintragen.' : err.message, true);
 			}
 		});
 		$('int-delete').addEventListener('click', async () => {
