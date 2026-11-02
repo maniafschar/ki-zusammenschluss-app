@@ -160,7 +160,6 @@
         .todo-card h2 {
             margin: 0 0 16px;
             font-size: 1.25rem;
-            margin-top: 40px;
         }
 
         .todo-form {
@@ -374,9 +373,12 @@
     <div class="container">
         <div class="dashboard-grid">
             <section class="card todo-card" aria-labelledby="todo-heading">
+                <h2 id="todo-heading">Allgemeines</h2>
                 <info id="info-editor" contenteditable="true" role="textbox" aria-label="Editierbare Informationen"
                     aria-multiline="true">
                 </info>
+            </section>
+            <section class="card todo-card" aria-labelledby="todo-heading">
                 <h2 id="todo-heading">To-do Liste</h2>
                 <form class="todo-form" id="todo-form">
                     <label class="sr-only" for="todo-input">Neue Aufgabe</label>
