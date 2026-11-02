@@ -221,6 +221,15 @@
 			gap: 8px;
 		}
 
+		li.clickable {
+			cursor: pointer;
+		}
+
+		li.clickable:hover {
+			border-color: #8cc9b8;
+			background: #f4fbf8;
+		}
+
 		li span {
 			flex: 1;
 			font-weight: 600;
@@ -1076,6 +1085,21 @@
 			return b;
 		}
 
+		function makeClickable(li, onClick) {
+			li.classList.add('clickable');
+			li.tabIndex = 0;
+			li.addEventListener('click', (e) => {
+				if (e.target.closest('button, a')) return;
+				onClick();
+			});
+			li.addEventListener('keydown', (e) => {
+				if (e.target === li && (e.key === 'Enter' || e.key === ' ')) {
+					e.preventDefault();
+					onClick();
+				}
+			});
+		}
+
 		async function loadList() {
 			const cfg = TYPES[current];
 			let items = await api(cfg.public);
@@ -1093,11 +1117,8 @@
 				}
 				const title = document.createElement('span');
 				title.textContent = item[cfg.titleField];
-				li.append(
-					title,
-					makeButton('Bearbeiten', () => startEdit(item)),
-					makeButton('Löschen', () => remove(item), 'danger')
-				);
+				li.append(title, makeButton('Löschen', () => remove(item), 'danger'));
+				makeClickable(li, () => startEdit(item));
 				list.appendChild(li);
 			});
 		}
@@ -1309,7 +1330,8 @@
 				text.textContent = who + (i.firmenname ? ` (${i.firmenname})` : '')
 					+ (i.gesendetAm ? ` – gesendet ${fmt(i.gesendetAm)}` : ' – noch nicht gesendet')
 					+ (i.klickAnzahl ? ` – ${i.klickAnzahl}× geklickt, zuletzt ${fmt(i.letzterKlick)}` : '');
-				li.append(text, makeButton('Details', () => intEdit(i)));
+				li.append(text);
+				makeClickable(li, () => intEdit(i));
 				list.appendChild(li);
 			});
 		}
