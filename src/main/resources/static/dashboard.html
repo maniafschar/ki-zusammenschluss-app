@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>My Work Info</title>
+    <title>AI Work Info</title>
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <style>
@@ -55,7 +55,6 @@
 
         .dashboard-grid {
             display: grid;
-            grid-template-columns: minmax(0, 1.6fr) minmax(320px, 0.9fr);
             align-items: start;
             gap: 24px;
         }
@@ -205,15 +204,58 @@
             flex-wrap: wrap;
         }
 
-        .wissen-form { margin-top: 16px; display: flex; flex-direction: column; gap: 8px; }
-        .wissen-form[hidden] { display: none; }
-        .wissen-form input[type=text] { padding: 8px 10px; border: 1px solid var(--border); border-radius: 6px; font: inherit; }
-        .wissen-actions { display: flex; gap: 8px; flex-wrap: wrap; }
-        .rt-toolbar { display: flex; gap: 4px; flex-wrap: wrap; }
-        .rt-toolbar button { padding: 4px 8px; }
-        .rt-editor { min-height: 160px; max-height: 420px; overflow: auto; padding: 10px; border: 1px solid var(--border); border-radius: 6px; background: #fff; }
-        .rt-editor:focus { outline: 2px solid var(--primary); }
-        .wissen-meta { color: #667085; font-size: .85em; }
+        .wissen-form {
+            margin-top: 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .wissen-form[hidden] {
+            display: none;
+        }
+
+        .wissen-form input[type=text] {
+            padding: 8px 10px;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            font: inherit;
+        }
+
+        .wissen-actions {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .rt-toolbar {
+            display: flex;
+            gap: 4px;
+            flex-wrap: wrap;
+        }
+
+        .rt-toolbar button {
+            padding: 4px 8px;
+        }
+
+        .rt-editor {
+            min-height: 160px;
+            max-height: 420px;
+            overflow: auto;
+            padding: 10px;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            background: #fff;
+        }
+
+        .rt-editor:focus {
+            outline: 2px solid var(--primary);
+        }
+
+        .wissen-meta {
+            color: #667085;
+            font-size: .85em;
+        }
 
         .todo-form input:focus,
         .todo-form button:focus-visible,
@@ -309,12 +351,6 @@
             border: 0;
         }
 
-        @media (max-width: 900px) {
-            .dashboard-grid {
-                grid-template-columns: minmax(0, 1fr);
-            }
-        }
-
         @media (max-width: 480px) {
             .todo-card {
                 padding: 18px;
@@ -336,6 +372,25 @@
 
     <div class="container">
         <div class="dashboard-grid">
+            <section class="card todo-card" aria-labelledby="todo-heading">
+                <info id="info-editor" contenteditable="true" role="textbox" aria-label="Editierbare Informationen"
+                    aria-multiline="true">
+                </info>
+                <h2 id="todo-heading">To-do Liste</h2>
+                <form class="todo-form" id="todo-form">
+                    <label class="sr-only" for="todo-input">Neue Aufgabe</label>
+                    <input id="todo-input" type="text" maxlength="200" placeholder="Neue Aufgabe ..." required>
+                    <label class="sr-only" for="todo-expert">Experte</label>
+                    <select id="todo-expert">
+                        <option value="">– Experte –</option>
+                    </select>
+                    <label class="sr-only" for="todo-due">Erledigen bis</label>
+                    <input id="todo-due" type="date" title="Erledigen bis" style="flex:0 0 auto">
+                    <button type="submit">Hinzufügen</button>
+                </form>
+                <ul class="todo-list" id="todo-list" aria-live="polite"></ul>
+                <p class="count" id="todo-count" aria-live="polite"></p>
+            </section>
             <section class="card todo-card" aria-labelledby="wissen-heading">
                 <h2 id="wissen-heading" style="margin-top:0">Wissensquellen</h2>
                 <form class="todo-form" id="search-form" onsubmit="return false">
@@ -374,31 +429,13 @@
                     </div>
                 </form>
             </section>
-
-            <section class="card todo-card" aria-labelledby="todo-heading">
-                <info id="info-editor" contenteditable="true" role="textbox" aria-label="Editierbare Informationen"
-                    aria-multiline="true">
-                </info>
-                <h2 id="todo-heading">To-do Liste</h2>
-                <form class="todo-form" id="todo-form">
-                    <label class="sr-only" for="todo-input">Neue Aufgabe</label>
-                    <input id="todo-input" type="text" maxlength="200" placeholder="Neue Aufgabe ..." required>
-                    <label class="sr-only" for="todo-expert">Experte</label>
-                    <select id="todo-expert"><option value="">– Experte –</option></select>
-                    <label class="sr-only" for="todo-due">Erledigen bis</label>
-                    <input id="todo-due" type="date" title="Erledigen bis" style="flex:0 0 auto">
-                    <button type="submit">Hinzufügen</button>
-                </form>
-                <ul class="todo-list" id="todo-list" aria-live="polite"></ul>
-                <p class="count" id="todo-count" aria-live="polite"></p>
-            </section>
         </div>
     </div>
 
     <script>
         const apiUrl = '/ai-expert/api/dashboard';
         const searchInput = document.getElementById('search');
-                const todoForm = document.getElementById('todo-form');
+        const todoForm = document.getElementById('todo-form');
         const todoInput = document.getElementById('todo-input');
         const todoList = document.getElementById('todo-list');
         const todoCount = document.getElementById('todo-count');
