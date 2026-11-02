@@ -257,14 +257,13 @@
             font-size: .85em;
         }
 
-        .todo-form input:focus,
-        .todo-form button:focus-visible,
-        .todo-delete:focus-visible {
+        input:focus,
+        *:focus-visible {
             outline: 2px solid var(--primary);
             outline-offset: 2px;
         }
 
-        .todo-form button {
+        button {
             padding: 0 18px;
             border: 0;
             border-radius: 8px;
@@ -273,9 +272,10 @@
             font: inherit;
             font-weight: 600;
             cursor: pointer;
+            min-height: 2.4em;
         }
 
-        .todo-form button:hover {
+        button:hover {
             background: var(--primary-dark);
         }
 
@@ -356,7 +356,7 @@
                 padding: 18px;
             }
 
-            .todo-form button {
+            button {
                 padding: 0 12px;
             }
         }
