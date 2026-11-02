@@ -6,6 +6,7 @@ import java.util.Map;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -37,14 +38,16 @@ public class MeController {
 
 	/** The logged-in user: expert name if the login belongs to an expert, otherwise the plain username. */
 	@GetMapping("/api/admin/me")
-	Map<String, Object> me(final Principal principal) {
+	Map<String, Object> me(final Authentication principal) {
 		final var experte = this.experten.findByEmailIgnoreCase(principal.getName());
 		return Map.of("username", principal.getName(), "name",
 				experte.map(Experte::getName).orElse(principal.getName()),
 				// the configured emergency account has its password in the server configuration
 				"passwortAenderbar", experte.isPresent(),
 				// the configured admin account may set the passwords of all experts
-				"darfPasswoerterSetzen", principal.getName().equals(this.adminName));
+				"darfPasswoerterSetzen", principal.getName().equals(this.adminName),
+				// Berater may only read
+				"nurLesen", principal.getAuthorities().stream().noneMatch(a -> a.getAuthority().equals("ROLE_ADMIN")));
 	}
 
 	@PostMapping("/api/admin/me/passwort")

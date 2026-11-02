@@ -12,8 +12,8 @@ import de.kiexperten.content.ExpertenRolle;
 import de.kiexperten.content.ExpertenRollenService;
 
 /**
- * Only experts whose current role is ADMIN (and who have a password) may log in. The role is evaluated on every
- * request, so a change takes effect immediately. The configured emergency account is kept for scripts.
+ * Experts with the current role ADMIN or BERATER (and a password) may log in; AUSGESCHIEDEN may not. The role is
+ * evaluated on every request, so a change takes effect immediately. The configured emergency account is kept for scripts.
  */
 class ExpertenUserDetailsService implements UserDetailsService {
 	private final UserDetails notzugang;
@@ -35,9 +35,9 @@ class ExpertenUserDetailsService implements UserDetailsService {
 		}
 		return this.experten.findByEmailIgnoreCase(username.trim().toLowerCase(Locale.ROOT))
 				.filter(e -> e.getPasswortHash() != null)
-				.filter(e -> this.rollen.aktuelle(e.getId()) == ExpertenRolle.ADMIN)
-				.map(e -> (UserDetails) User.withUsername(e.getEmail()).password(e.getPasswortHash()).roles("ADMIN")
-						.build())
+				.filter(e -> this.rollen.aktuelle(e.getId()) != ExpertenRolle.AUSGESCHIEDEN)
+				.map(e -> (UserDetails) User.withUsername(e.getEmail()).password(e.getPasswortHash())
+						.roles(this.rollen.aktuelle(e.getId()).name()).build())
 				.orElseThrow(() -> new UsernameNotFoundException("unbekannt"));
 	}
 }

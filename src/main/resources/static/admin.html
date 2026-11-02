@@ -905,6 +905,7 @@
 
 		let current = 'leistungen';
 		let dashboardLoaded = false;
+		let readOnly = false; // Berater: read access to experts, services and products only
 		let canSetPasswords = false; // only the configured admin account may set passwords of experts
 		let editingId = null;
 
@@ -973,6 +974,7 @@
 			box.innerHTML = '';
 			TYPES[current].fields.forEach((f) => {
 				if (f.name === 'passwort' && !canSetPasswords) return;
+				if (readOnly && (f.name === 'passwort' || f.name === 'email')) return;
 				const label = document.createElement('label');
 				label.textContent = f.label;
 				const input = f.type === 'textarea' ? document.createElement('textarea') : document.createElement('input');
@@ -987,6 +989,7 @@
 				if (f.type === 'file') input.accept = 'image/png,image/jpeg,image/gif';
 				input.name = f.name;
 				input.required = !!f.required;
+				input.disabled = readOnly;
 				label.appendChild(input);
 				box.appendChild(label);
 			});
@@ -995,7 +998,7 @@
 		function resetForm() {
 			editingId = null;
 			form.reset();
-			$('form-title').textContent = 'Neu anlegen';
+			$('form-title').textContent = readOnly ? 'Ansicht' : 'Neu anlegen';
 			updateRequiredFields();
 			message('');
 			showZugang(null);
@@ -1006,7 +1009,7 @@
 			TYPES[current].fields.forEach((f) => {
 				if (f.type !== 'file' && form.elements[f.name]) form.elements[f.name].value = item[f.name] ?? '';
 			});
-			$('form-title').textContent = 'Bearbeiten';
+			$('form-title').textContent = readOnly ? 'Ansicht' : 'Bearbeiten';
 			updateRequiredFields();
 			message('');
 			showZugang(item);
@@ -1020,7 +1023,8 @@
 		function showZugang(item) {
 			const panel = $('zugang-panel');
 			zugangId = current === 'experten' && item ? item.id : null;
-			panel.hidden = !zugangId;
+			panel.hidden = !zugangId || readOnly;
+			if (readOnly) return;
 			$('zugang-message').textContent = '';
 			if (!zugangId) return;
 			$('rolle-form').elements.seit.value = new Date().toLocaleDateString('sv-SE');
@@ -1117,7 +1121,8 @@
 				}
 				const title = document.createElement('span');
 				title.textContent = item[cfg.titleField];
-				li.append(title, makeButton('Löschen', () => remove(item), 'danger'));
+				li.append(title);
+				if (!readOnly) li.append(makeButton('Löschen', () => remove(item), 'danger'));
 				makeClickable(li, () => startEdit(item));
 				list.appendChild(li);
 			});
@@ -1415,7 +1420,21 @@
 
 		(async () => {
 			await api('/ai-expert/api/csrf');
-			canSetPasswords = !!(await api('/ai-expert/api/admin/me')).darfPasswoerterSetzen;
+			const me = await api('/ai-expert/api/admin/me');
+			canSetPasswords = !!me.darfPasswoerterSetzen;
+			readOnly = !!me.nurLesen;
+			if (readOnly) {
+				['dashboard', 'termine', 'interessenten', 'logs'].forEach((t) => document.querySelector(`.tabs button[data-type="${t}"]`).remove());
+				$('script-btn').hidden = true;
+				$('new-btn').hidden = true;
+				form.querySelector('.actions').hidden = true;
+				$('form-title').textContent = 'Ansicht';
+				$('dashboard-panel').hidden = true;
+				document.querySelector('.tabs button[data-type="experten"]').click();
+				return;
+			}
+			dashboardLoaded = true;
+			window.loadDashboard();
 			renderFields();
 			await loadList();
 		})().catch((err) => message(err.message, true));
@@ -1807,9 +1826,6 @@
 			}
 
 			window.loadDashboard = load;
-			// Dashboard is the initially active tab, so load it right away
-			dashboardLoaded = true;
-			load();
 
 		})();
 	</script>

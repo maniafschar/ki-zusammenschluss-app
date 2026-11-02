@@ -2,6 +2,7 @@ package de.kiexperten.config;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
+import org.springframework.http.HttpMethod;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -31,6 +32,11 @@ public class SecurityConfig {
 				.requestMatchers("/", "/index.html", "/api/leistungen", "/api/produkte", "/api/experten",
 						"/api/csrf", "/api/termine", "/api/termine/bestaetigen", "/api/r/*", "/error")
 				.permitAll()
+				// Berater: read-only access to experts (leistungen/produkte are public reads) and their own account
+				.requestMatchers(HttpMethod.GET, "/api/admin/experten", "/api/admin/experten/*/rollen")
+				.hasAnyRole("ADMIN", "BERATER")
+				.requestMatchers("/api/admin/me", "/api/admin/me/passwort").hasAnyRole("ADMIN", "BERATER")
+				.requestMatchers("/api/admin/**", "/api/dashboard/**").hasRole("ADMIN")
 				.anyRequest().authenticated())
 				.httpBasic(Customizer.withDefaults())
 				.csrf(csrf -> csrf
