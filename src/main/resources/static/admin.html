@@ -667,6 +667,180 @@
 				padding: 0 12px;
 			}
 		}
+
+		/* ---- Mobile ---- */
+		@media (max-width: 700px) {
+			body {
+				padding: 12px;
+				padding-top: 8px;
+			}
+
+			.current-user {
+				top: 6px;
+				right: 8px;
+				background: #fff;
+				border: 1px solid #d9ece6;
+				max-width: 55vw;
+				overflow: hidden;
+				text-overflow: ellipsis;
+				white-space: nowrap;
+				font-size: .85em;
+			}
+
+			h1 {
+				font-size: 1.3rem;
+				margin: 44px 0 12px;
+			}
+
+			.tabs {
+				overflow-x: auto;
+				-webkit-overflow-scrolling: touch;
+				scrollbar-width: none;
+				margin: 0 -12px 16px;
+				padding: 0 12px 4px;
+			}
+
+			.tabs::-webkit-scrollbar {
+				display: none;
+			}
+
+			.tabs button {
+				flex: 0 0 auto;
+				white-space: nowrap;
+			}
+
+			#script-btn {
+				margin-left: 0 !important;
+			}
+
+			button {
+				min-height: 44px;
+			}
+
+			input,
+			textarea,
+			select {
+				font-size: 16px;
+				min-height: 44px;
+				max-width: 100%;
+				box-sizing: border-box;
+			}
+
+			.layout {
+				grid-template-columns: minmax(0, 1fr);
+				gap: 16px;
+			}
+
+			.layout>div,
+			form,
+			label {
+				min-width: 0;
+			}
+
+			input[type="file"] {
+				width: 100%;
+				min-height: 0;
+			}
+
+			form {
+				padding: 14px;
+				border-radius: 10px;
+			}
+
+			li {
+				padding: 10px 12px;
+				flex-wrap: wrap;
+			}
+
+			li img {
+				width: 44px;
+				height: 44px;
+			}
+
+			li span {
+				min-width: 0;
+				overflow-wrap: anywhere;
+			}
+
+			li button {
+				min-height: 40px;
+			}
+
+			.actions {
+				flex-wrap: wrap;
+			}
+
+			.actions button {
+				flex: 1 1 120px;
+			}
+
+			.log-filter {
+				grid-template-columns: 1fr;
+			}
+
+			.table-wrap,
+			#zugang-panel {
+				overflow-x: auto;
+			}
+
+			#zugang-panel table {
+				font-size: .85rem;
+			}
+
+			#zugang-panel input,
+			#zugang-panel select {
+				width: 100%;
+				box-sizing: border-box;
+			}
+
+			.int-info {
+				grid-template-columns: 1fr;
+			}
+
+			.log-detail dl {
+				grid-template-columns: 1fr;
+			}
+
+			#user-menu {
+				left: 8px;
+				right: 8px;
+				width: auto !important;
+				top: 44px !important;
+			}
+
+			#dashboard-panel {
+				margin: 0 -4px;
+			}
+
+			#dashboard-panel :is(input, select, textarea) {
+				font-size: 16px;
+				max-width: 100%;
+			}
+
+			#dashboard-panel .todo-form {
+				flex-wrap: wrap;
+			}
+
+			#dashboard-panel .todo-item {
+				flex-wrap: wrap;
+			}
+
+			#dashboard-panel .todo-meta {
+				flex: 1 1 100%;
+			}
+
+			#dashboard-panel .todo-meta select,
+			#dashboard-panel .todo-meta input {
+				flex: 1 1 120px;
+				max-width: none;
+			}
+
+			#dashboard-panel .todo-form input,
+			#dashboard-panel .todo-form select {
+				flex: 1 1 100%;
+				width: 100%;
+			}
+		}
 	</style>
 </head>
 
