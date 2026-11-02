@@ -382,6 +382,7 @@
 			<ul id="list"></ul>
 		</div>
 
+		<div>
 		<form id="form">
 			<h2 id="form-title">Neu anlegen</h2>
 			<div id="fields"></div>
@@ -416,16 +417,9 @@
 					</thead>
 					<tbody id="rolle-verlauf"></tbody>
 				</table>
-				<h3>Zugangsdaten</h3>
-				<form id="zugang-form">
-					<label>E-Mail (Benutzername; leer = kein Zugang)<input type="email" name="email" maxlength="254"
-							autocomplete="off"></label>
-					<label>Neues Passwort (mind. 10 Zeichen; leer = unverändert)<input type="password"
-							name="passwort" minlength="10" maxlength="200" autocomplete="new-password"></label>
-					<button type="submit">Zugang speichern</button>
-				</form>
 				<p id="zugang-message" role="status"></p>
 			</section>
+		</div>
 	</div>
 
 	<script>
@@ -460,7 +454,9 @@
 					{ name: 'rolle', label: 'Rolle / Fachgebiet', type: 'text', required: true },
 					{ name: 'beschreibung', label: 'Profilbeschreibung', type: 'textarea', required: true },
 					{ name: 'position', label: 'Reihenfolge', type: 'number' },
-					{ name: 'bild', label: 'Profilbild (PNG, JPEG oder GIF, max. 5 MB)', type: 'file', required: true }
+					{ name: 'bild', label: 'Profilbild (PNG, JPEG oder GIF, max. 5 MB)', type: 'file', required: true },
+					{ name: 'email', label: 'Login E-Mail (leer = kein Zugang)', type: 'email' },
+					{ name: 'passwort', label: 'Passwort (mind. 10 Zeichen; beim Bearbeiten leer = unverändert)', type: 'password', minlength: 10 }
 				]
 			}
 		};
@@ -541,6 +537,8 @@
 					input.type = f.type;
 				}
 				if (f.type === 'number') input.min = 0;
+				if (f.type === 'email' || f.type === 'password') input.autocomplete = f.type === 'email' ? 'off' : 'new-password';
+				if (f.minlength) input.minLength = f.minlength;
 				if (f.type === 'file') input.accept = 'image/png,image/jpeg,image/gif';
 				input.name = f.name;
 				input.required = !!f.required;
@@ -580,8 +578,6 @@
 			panel.hidden = !zugangId;
 			$('zugang-message').textContent = '';
 			if (!zugangId) return;
-			$('zugang-form').elements.email.value = item.email || '';
-			$('zugang-form').elements.passwort.value = '';
 			$('rolle-form').elements.seit.value = new Date().toLocaleDateString('sv-SE');
 			$('rolle-aktuell').textContent = ROLLEN[item.aktuelleRolle] || '';
 			loadVerlauf().catch((e) => { $('zugang-message').textContent = e.message; });
@@ -626,19 +622,6 @@
 				await loadVerlauf();
 				$('zugang-message').textContent = 'Rolle gespeichert.';
 			} catch (err) { $('zugang-message').textContent = err.message; }
-		});
-
-		$('zugang-form').addEventListener('submit', async (e) => {
-			e.preventDefault();
-			const f = e.target.elements;
-			try {
-				await api(`${ZUGANG}/${zugangId}/zugang`, { method: 'PUT', body: JSON.stringify({ email: f.email.value, passwort: f.passwort.value }) });
-				f.passwort.value = '';
-				$('zugang-message').textContent = 'Zugang gespeichert.';
-			} catch (err) {
-				$('zugang-message').textContent = err.status === 409 ? 'Diese E-Mail wird bereits verwendet.' :
-					(err.body && err.body.message) || err.message;
-			}
 		});
 
 		function updateRequiredFields() {
@@ -702,6 +685,8 @@
 			if (current === 'experten') {
 				body = new FormData(form);
 				if (!body.get('position')) body.set('position', '0');
+				body.delete('email');
+				body.delete('passwort');
 			} else {
 				body = {};
 				cfg.fields.forEach((f) => {
@@ -712,7 +697,21 @@
 			}
 			try {
 				const url = editingId ? `${cfg.base}/${editingId}` : cfg.base;
-				await api(url, { method: editingId ? 'PUT' : 'POST', body });
+				const saved = await api(url, { method: editingId ? 'PUT' : 'POST', body });
+				if (current === 'experten') {
+					const email = form.elements.email.value.trim();
+					const passwort = form.elements.passwort.value;
+					if (editingId || email || passwort) {
+						try {
+							await api(`${ZUGANG}/${saved.id}/zugang`, { method: 'PUT', body: JSON.stringify({ email, passwort }) });
+						} catch (err) {
+							await loadList();
+							message(err.status === 409 ? 'Experte gespeichert, aber diese E-Mail wird bereits verwendet.' :
+								'Experte gespeichert, aber der Zugang nicht: ' + ((err.body && err.body.message) || err.message), true);
+							return;
+						}
+					}
+				}
 				resetForm();
 				message('Gespeichert.');
 				await loadList();
