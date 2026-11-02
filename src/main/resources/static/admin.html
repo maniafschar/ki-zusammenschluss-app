@@ -262,6 +262,11 @@
 				grid-template-columns: 1fr;
 			}
 		}
+		#zugang-panel { margin-top: 24px; max-width: 720px; }
+		#zugang-panel label { display: block; margin: 8px 0; }
+		#zugang-panel input, #zugang-panel select { display: block; padding: 8px 10px; border: 1px solid #cbd5e1; border-radius: 6px; font: inherit; }
+		#zugang-panel table { border-collapse: collapse; width: 100%; margin-top: 8px; }
+		#zugang-panel th, #zugang-panel td { text-align: left; padding: 4px 8px; border-bottom: 1px solid #e2e8f0; }
 	</style>
 </head>
 
@@ -361,6 +366,32 @@
 		</form>
 	</div>
 
+	<section id="zugang-panel" hidden>
+		<h2>Rolle &amp; Zugang</h2>
+		<p>Anmelden in Admin und Dashboard dürfen nur Experten mit der aktuellen Rolle „Admin“.</p>
+		<p><strong>Aktuelle Rolle:</strong> <span id="rolle-aktuell"></span></p>
+		<form id="rolle-form">
+			<label>Rolle<select name="rolle">
+					<option value="ADMIN">Admin</option>
+					<option value="BERATER">Berater</option>
+					<option value="AUSGESCHIEDEN">Ausgeschieden</option>
+				</select></label>
+			<label>Gültig ab<input type="date" name="seit" required></label>
+			<button type="submit">Rolle vergeben</button>
+		</form>
+		<table>
+			<thead><tr><th>Rolle</th><th>Seit</th><th>Vergeben von</th><th>Erfasst</th><th></th></tr></thead>
+			<tbody id="rolle-verlauf"></tbody>
+		</table>
+		<h3>Zugangsdaten</h3>
+		<form id="zugang-form">
+			<label>E-Mail (Benutzername; leer = kein Zugang)<input type="email" name="email" maxlength="254" autocomplete="off"></label>
+			<label>Neues Passwort (mind. 10 Zeichen; leer = unverändert)<input type="password" name="passwort" minlength="10" maxlength="200" autocomplete="new-password"></label>
+			<button type="submit">Zugang speichern</button>
+		</form>
+		<p id="zugang-message" role="status"></p>
+	</section>
+
 	<script>
 		const TYPES = {
 			leistungen: {
@@ -386,7 +417,7 @@
 			},
 			experten: {
 				base: '/ai-expert/api/admin/experten',
-				public: '/ai-expert/api/experten',
+				public: '/ai-expert/api/admin/experten',
 				titleField: 'name',
 				fields: [
 					{ name: 'name', label: 'Name', type: 'text', required: true },
@@ -488,6 +519,7 @@
 			$('form-title').textContent = 'Neu anlegen';
 			updateRequiredFields();
 			message('');
+			showZugang(null);
 		}
 
 		function startEdit(item) {
@@ -498,7 +530,80 @@
 			$('form-title').textContent = 'Bearbeiten';
 			updateRequiredFields();
 			message('');
+			showZugang(item);
 		}
+
+		const ROLLEN = { ADMIN: 'Admin', BERATER: 'Berater', AUSGESCHIEDEN: 'Ausgeschieden' };
+		const ZUGANG = '/ai-expert/api/admin/experten';
+		let zugangId = null;
+		const fmtDate = (d) => new Date(d + 'T00:00:00').toLocaleDateString();
+
+		function showZugang(item) {
+			const panel = $('zugang-panel');
+			zugangId = current === 'experten' && item ? item.id : null;
+			panel.hidden = !zugangId;
+			$('zugang-message').textContent = '';
+			if (!zugangId) return;
+			$('zugang-form').elements.email.value = item.email || '';
+			$('zugang-form').elements.passwort.value = '';
+			$('rolle-form').elements.seit.value = new Date().toLocaleDateString('sv-SE');
+			$('rolle-aktuell').textContent = ROLLEN[item.aktuelleRolle] || '';
+			loadVerlauf().catch((e) => { $('zugang-message').textContent = e.message; });
+		}
+
+		async function loadVerlauf() {
+			const id = zugangId;
+			const rows = await api(`${ZUGANG}/${id}/rollen`);
+			if (id !== zugangId) return;
+			const body = $('rolle-verlauf');
+			body.innerHTML = '';
+			rows.forEach((r) => {
+				const tr = document.createElement('tr');
+				[ROLLEN[r.rolle], fmtDate(r.seit), r.vergebenVon || '', new Date(r.erfasstAmUtc).toLocaleString()].forEach((t) => {
+					const td = document.createElement('td');
+					td.textContent = t;
+					tr.appendChild(td);
+				});
+				const td = document.createElement('td');
+				td.appendChild(makeButton('Löschen', async () => {
+					if (!confirm('Eintrag wirklich löschen?')) return;
+					try {
+						await api(`${ZUGANG}/${id}/rollen/${r.id}`, { method: 'DELETE' });
+						await loadVerlauf();
+						await loadList();
+					} catch (e) { $('zugang-message').textContent = e.message; }
+				}, 'danger'));
+				tr.appendChild(td);
+				body.appendChild(tr);
+			});
+		}
+
+		$('rolle-form').addEventListener('submit', async (e) => {
+			e.preventDefault();
+			const f = e.target.elements;
+			try {
+				await api(`${ZUGANG}/${zugangId}/rollen`, { method: 'POST', body: JSON.stringify({ rolle: f.rolle.value, seit: f.seit.value }) });
+				const id = zugangId;
+				await loadList();
+				const item = (await api(ZUGANG)).find((x) => x.profil.id === id);
+				if (item) $('rolle-aktuell').textContent = ROLLEN[item.aktuelleRolle];
+				await loadVerlauf();
+				$('zugang-message').textContent = 'Rolle gespeichert.';
+			} catch (err) { $('zugang-message').textContent = err.message; }
+		});
+
+		$('zugang-form').addEventListener('submit', async (e) => {
+			e.preventDefault();
+			const f = e.target.elements;
+			try {
+				await api(`${ZUGANG}/${zugangId}/zugang`, { method: 'PUT', body: JSON.stringify({ email: f.email.value, passwort: f.passwort.value }) });
+				f.passwort.value = '';
+				$('zugang-message').textContent = 'Zugang gespeichert.';
+			} catch (err) {
+				$('zugang-message').textContent = err.status === 409 ? 'Diese E-Mail wird bereits verwendet.' :
+					(err.body && err.body.message) || err.message;
+			}
+		});
 
 		function updateRequiredFields() {
 			TYPES[current].fields.forEach((f) => {
@@ -517,7 +622,8 @@
 
 		async function loadList() {
 			const cfg = TYPES[current];
-			const items = await api(cfg.public);
+			let items = await api(cfg.public);
+			if (current === 'experten') items = items.map((x) => ({ ...x.profil, email: x.email, aktuelleRolle: x.aktuelleRolle }));
 			const list = $('list');
 			list.innerHTML = '';
 			items.forEach((item) => {

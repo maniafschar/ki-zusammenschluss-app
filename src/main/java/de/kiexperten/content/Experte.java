@@ -32,6 +32,14 @@ public class Experte {
 
 	private int position;
 
+	// Login of the expert (only effective while the current role is ADMIN)
+	@Column(unique = true, length = 254)
+	private String email;
+
+	@JsonIgnore
+	@Column(length = 100)
+	private String passwortHash;
+
 	@JsonIgnore
 	@Lob
 	@Column(nullable = false)

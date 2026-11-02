@@ -32,12 +32,14 @@ public class AdminContentController {
 	private final LeistungRepository leistungen;
 	private final ProduktRepository produkte;
 	private final ExperteRepository experten;
+	private final ExpertenRollenRepository rollen;
 
 	public AdminContentController(LeistungRepository leistungen, ProduktRepository produkte,
-			ExperteRepository experten) {
+			ExperteRepository experten, ExpertenRollenRepository rollen) {
 		this.leistungen = leistungen;
 		this.produkte = produkte;
 		this.experten = experten;
+		this.rollen = rollen;
 	}
 
 	@PostMapping("/leistungen")
@@ -91,12 +93,16 @@ public class AdminContentController {
 
 	@PostMapping("/experten")
 	ResponseEntity<Experte> createExperte(@RequestParam String name, @RequestParam String rolle,
-			@RequestParam String beschreibung, @RequestParam int position, @RequestParam MultipartFile bild) {
+			@RequestParam String beschreibung, @RequestParam int position, @RequestParam MultipartFile bild,
+			java.security.Principal principal) {
 		validateExperte(name, rolle, beschreibung, position);
 		ValidatedImage image = validateImage(bild);
 		Experte experte = new Experte(name.trim(), rolle.trim(), beschreibung.trim(), position, image.data(),
 				image.contentType());
-		return ResponseEntity.status(HttpStatus.CREATED).body(this.experten.save(experte));
+		Experte saved = this.experten.save(experte);
+		this.rollen.save(new ExpertenRollenEintrag(saved.getId(), ExpertenRolle.BERATER,
+				ExpertenRollenService.heute(), principal.getName()));
+		return ResponseEntity.status(HttpStatus.CREATED).body(saved);
 	}
 
 	@PutMapping("/experten/{id}")
@@ -123,6 +129,7 @@ public class AdminContentController {
 			throw notFound();
 		}
 		this.experten.deleteById(id);
+		this.rollen.deleteByExperteId(id);
 		return ResponseEntity.noContent().build();
 	}
 

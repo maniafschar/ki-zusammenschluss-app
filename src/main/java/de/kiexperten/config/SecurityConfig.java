@@ -10,8 +10,9 @@ import org.springframework.security.core.userdetails.User;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.security.provisioning.InMemoryUserDetailsManager;
 import org.springframework.security.web.SecurityFilterChain;
+import de.kiexperten.content.ExperteRepository;
+import de.kiexperten.content.ExpertenRollenService;
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
 import org.springframework.security.web.csrf.CsrfTokenRequestAttributeHandler;
 
@@ -27,7 +28,7 @@ public class SecurityConfig {
 		csrfRequestHandler.setCsrfRequestAttributeName(null);
 
 		http.authorizeHttpRequests(auth -> auth
-				.requestMatchers("/", "/index.html", "/admin.html", "/api/leistungen", "/api/produkte", "/api/experten",
+				.requestMatchers("/", "/index.html", "/api/leistungen", "/api/produkte", "/api/experten",
 						"/api/csrf", "/api/termine", "/api/termine/bestaetigen", "/api/r/*", "/error")
 				.permitAll()
 				.anyRequest().authenticated())
@@ -45,9 +46,10 @@ public class SecurityConfig {
 	@Bean
 	UserDetailsService userDetailsService(@Value("${app.admin.username}") final String username,
 			@Value("${app.admin.password}") final String password,
-			final PasswordEncoder encoder) {
-		return new InMemoryUserDetailsManager(
-				User.withUsername(username).password(encoder.encode(password)).roles("ADMIN").build());
+			final PasswordEncoder encoder, final ExperteRepository experten, final ExpertenRollenService rollen) {
+		return new ExpertenUserDetailsService(
+				User.withUsername(username).password(encoder.encode(password)).roles("ADMIN").build(), experten,
+				rollen);
 	}
 
 	@Bean

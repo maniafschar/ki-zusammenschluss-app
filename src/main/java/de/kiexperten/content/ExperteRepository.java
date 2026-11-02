@@ -6,4 +6,6 @@ import org.springframework.data.jpa.repository.JpaRepository;
 public interface ExperteRepository extends JpaRepository<Experte, Long> {
 
 	List<Experte> findAllByOrderByPositionAscIdAsc();
+
+	java.util.Optional<Experte> findByEmailIgnoreCase(String email);
 }
