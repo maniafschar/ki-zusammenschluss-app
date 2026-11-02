@@ -831,7 +831,17 @@
 
         load();
     </script>
-    <script src="user-menu.js"></script>
+    <script>
+        // Embedded in the admin page: the admin page already shows header and user menu
+        if (new URLSearchParams(location.search).has('embedded')) {
+            document.querySelector('header').hidden = true;
+            document.getElementById('current-user').hidden = true;
+        } else {
+            const s = document.createElement('script');
+            s.src = 'user-menu.js';
+            document.body.appendChild(s);
+        }
+    </script>
 
 </body>
 
