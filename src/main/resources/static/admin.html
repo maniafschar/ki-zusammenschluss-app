@@ -1807,6 +1807,9 @@
 			}
 
 			window.loadDashboard = load;
+			// Dashboard is the initially active tab, so load it right away
+			dashboardLoaded = true;
+			load();
 
 		})();
 	</script>
