@@ -959,16 +959,13 @@
 		$('new-btn').addEventListener('click', resetForm);
 		$('cancel-btn').addEventListener('click', resetForm);
 
-		api('/ai-expert/api/admin/me').then((me) => {
-			$('current-user').textContent = '👤 ' + me.name;
-		}).catch(() => { });
-
 		(async () => {
 			await api('/ai-expert/api/csrf');
 			renderFields();
 			await loadList();
 		})().catch((err) => message(err.message, true));
 	</script>
+	<script src="user-menu.js"></script>
 
 </body>
 
