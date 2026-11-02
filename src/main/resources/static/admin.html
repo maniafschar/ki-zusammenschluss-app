@@ -302,6 +302,294 @@
 			padding: 4px 8px;
 			border-bottom: 1px solid #e2e8f0;
 		}
+
+		/* ---- Dashboard (embedded) ---- */
+#dashboard-panel :is(button, ul, li, form, label, textarea, input, select, h1, h2, h3, span, img, a, p, table, th, td) { all: revert; box-sizing: border-box; }
+#dashboard-panel { background: var(--bg); color: var(--text); font-family: "Segoe UI", Arial, sans-serif; border-radius: 10px; }
+#dashboard-panel {
+            --primary: #0078d4;
+            --primary-dark: #005a9e;
+            --bg: #f5f7fb;
+            --card: #ffffff;
+            --border: #e5e7eb;
+            --text: #1f2937;
+            --hover: #f0f7ff;
+        }
+#dashboard-panel * {
+            box-sizing: border-box;
+        }
+#dashboard-panel {
+            margin: 0;
+            font-family: "Segoe UI", Arial, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+        }
+#dashboard-panel .container {
+            max-width: 1600px;
+            margin: 30px auto;
+            padding: 0 20px;
+        }
+#dashboard-panel .dashboard-grid {
+            display: grid;
+            align-items: start;
+            gap: 24px;
+        }
+#dashboard-panel .card {
+            background: var(--card);
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, .08);
+            overflow: hidden;
+        }
+#dashboard-panel .toolbar {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 20px;
+            border-bottom: 1px solid var(--border);
+        }
+#dashboard-panel #filter-count {
+            white-space: nowrap;
+            font-size: 0.9rem;
+            color: #666;
+        }
+#dashboard-panel info {
+            white-space: pre-wrap;
+            margin: -15px;
+            padding: 15px;
+            border-radius: 8px;
+            display: block;
+        }
+#dashboard-panel info[contenteditable="true"]:focus {
+            outline: 2px solid var(--primary);
+            outline-offset: -2px;
+        }
+#dashboard-panel #search {
+            width: 100%;
+            padding: 12px 16px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            font-size: 14px;
+        }
+#dashboard-panel table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+#dashboard-panel th {
+            background: #fafafa;
+            cursor: pointer;
+            user-select: none;
+            position: sticky;
+            top: 0;
+            z-index: 1;
+        }
+#dashboard-panel th,
+#dashboard-panel td {
+            text-align: left;
+            padding: 14px 16px;
+            border-bottom: 1px solid var(--border);
+        }
+#dashboard-panel tr:hover {
+            background: var(--hover);
+        }
+#dashboard-panel a {
+            color: var(--primary);
+            text-decoration: none;
+            word-break: break-all;
+        }
+#dashboard-panel a:hover {
+            text-decoration: underline;
+        }
+#dashboard-panel .badge {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 20px;
+            background: #eef6ff;
+            color: var(--primary);
+            font-size: 12px;
+            font-weight: 600;
+        }
+#dashboard-panel .count {
+            margin-top: 10px;
+            font-size: 14px;
+            color: #666;
+        }
+#dashboard-panel .todo-card {
+            margin-top: 0;
+            padding: 24px;
+        }
+#dashboard-panel .todo-card h2 {
+            margin: 0 0 16px;
+            font-size: 1.25rem;
+        }
+#dashboard-panel .todo-form {
+            display: flex;
+            gap: 10px;
+        }
+#dashboard-panel .todo-form input {
+            flex: 1;
+            min-width: 0;
+            padding: 12px 14px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            font: inherit;
+        }
+#dashboard-panel .todo-form select,
+#dashboard-panel .todo-meta select,
+#dashboard-panel .todo-meta input {
+            padding: 6px 8px;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            font: inherit;
+            min-width: 0;
+            max-width: 160px;
+        }
+#dashboard-panel .todo-meta {
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap;
+        }
+#dashboard-panel .todo-item.overdue .todo-meta input {
+            border-color: #b42318;
+            color: #b42318;
+            font-weight: 600;
+        }
+#dashboard-panel .todo-form {
+            flex-wrap: wrap;
+        }
+#dashboard-panel .wissen-form {
+            margin-top: 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+#dashboard-panel .wissen-form[hidden] {
+            display: none;
+        }
+#dashboard-panel .wissen-form input[type=text] {
+            padding: 8px 10px;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            font: inherit;
+        }
+#dashboard-panel .wissen-actions {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+#dashboard-panel .rt-toolbar {
+            display: flex;
+            gap: 4px;
+            flex-wrap: wrap;
+        }
+#dashboard-panel .rt-toolbar button {
+            padding: 4px 8px;
+        }
+#dashboard-panel .rt-editor {
+            min-height: 160px;
+            max-height: 420px;
+            overflow: auto;
+            padding: 10px;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            background: #fff;
+        }
+#dashboard-panel .rt-editor:focus {
+            outline: 2px solid var(--primary);
+        }
+#dashboard-panel .wissen-meta {
+            color: #667085;
+            font-size: .85em;
+        }
+#dashboard-panel input:focus,
+#dashboard-panel *:focus-visible {
+            outline: 2px solid var(--primary);
+            outline-offset: 2px;
+        }
+#dashboard-panel button {
+            padding: 0 18px;
+            border: 0;
+            border-radius: 8px;
+            background: var(--primary);
+            color: white;
+            font: inherit;
+            font-weight: 600;
+            cursor: pointer;
+            min-height: 2.4em;
+            min-width: 2.4em;
+        }
+#dashboard-panel button:hover {
+            background: var(--primary-dark);
+        }
+#dashboard-panel .todo-list {
+            display: grid;
+            gap: 8px;
+            margin: 18px 0 0;
+            padding: 0;
+            list-style: none;
+        }
+#dashboard-panel .todo-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            min-height: 48px;
+            padding: 8px 10px;
+            border-bottom: 1px solid var(--border);
+        }
+#dashboard-panel .todo-item input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+            margin: 0;
+            accent-color: var(--primary);
+            cursor: pointer;
+        }
+#dashboard-panel .todo-note {
+            flex: 1;
+            overflow-wrap: anywhere;
+        }
+#dashboard-panel .todo-item.completed .todo-note {
+            color: #6b7280;
+            text-decoration: line-through;
+        }
+#dashboard-panel .todo-delete {
+            width: 36px;
+            height: 36px;
+            border: 0;
+            border-radius: 6px;
+            background: transparent;
+            color: #6b7280;
+            font-size: 20px;
+            cursor: pointer;
+        }
+#dashboard-panel .todo-delete:hover {
+            background: #fff1f0;
+            color: #b42318;
+        }
+#dashboard-panel .link-note {
+            color: #6b7280;
+        }
+#dashboard-panel .todo-empty {
+            padding: 14px 10px;
+            color: #6b7280;
+        }
+#dashboard-panel .sr-only {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            padding: 0;
+            margin: -1px;
+            overflow: hidden;
+            clip: rect(0, 0, 0, 0);
+            white-space: nowrap;
+            border: 0;
+        }
+@media (max-width: 480px) {
+#dashboard-panel .todo-card {
+                padding: 18px;
+            }
+#dashboard-panel button {
+                padding: 0 12px;
+            }
+}
 	</style>
 </head>
 
@@ -387,8 +675,70 @@
 	</section>
 
 	<section id="dashboard-panel" hidden>
-		<iframe id="dashboard-frame" title="Dashboard"
-			style="width:100%;height:calc(100vh - 150px);min-height:500px;border:1px solid #d9ece6;border-radius:10px;background:#fff"></iframe>
+<div class="container">
+        <div class="dashboard-grid">
+            <section class="card todo-card" aria-labelledby="todo-heading">
+                <h2 id="todo-heading">Allgemeines</h2>
+                <info id="info-editor" contenteditable="true" role="textbox" aria-label="Editierbare Informationen"
+                    aria-multiline="true">
+                </info>
+            </section>
+            <section class="card todo-card" aria-labelledby="todo-heading">
+                <h2 id="todo-heading">To-do Liste</h2>
+                <form class="todo-form" id="todo-form">
+                    <label class="sr-only" for="todo-input">Neue Aufgabe</label>
+                    <input id="todo-input" type="text" maxlength="200" placeholder="Neue Aufgabe ..." required>
+                    <label class="sr-only" for="todo-expert">Experte</label>
+                    <select id="todo-expert">
+                        <option value="">– Experte –</option>
+                    </select>
+                    <label class="sr-only" for="todo-due">Erledigen bis</label>
+                    <input id="todo-due" type="date" title="Erledigen bis" style="flex:0 0 auto">
+                    <button type="submit">Hinzufügen</button>
+                </form>
+                <ul class="todo-list" id="todo-list" aria-live="polite"></ul>
+                <p class="count" id="todo-count" aria-live="polite"></p>
+            </section>
+            <section class="card todo-card" aria-labelledby="wissen-heading">
+                <h2 id="wissen-heading" style="margin-top:0">Wissensquellen</h2>
+                <form class="todo-form" id="search-form" onsubmit="return false">
+                    <label class="sr-only" for="search">Suchen</label>
+                    <input type="text" id="search" placeholder="🔍 Nach Titel oder Inhalt suchen ...">
+                    <button type="button" id="wissen-new">Neu</button>
+                </form>
+                <ul class="todo-list" id="wissen-list" aria-live="polite"></ul>
+                <p class="count" id="filter-count" aria-live="polite"></p>
+
+                <form id="wissen-form" class="wissen-form" hidden>
+                    <label for="wissen-title">Titel</label>
+                    <input id="wissen-title" type="text" maxlength="200" required>
+                    <label id="wissen-text-label">Inhalt</label>
+                    <div class="rt-toolbar" role="toolbar" aria-label="Formatierung">
+                        <button type="button" data-cmd="bold" title="Fett"><b>B</b></button>
+                        <button type="button" data-cmd="italic" title="Kursiv"><i>I</i></button>
+                        <button type="button" data-cmd="underline" title="Unterstrichen"><u>U</u></button>
+                        <button type="button" data-cmd="formatBlock" data-arg="h3" title="Überschrift">H</button>
+                        <button type="button" data-cmd="formatBlock" data-arg="p" title="Absatz">¶</button>
+                        <button type="button" data-cmd="insertUnorderedList" title="Aufzählung">• Liste</button>
+                        <button type="button" data-cmd="insertOrderedList" title="Nummerierung">1. Liste</button>
+                        <button type="button" data-cmd="createLink" title="Link einfügen">🔗</button>
+                        <button type="button" data-cmd="unlink" title="Link entfernen">⛓</button>
+                        <button type="button" data-cmd="removeFormat" title="Formatierung entfernen">✕</button>
+                    </div>
+                    <div id="wissen-content" class="rt-editor" contenteditable="true" role="textbox"
+                        aria-multiline="true" aria-labelledby="wissen-text-label"></div>
+                    <label for="wissen-files">Anhänge</label>
+                    <ul class="todo-list" id="wissen-files-list"></ul>
+                    <input id="wissen-files" type="file" multiple>
+                    <div class="wissen-actions">
+                        <button type="submit">Speichern</button>
+                        <button type="button" id="wissen-cancel">Abbrechen</button>
+                        <button type="button" id="wissen-delete" hidden>Löschen</button>
+                    </div>
+                </form>
+            </section>
+        </div>
+    </div>
 	</section>
 
 	<div class="layout" id="content-layout">
@@ -477,6 +827,7 @@
 		};
 
 		let current = 'leistungen';
+		let dashboardLoaded = false;
 		let canSetPasswords = false; // only the configured admin account may set passwords of experts
 		let editingId = null;
 
@@ -947,8 +1298,7 @@
 				$('logs-panel').hidden = !isLogs;
 				const isDash = btn.dataset.type === 'dashboard';
 				$('dashboard-panel').hidden = !isDash;
-				// loaded on first use; the embedded page hides its own header and user menu
-				if (isDash && !$('dashboard-frame').src) $('dashboard-frame').src = '/ai-expert/dashboard.html?embedded=1';
+				if (isDash && !dashboardLoaded) { dashboardLoaded = true; window.loadDashboard(); }
 				$('content-layout').hidden = isTermine || isLogs || isInt || isDash;
 				if (isDash) return;
 				if (isInt) {
@@ -979,6 +1329,396 @@
 			renderFields();
 			await loadList();
 		})().catch((err) => message(err.message, true));
+	</script>
+	<script>
+(function () {
+
+        const apiUrl = '/ai-expert/api/dashboard';
+        const searchInput = document.getElementById('search');
+        const todoForm = document.getElementById('todo-form');
+        const todoInput = document.getElementById('todo-input');
+        const todoList = document.getElementById('todo-list');
+        const todoCount = document.getElementById('todo-count');
+        const infoEditor = document.getElementById('info-editor');
+        let wissen = [];
+        let todos = [];
+        let experts = [];
+        const todoExpert = document.getElementById('todo-expert');
+        const todoDue = document.getElementById('todo-due');
+
+        const getCookie = name => decodeURIComponent((document.cookie.match(new RegExp('(?:^|; )' + name + '=([^;]*)')) || [])[1] || '');
+
+        // Uses the browser's admin (HTTP Basic) login; changing requests need the CSRF token
+        async function api(method, path = '', body, extraHeaders = {}) {
+            const isForm = body instanceof FormData;
+            const headers = { ...(isForm ? {} : { 'Content-Type': 'application/json' }), ...extraHeaders };
+            if (method !== 'GET') {
+                await fetch('/ai-expert/api/csrf', { credentials: 'same-origin' });
+                headers['X-XSRF-TOKEN'] = getCookie('XSRF-TOKEN');
+            }
+            const response = await fetch(apiUrl + path, {
+                method, headers, credentials: 'same-origin',
+                body: body === undefined ? undefined : isForm ? body : JSON.stringify(body)
+            });
+            if (response.status === 401) throw new Error('Zugang abgelehnt');
+            if (!response.ok) throw new Error('Fehler ' + response.status);
+            const note = await response.text();
+            return note ? JSON.parse(note) : null;
+        }
+
+        function fail(error) {
+            alert('Aktion fehlgeschlagen: ' + error.message);
+        }
+
+        const wissenList = document.getElementById('wissen-list');
+        const wissenForm = document.getElementById('wissen-form');
+        const wissenTitle = document.getElementById('wissen-title');
+        const wissenContent = document.getElementById('wissen-content');
+        const wissenFiles = document.getElementById('wissen-files');
+        const wissenFilesList = document.getElementById('wissen-files-list');
+        const wissenDelete = document.getElementById('wissen-delete');
+        let editing = null; // knowledge source being edited, or {} for a new one
+
+        const plainText = html => { const d = document.createElement('div'); d.innerHTML = html || ''; return d.textContent; };
+        const formatSize = n => n < 1024 ? n + ' B' : n < 1048576 ? (n / 1024).toFixed(1) + ' KB' : (n / 1048576).toFixed(1) + ' MB';
+
+        function applyFilter() {
+            const filter = searchInput.value.toLowerCase();
+            let visible = 0;
+            wissen.forEach((w, i) => {
+                const item = wissenList.children[i];
+                if (!item || !item.classList.contains('todo-item')) return;
+                const match = (w.title + ' ' + plainText(w.content)).toLowerCase().includes(filter);
+                item.style.display = match ? '' : 'none';
+                if (match) visible++;
+            });
+            document.getElementById('filter-count').textContent = visible + ' / ' + wissen.length;
+        }
+
+        searchInput.addEventListener('input', applyFilter);
+
+        function renderWissen() {
+            wissenList.replaceChildren();
+            wissen.sort((a, b) => a.title.localeCompare(b.title, 'de'));
+            wissen.forEach(w => {
+                const item = document.createElement('li');
+                item.className = 'todo-item';
+                const open = document.createElement('button');
+                open.type = 'button';
+                open.className = 'todo-note';
+                open.style.cssText = 'background:none;border:0;text-align:left;cursor:pointer;font:inherit;color:inherit';
+                const files = w.anhaenge.length ? ` 📎 ${w.anhaenge.length}` : '';
+                open.textContent = w.title + files;
+                open.addEventListener('click', () => openEditor(w));
+                item.appendChild(open);
+                wissenList.appendChild(item);
+            });
+            if (wissen.length === 0) {
+                const empty = document.createElement('li');
+                empty.className = 'todo-empty';
+                empty.textContent = 'Noch keine Wissensquellen.';
+                wissenList.appendChild(empty);
+            }
+            applyFilter();
+        }
+
+        let pending = [];
+
+        function renderFiles() {
+            wissenFilesList.replaceChildren();
+            (editing.anhaenge || []).forEach(a => {
+                const li = document.createElement('li');
+                li.className = 'todo-item';
+                const link = document.createElement('a');
+                link.href = `${apiUrl}/wissen/${editing.id}/anhang/${a.id}`;
+                link.textContent = `${a.name} (${formatSize(a.size)})`;
+                link.className = 'todo-note';
+                const del = document.createElement('button');
+                del.type = 'button';
+                del.className = 'todo-delete';
+                del.textContent = '×';
+                del.title = 'Anhang löschen';
+                del.setAttribute('aria-label', 'Anhang löschen: ' + a.name);
+                del.addEventListener('click', async () => {
+                    if (!confirm(`Anhang "${a.name}" wirklich löschen?`)) return;
+                    try {
+                        await api('DELETE', `/wissen/${editing.id}/anhang/${a.id}`);
+                        editing.anhaenge = editing.anhaenge.filter(x => x !== a);
+                        renderFiles();
+                        renderWissen();
+                    } catch (error) { fail(error); }
+                });
+                li.append(link, del);
+                wissenFilesList.appendChild(li);
+            });
+            pending.forEach(f => {
+                const li = document.createElement('li');
+                li.className = 'todo-item wissen-meta';
+                li.textContent = `${f.name} (${formatSize(f.size)}) – wird beim Speichern hochgeladen`;
+                wissenFilesList.appendChild(li);
+            });
+        }
+
+        function openEditor(w) {
+            editing = w || { anhaenge: [] };
+            pending = [];
+            wissenFiles.value = '';
+            wissenTitle.value = editing.title || '';
+            wissenContent.innerHTML = editing.content || '';
+            wissenDelete.hidden = !editing.id;
+            wissenForm.hidden = false;
+            renderFiles();
+            wissenTitle.focus();
+        }
+
+        const closeEditor = () => { wissenForm.hidden = true; editing = null; };
+
+        document.getElementById('wissen-new').addEventListener('click', () => openEditor(null));
+        document.getElementById('wissen-cancel').addEventListener('click', closeEditor);
+
+        wissenFiles.addEventListener('change', () => {
+            pending.push(...wissenFiles.files);
+            wissenFiles.value = '';
+            renderFiles();
+        });
+
+        document.querySelector('.rt-toolbar').addEventListener('click', event => {
+            const button = event.target.closest('button[data-cmd]');
+            if (!button) return;
+            let arg = button.dataset.arg;
+            if (button.dataset.cmd === 'createLink') {
+                arg = prompt('Adresse (https://...)');
+                if (!arg || !/^(https?:\/\/|mailto:)/i.test(arg.trim())) return;
+                arg = arg.trim();
+            }
+            wissenContent.focus();
+            document.execCommand(button.dataset.cmd, false, arg);
+        });
+
+        wissenForm.addEventListener('submit', async event => {
+            event.preventDefault();
+            const title = wissenTitle.value.trim();
+            if (!title) return;
+            const content = wissenContent.innerHTML;
+            try {
+                let saved;
+                if (editing.id) {
+                    saved = await api('PUT', '/wissen/' + editing.id, { title, content });
+                    wissen = wissen.filter(w => w.id !== saved.id);
+                } else {
+                    saved = await api('POST', '/wissen', { title, content });
+                }
+                if (pending.length) {
+                    const form = new FormData();
+                    pending.forEach(f => form.append('dateien', f));
+                    saved.anhaenge = (saved.anhaenge || []).concat(await api('POST', `/wissen/${saved.id}/anhang`, form));
+                }
+                wissen.push(saved);
+                renderWissen();
+                openEditor(saved);
+            } catch (error) {
+                fail(error);
+            }
+        });
+
+        wissenDelete.addEventListener('click', async () => {
+            if (!confirm(`Wissensquelle "${editing.title}" samt Anhängen wirklich löschen?`)) return;
+            try {
+                await api('DELETE', '/wissen/' + editing.id);
+                wissen = wissen.filter(w => w !== editing);
+                closeEditor();
+                renderWissen();
+            } catch (error) { fail(error); }
+        });
+
+        const today = () => {
+            const d = new Date();
+            return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+        };
+
+        // Todos with a due date first (earliest first), then the rest by creation
+        function sortTodos() {
+            todos.sort((a, b) => (a.dueDate || '9999') < (b.dueDate || '9999') ? -1
+                : (a.dueDate || '9999') > (b.dueDate || '9999') ? 1 : Number(a.id) - Number(b.id));
+        }
+
+        function expertSelectElement(selectedId) {
+            const select = document.createElement('select');
+            select.add(new Option('– Experte –', ''));
+            experts.forEach(e => select.add(new Option(e.name, e.id)));
+            select.value = selectedId == null ? '' : String(selectedId);
+            return select;
+        }
+
+        function fillExpertSelect() {
+            todoExpert.length = 1;
+            experts.forEach(e => todoExpert.add(new Option(e.name, e.id)));
+        }
+
+        function renderTodos() {
+            todoList.replaceChildren();
+
+            todos.forEach(todo => {
+                const item = document.createElement('li');
+                const overdue = !todo.completed && todo.dueDate && todo.dueDate < today();
+                item.className = `todo-item${todo.completed ? ' completed' : ''}${overdue ? ' overdue' : ''}`;
+
+                const checkbox = document.createElement('input');
+                checkbox.type = 'checkbox';
+                checkbox.checked = todo.completed;
+                checkbox.setAttribute('aria-label', `Aufgabe erledigt: ${todo.note}`);
+                checkbox.addEventListener('change', async () => {
+                    try {
+                        await api('PUT', '/todo/' + todo.id, { completed: checkbox.checked });
+                        todo.completed = checkbox.checked;
+                    } catch (error) {
+                        fail(error);
+                    }
+                    renderTodos();
+                });
+
+                const note = document.createElement('span');
+                note.className = 'todo-note';
+                note.textContent = todo.note;
+
+                const deleteButton = document.createElement('button');
+                deleteButton.className = 'todo-delete';
+                deleteButton.type = 'button';
+                deleteButton.textContent = '×';
+                deleteButton.setAttribute('aria-label', `Aufgabe löschen: ${todo.note}`);
+                deleteButton.title = 'Aufgabe löschen';
+                deleteButton.addEventListener('click', async () => {
+                    try {
+                        await api('DELETE', '/todo/' + todo.id);
+                        todos = todos.filter(entry => entry !== todo);
+                        renderTodos();
+                    } catch (error) {
+                        fail(error);
+                    }
+                });
+
+                const meta = document.createElement('div');
+                meta.className = 'todo-meta';
+                const expertSelect = expertSelectElement(todo.expertId);
+                expertSelect.setAttribute('aria-label', `Experte für: ${todo.note}`);
+                const dueInput = document.createElement('input');
+                dueInput.type = 'date';
+                dueInput.value = todo.dueDate || '';
+                dueInput.title = 'Erledigen bis';
+                dueInput.setAttribute('aria-label', `Erledigen bis für: ${todo.note}`);
+                const saveAssignment = async () => {
+                    try {
+                        const saved = await api('PUT', '/todo/' + todo.id, {
+                            assign: true,
+                            expertId: expertSelect.value ? Number(expertSelect.value) : null,
+                            dueDate: dueInput.value || null
+                        });
+                        todo.expertId = saved.expertId ?? null;
+                        todo.dueDate = saved.dueDate ?? null;
+                    } catch (error) {
+                        fail(error);
+                    }
+                    sortTodos();
+                    renderTodos();
+                };
+                expertSelect.addEventListener('change', saveAssignment);
+                dueInput.addEventListener('change', saveAssignment);
+                meta.append(expertSelect, dueInput);
+
+                item.append(checkbox, note, meta, deleteButton);
+                todoList.appendChild(item);
+            });
+
+            if (todos.length === 0) {
+                const emptyMessage = document.createElement('li');
+                emptyMessage.className = 'todo-empty';
+                emptyMessage.textContent = 'Noch keine Aufgaben.';
+                todoList.appendChild(emptyMessage);
+            }
+
+            const openCount = todos.filter(todo => !todo.completed).length;
+            todoCount.textContent = `${openCount} offen · ${todos.length} insgesamt`;
+        }
+
+        todoForm.addEventListener('submit', async event => {
+            event.preventDefault();
+            const note = todoInput.value.trim();
+            if (!note) return;
+            try {
+                todos.push(await api('POST', '/todo', {
+                    note,
+                    expertId: todoExpert.value ? Number(todoExpert.value) : null,
+                    dueDate: todoDue.value || null
+                }));
+                sortTodos();
+                renderTodos();
+                todoForm.reset();
+                todoInput.focus();
+            } catch (error) {
+                fail(error);
+            }
+        });
+
+        let infoTimer = null;
+        let infoDirty = false;
+
+        async function saveInfo() {
+            clearTimeout(infoTimer);
+            if (!infoDirty) return;
+            infoDirty = false;
+            try {
+                await api('PUT', '/info', { note: infoEditor.innerText });
+            } catch (error) {
+                infoDirty = true;
+                console.error(error);
+            }
+        }
+
+        infoEditor.addEventListener('input', () => {
+            infoDirty = true;
+            clearTimeout(infoTimer);
+            infoTimer = setTimeout(saveInfo, 800);
+        });
+        infoEditor.addEventListener('blur', saveInfo);
+        window.addEventListener('pagehide', saveInfo);
+
+        const toBase64 = bytes => btoa(String.fromCharCode(...new Uint8Array(bytes)));
+        const fromBase64 = text => Uint8Array.from(atob(text), c => c.charCodeAt(0));
+
+        // The private key never leaves the browser; the server only gets the public key
+        async function loadEncrypted() {
+            const keyPair = await crypto.subtle.generateKey({
+                name: 'RSA-OAEP', modulusLength: 2048, publicExponent: new Uint8Array([1, 0, 1]), hash: 'SHA-256'
+            }, false, ['decrypt']);
+            const publicKey = toBase64(await crypto.subtle.exportKey('spki', keyPair.publicKey));
+            const encrypted = await api('GET', '', undefined, { publicKey });
+            const aesKey = await crypto.subtle.importKey('raw',
+                await crypto.subtle.decrypt({ name: 'RSA-OAEP' }, keyPair.privateKey, fromBase64(encrypted.key)),
+                'AES-GCM', false, ['decrypt']);
+            const plain = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: fromBase64(encrypted.iv) },
+                aesKey, fromBase64(encrypted.data));
+            return JSON.parse(new TextDecoder().decode(plain));
+        }
+
+        async function load() {
+            try {
+                const data = await loadEncrypted();
+                wissen = data.wissen;
+                todos = data.todos;
+                experts = data.experten || [];
+                fillExpertSelect();
+                sortTodos();
+                infoEditor.textContent = data.info;
+            } catch (error) {
+                fail(error);
+            }
+            renderWissen();
+            renderTodos();
+        }
+
+        window.loadDashboard = load;
+    
+})();
 	</script>
 	<script src="user-menu.js"></script>
 
