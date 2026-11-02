@@ -325,64 +325,27 @@
 				<button type="button" id="int-new">+ Neu anlegen</button>
 				<ul id="int-list"></ul>
 			</div>
-			<div>
-				<form id="int-form">
-					<h2 id="int-title">Neu anlegen</h2>
-					<label>Anrede (Herr / Frau / leer)<input name="anrede" maxlength="40"></label>
-					<label>Vorname<input name="vorname" maxlength="120"></label>
-					<label>Name<input name="name" maxlength="120"></label>
-					<label>Firmenname<input name="firmenname" maxlength="200"></label>
-					<label>E-Mail<input name="email" type="email" required maxlength="200"></label>
-					<label>Betreuer (Experte, wird beim Senden in die E-Mail aufgenommen)<select name="betreuerId">
-							<option value="">– keiner –</option>
-						</select></label>
-					<label>Telefon<input name="telefon" type="tel" maxlength="40"></label>
-					<label>URL<input name="url" type="url" maxlength="500"></label>
-					<label>Text der E-Mail<textarea name="text" rows="8" maxlength="10000"></textarea></label>
-					<dl id="int-info" class="int-info" hidden></dl>
-					<p id="int-message" role="status"></p>
-					<div class="actions">
-						<button type="submit" class="active">Speichern</button>
-						<button type="button" id="int-send" hidden>E-Mail senden</button>
-						<button type="button" id="int-delete" class="danger" hidden>Löschen</button>
-					</div>
-				</form>
-				<section id="zugang-panel" hidden>
-					<h2>Rolle &amp; Zugang</h2>
-					<p>Anmelden in Admin und Dashboard dürfen nur Experten mit der aktuellen Rolle „Admin“.</p>
-					<p><strong>Aktuelle Rolle:</strong> <span id="rolle-aktuell"></span></p>
-					<form id="rolle-form">
-						<label>Rolle<select name="rolle">
-								<option value="ADMIN">Admin</option>
-								<option value="BERATER">Berater</option>
-								<option value="AUSGESCHIEDEN">Ausgeschieden</option>
-							</select></label>
-						<label>Gültig ab<input type="date" name="seit" required></label>
-						<button type="submit">Rolle vergeben</button>
-					</form>
-					<table>
-						<thead>
-							<tr>
-								<th>Rolle</th>
-								<th>Seit</th>
-								<th>Vergeben von</th>
-								<th>Erfasst</th>
-								<th></th>
-							</tr>
-						</thead>
-						<tbody id="rolle-verlauf"></tbody>
-					</table>
-					<h3>Zugangsdaten</h3>
-					<form id="zugang-form">
-						<label>E-Mail (Benutzername; leer = kein Zugang)<input type="email" name="email" maxlength="254"
-								autocomplete="off"></label>
-						<label>Neues Passwort (mind. 10 Zeichen; leer = unverändert)<input type="password"
-								name="passwort" minlength="10" maxlength="200" autocomplete="new-password"></label>
-						<button type="submit">Zugang speichern</button>
-					</form>
-					<p id="zugang-message" role="status"></p>
-				</section>
-			</div>
+			<form id="int-form">
+				<h2 id="int-title">Neu anlegen</h2>
+				<label>Anrede (Herr / Frau / leer)<input name="anrede" maxlength="40"></label>
+				<label>Vorname<input name="vorname" maxlength="120"></label>
+				<label>Name<input name="name" maxlength="120"></label>
+				<label>Firmenname<input name="firmenname" maxlength="200"></label>
+				<label>E-Mail<input name="email" type="email" required maxlength="200"></label>
+				<label>Betreuer (Experte, wird beim Senden in die E-Mail aufgenommen)<select name="betreuerId">
+						<option value="">– keiner –</option>
+					</select></label>
+				<label>Telefon<input name="telefon" type="tel" maxlength="40"></label>
+				<label>URL<input name="url" type="url" maxlength="500"></label>
+				<label>Text der E-Mail<textarea name="text" rows="8" maxlength="10000"></textarea></label>
+				<dl id="int-info" class="int-info" hidden></dl>
+				<p id="int-message" role="status"></p>
+				<div class="actions">
+					<button type="submit" class="active">Speichern</button>
+					<button type="button" id="int-send" hidden>E-Mail senden</button>
+					<button type="button" id="int-delete" class="danger" hidden>Löschen</button>
+				</div>
+			</form>
 		</div>
 	</section>
 
@@ -427,6 +390,33 @@
 				<button type="submit" class="active">Speichern</button>
 				<button type="button" id="cancel-btn">Abbrechen</button>
 			</div>
+			<section id="zugang-panel" hidden>
+				<h2>Rolle &amp; Zugang</h2>
+				<p>Anmelden in Admin und Dashboard dürfen nur Experten mit der aktuellen Rolle „Admin“.</p>
+				<p><strong>Aktuelle Rolle:</strong> <span id="rolle-aktuell"></span></p>
+				<form id="rolle-form">
+					<label>Rolle<select name="rolle">
+							<option value="ADMIN">Admin</option>
+							<option value="BERATER">Berater</option>
+							<option value="AUSGESCHIEDEN">Ausgeschieden</option>
+						</select></label>
+					<label>Gültig ab<input type="date" name="seit" required></label>
+					<button type="submit">Rolle vergeben</button>
+				</form>
+				<table>
+					<thead>
+						<tr>
+							<th>Rolle</th>
+							<th>Seit</th>
+							<th>Vergeben von</th>
+							<th>Erfasst</th>
+							<th></th>
+						</tr>
+					</thead>
+					<tbody id="rolle-verlauf"></tbody>
+				</table>
+				<p id="zugang-message" role="status"></p>
+			</section>
 		</form>
 	</div>
 
@@ -462,7 +452,9 @@
 					{ name: 'rolle', label: 'Rolle / Fachgebiet', type: 'text', required: true },
 					{ name: 'beschreibung', label: 'Profilbeschreibung', type: 'textarea', required: true },
 					{ name: 'position', label: 'Reihenfolge', type: 'number' },
-					{ name: 'bild', label: 'Profilbild (PNG, JPEG oder GIF, max. 5 MB)', type: 'file', required: true }
+					{ name: 'bild', label: 'Profilbild (PNG, JPEG oder GIF, max. 5 MB)', type: 'file', required: true },
+					{ name: 'Email', label: 'Email', type: 'email', required: true },
+					{ name: 'Passwort', label: 'Passwort', type: 'text', required: true }
 				]
 			}
 		};
@@ -582,8 +574,6 @@
 			panel.hidden = !zugangId;
 			$('zugang-message').textContent = '';
 			if (!zugangId) return;
-			$('zugang-form').elements.email.value = item.email || '';
-			$('zugang-form').elements.passwort.value = '';
 			$('rolle-form').elements.seit.value = new Date().toLocaleDateString('sv-SE');
 			$('rolle-aktuell').textContent = ROLLEN[item.aktuelleRolle] || '';
 			loadVerlauf().catch((e) => { $('zugang-message').textContent = e.message; });
@@ -628,19 +618,6 @@
 				await loadVerlauf();
 				$('zugang-message').textContent = 'Rolle gespeichert.';
 			} catch (err) { $('zugang-message').textContent = err.message; }
-		});
-
-		$('zugang-form').addEventListener('submit', async (e) => {
-			e.preventDefault();
-			const f = e.target.elements;
-			try {
-				await api(`${ZUGANG}/${zugangId}/zugang`, { method: 'PUT', body: JSON.stringify({ email: f.email.value, passwort: f.passwort.value }) });
-				f.passwort.value = '';
-				$('zugang-message').textContent = 'Zugang gespeichert.';
-			} catch (err) {
-				$('zugang-message').textContent = err.status === 409 ? 'Diese E-Mail wird bereits verwendet.' :
-					(err.body && err.body.message) || err.message;
-			}
 		});
 
 		function updateRequiredFields() {
