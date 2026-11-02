@@ -3,6 +3,7 @@ package de.kiexperten.admin;
 import java.security.Principal;
 import java.util.Map;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -22,8 +23,11 @@ import jakarta.validation.constraints.Size;
 public class MeController {
 	private final ExperteRepository experten;
 	private final PasswordEncoder encoder;
+	private final String adminName;
 
-	public MeController(final ExperteRepository experten, final PasswordEncoder encoder) {
+	public MeController(final ExperteRepository experten, final PasswordEncoder encoder,
+			@Value("${app.admin.username}") final String adminName) {
+		this.adminName = adminName;
 		this.experten = experten;
 		this.encoder = encoder;
 	}
@@ -38,7 +42,9 @@ public class MeController {
 		return Map.of("username", principal.getName(), "name",
 				experte.map(Experte::getName).orElse(principal.getName()),
 				// the configured emergency account has its password in the server configuration
-				"passwortAenderbar", experte.isPresent());
+				"passwortAenderbar", experte.isPresent(),
+				// the configured admin account may set the passwords of all experts
+				"darfPasswoerterSetzen", principal.getName().equals(this.adminName));
 	}
 
 	@PostMapping("/api/admin/me/passwort")

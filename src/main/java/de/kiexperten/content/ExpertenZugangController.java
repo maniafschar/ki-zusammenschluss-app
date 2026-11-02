@@ -5,6 +5,7 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.regex.Pattern;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -33,9 +34,12 @@ public class ExpertenZugangController {
 	private final ExpertenRollenRepository rollen;
 	private final ExpertenRollenService service;
 	private final PasswordEncoder encoder;
+	private final String adminName;
 
 	public ExpertenZugangController(final ExperteRepository experten, final ExpertenRollenRepository rollen,
-			final ExpertenRollenService service, final PasswordEncoder encoder) {
+			final ExpertenRollenService service, final PasswordEncoder encoder,
+			@Value("${app.admin.username}") final String adminName) {
+		this.adminName = adminName;
 		this.experten = experten;
 		this.rollen = rollen;
 		this.service = service;
@@ -84,10 +88,15 @@ public class ExpertenZugangController {
 	/** An empty e-mail removes the login; an empty password keeps the existing one. */
 	@PutMapping("/{id}/zugang")
 	@Transactional
-	AdminProfil zugang(@PathVariable final Long id, @Valid @RequestBody final ZugangRequest request) {
+	AdminProfil zugang(@PathVariable final Long id, @Valid @RequestBody final ZugangRequest request,
+			final Principal principal) {
 		final Experte experte = pruefe(id);
 		final String email = request.email() == null ? "" : request.email().trim().toLowerCase();
 		final String passwort = request.passwort() == null ? "" : request.passwort();
+		if (!passwort.isEmpty() && !principal.getName().equals(this.adminName)) {
+			throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Nur der Benutzer \"" + this.adminName
+					+ "\" darf Passwörter setzen");
+		}
 		if (email.isEmpty()) {
 			experte.setEmail(null);
 			experte.setPasswortHash(null);

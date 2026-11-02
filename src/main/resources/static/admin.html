@@ -471,6 +471,7 @@
 		};
 
 		let current = 'leistungen';
+		let canSetPasswords = false; // only the configured admin account may set passwords of experts
 		let editingId = null;
 
 		const $ = (id) => document.getElementById(id);
@@ -537,6 +538,7 @@
 			const box = $('fields');
 			box.innerHTML = '';
 			TYPES[current].fields.forEach((f) => {
+				if (f.name === 'passwort' && !canSetPasswords) return;
 				const label = document.createElement('label');
 				label.textContent = f.label;
 				const input = f.type === 'textarea' ? document.createElement('textarea') : document.createElement('input');
@@ -568,7 +570,7 @@
 		function startEdit(item) {
 			editingId = item.id;
 			TYPES[current].fields.forEach((f) => {
-				if (f.type !== 'file') form.elements[f.name].value = item[f.name] ?? '';
+				if (f.type !== 'file' && form.elements[f.name]) form.elements[f.name].value = item[f.name] ?? '';
 			});
 			$('form-title').textContent = 'Bearbeiten';
 			updateRequiredFields();
@@ -635,6 +637,7 @@
 
 		function updateRequiredFields() {
 			TYPES[current].fields.forEach((f) => {
+				if (!form.elements[f.name]) return;
 				form.elements[f.name].required = !!f.required && (f.type !== 'file' || !editingId);
 			});
 		}
@@ -709,7 +712,7 @@
 				const saved = await api(url, { method: editingId ? 'PUT' : 'POST', body });
 				if (current === 'experten') {
 					const email = form.elements.email.value.trim();
-					const passwort = form.elements.passwort.value;
+					const passwort = form.elements.passwort ? form.elements.passwort.value : '';
 					if (editingId || email || passwort) {
 						try {
 							await api(`${ZUGANG}/${saved.id}/zugang`, { method: 'PUT', body: JSON.stringify({ email, passwort }) });
@@ -961,6 +964,7 @@
 
 		(async () => {
 			await api('/ai-expert/api/csrf');
+			canSetPasswords = !!(await api('/ai-expert/api/admin/me')).darfPasswoerterSetzen;
 			renderFields();
 			await loadList();
 		})().catch((err) => message(err.message, true));
