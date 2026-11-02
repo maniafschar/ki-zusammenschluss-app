@@ -390,7 +390,8 @@
 				<button type="submit" class="active">Speichern</button>
 				<button type="button" id="cancel-btn">Abbrechen</button>
 			</div>
-			<section id="zugang-panel" hidden>
+		</form>
+		<section id="zugang-panel" hidden>
 				<h2>Rolle &amp; Zugang</h2>
 				<p>Anmelden in Admin und Dashboard dürfen nur Experten mit der aktuellen Rolle „Admin“.</p>
 				<p><strong>Aktuelle Rolle:</strong> <span id="rolle-aktuell"></span></p>
@@ -415,9 +416,16 @@
 					</thead>
 					<tbody id="rolle-verlauf"></tbody>
 				</table>
+				<h3>Zugangsdaten</h3>
+				<form id="zugang-form">
+					<label>E-Mail (Benutzername; leer = kein Zugang)<input type="email" name="email" maxlength="254"
+							autocomplete="off"></label>
+					<label>Neues Passwort (mind. 10 Zeichen; leer = unverändert)<input type="password"
+							name="passwort" minlength="10" maxlength="200" autocomplete="new-password"></label>
+					<button type="submit">Zugang speichern</button>
+				</form>
 				<p id="zugang-message" role="status"></p>
 			</section>
-		</form>
 	</div>
 
 	<script>
@@ -452,9 +460,7 @@
 					{ name: 'rolle', label: 'Rolle / Fachgebiet', type: 'text', required: true },
 					{ name: 'beschreibung', label: 'Profilbeschreibung', type: 'textarea', required: true },
 					{ name: 'position', label: 'Reihenfolge', type: 'number' },
-					{ name: 'bild', label: 'Profilbild (PNG, JPEG oder GIF, max. 5 MB)', type: 'file', required: true },
-					{ name: 'Email', label: 'Email', type: 'email', required: true },
-					{ name: 'Passwort', label: 'Passwort', type: 'text', required: true }
+					{ name: 'bild', label: 'Profilbild (PNG, JPEG oder GIF, max. 5 MB)', type: 'file', required: true }
 				]
 			}
 		};
@@ -574,6 +580,8 @@
 			panel.hidden = !zugangId;
 			$('zugang-message').textContent = '';
 			if (!zugangId) return;
+			$('zugang-form').elements.email.value = item.email || '';
+			$('zugang-form').elements.passwort.value = '';
 			$('rolle-form').elements.seit.value = new Date().toLocaleDateString('sv-SE');
 			$('rolle-aktuell').textContent = ROLLEN[item.aktuelleRolle] || '';
 			loadVerlauf().catch((e) => { $('zugang-message').textContent = e.message; });
@@ -618,6 +626,19 @@
 				await loadVerlauf();
 				$('zugang-message').textContent = 'Rolle gespeichert.';
 			} catch (err) { $('zugang-message').textContent = err.message; }
+		});
+
+		$('zugang-form').addEventListener('submit', async (e) => {
+			e.preventDefault();
+			const f = e.target.elements;
+			try {
+				await api(`${ZUGANG}/${zugangId}/zugang`, { method: 'PUT', body: JSON.stringify({ email: f.email.value, passwort: f.passwort.value }) });
+				f.passwort.value = '';
+				$('zugang-message').textContent = 'Zugang gespeichert.';
+			} catch (err) {
+				$('zugang-message').textContent = err.status === 409 ? 'Diese E-Mail wird bereits verwendet.' :
+					(err.body && err.body.message) || err.message;
+			}
 		});
 
 		function updateRequiredFields() {
