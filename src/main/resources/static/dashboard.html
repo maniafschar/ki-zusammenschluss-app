@@ -30,10 +30,19 @@
         }
 
         header {
+            position: relative;
             background: linear-gradient(135deg, var(--primary), var(--primary-dark));
             color: white;
             padding: 30px;
             text-align: center;
+        }
+
+        .current-user {
+            position: absolute;
+            top: 10px;
+            right: 16px;
+            font-size: .9em;
+            opacity: .95;
         }
 
         header h1 {
@@ -366,6 +375,7 @@
 <body>
 
     <header>
+        <span id="current-user" class="current-user" title="Angemeldeter Benutzer"></span>
         <h1>🌐 My Work Info</h1>
         <span>All you need is...</span>
     </header>
@@ -818,6 +828,11 @@
             renderWissen();
             renderTodos();
         }
+
+        fetch('/ai-expert/api/admin/me', { credentials: 'same-origin' })
+            .then(r => r.ok ? r.json() : null)
+            .then(me => { if (me) document.getElementById('current-user').textContent = '👤 ' + me.name; })
+            .catch(() => { });
 
         load();
     </script>

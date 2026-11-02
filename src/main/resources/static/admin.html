@@ -6,6 +6,14 @@
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
 	<title>Admin | KI-Experten</title>
 	<style>
+		.current-user {
+			position: fixed;
+			top: 10px;
+			right: 16px;
+			font-size: .9em;
+			color: #1d2b3a;
+		}
+
 		body {
 			font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
 			background: #f7fbf9;
@@ -300,6 +308,7 @@
 <body>
 
 	<div id="progress" role="progressbar" aria-label="Daten werden übertragen" hidden></div>
+	<span id="current-user" class="current-user" title="Angemeldeter Benutzer"></span>
 	<h1>Inhalte verwalten</h1>
 
 	<nav class="tabs">
@@ -949,6 +958,10 @@
 
 		$('new-btn').addEventListener('click', resetForm);
 		$('cancel-btn').addEventListener('click', resetForm);
+
+		api('/ai-expert/api/admin/me').then((me) => {
+			$('current-user').textContent = '👤 ' + me.name;
+		}).catch(() => { });
 
 		(async () => {
 			await api('/ai-expert/api/csrf');
