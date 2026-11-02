@@ -262,11 +262,38 @@
 				grid-template-columns: 1fr;
 			}
 		}
-		#zugang-panel { margin-top: 24px; max-width: 720px; }
-		#zugang-panel label { display: block; margin: 8px 0; }
-		#zugang-panel input, #zugang-panel select { display: block; padding: 8px 10px; border: 1px solid #cbd5e1; border-radius: 6px; font: inherit; }
-		#zugang-panel table { border-collapse: collapse; width: 100%; margin-top: 8px; }
-		#zugang-panel th, #zugang-panel td { text-align: left; padding: 4px 8px; border-bottom: 1px solid #e2e8f0; }
+
+		#zugang-panel {
+			margin-top: 24px;
+			max-width: 720px;
+		}
+
+		#zugang-panel label {
+			display: block;
+			margin: 8px 0;
+		}
+
+		#zugang-panel input,
+		#zugang-panel select {
+			display: block;
+			padding: 8px 10px;
+			border: 1px solid #cbd5e1;
+			border-radius: 6px;
+			font: inherit;
+		}
+
+		#zugang-panel table {
+			border-collapse: collapse;
+			width: 100%;
+			margin-top: 8px;
+		}
+
+		#zugang-panel th,
+		#zugang-panel td {
+			text-align: left;
+			padding: 4px 8px;
+			border-bottom: 1px solid #e2e8f0;
+		}
 	</style>
 </head>
 
@@ -298,27 +325,64 @@
 				<button type="button" id="int-new">+ Neu anlegen</button>
 				<ul id="int-list"></ul>
 			</div>
-			<form id="int-form">
-				<h2 id="int-title">Neu anlegen</h2>
-				<label>Anrede (Herr / Frau / leer)<input name="anrede" maxlength="40"></label>
-				<label>Vorname<input name="vorname" maxlength="120"></label>
-				<label>Name<input name="name" maxlength="120"></label>
-				<label>Firmenname<input name="firmenname" maxlength="200"></label>
-				<label>E-Mail<input name="email" type="email" required maxlength="200"></label>
-				<label>Betreuer (Experte, wird beim Senden in die E-Mail aufgenommen)<select name="betreuerId">
-						<option value="">– keiner –</option>
-					</select></label>
-				<label>Telefon<input name="telefon" type="tel" maxlength="40"></label>
-				<label>URL<input name="url" type="url" maxlength="500"></label>
-				<label>Text der E-Mail<textarea name="text" rows="8" maxlength="10000"></textarea></label>
-				<dl id="int-info" class="int-info" hidden></dl>
-				<p id="int-message" role="status"></p>
-				<div class="actions">
-					<button type="submit" class="active">Speichern</button>
-					<button type="button" id="int-send" hidden>E-Mail senden</button>
-					<button type="button" id="int-delete" class="danger" hidden>Löschen</button>
-				</div>
-			</form>
+			<div>
+				<form id="int-form">
+					<h2 id="int-title">Neu anlegen</h2>
+					<label>Anrede (Herr / Frau / leer)<input name="anrede" maxlength="40"></label>
+					<label>Vorname<input name="vorname" maxlength="120"></label>
+					<label>Name<input name="name" maxlength="120"></label>
+					<label>Firmenname<input name="firmenname" maxlength="200"></label>
+					<label>E-Mail<input name="email" type="email" required maxlength="200"></label>
+					<label>Betreuer (Experte, wird beim Senden in die E-Mail aufgenommen)<select name="betreuerId">
+							<option value="">– keiner –</option>
+						</select></label>
+					<label>Telefon<input name="telefon" type="tel" maxlength="40"></label>
+					<label>URL<input name="url" type="url" maxlength="500"></label>
+					<label>Text der E-Mail<textarea name="text" rows="8" maxlength="10000"></textarea></label>
+					<dl id="int-info" class="int-info" hidden></dl>
+					<p id="int-message" role="status"></p>
+					<div class="actions">
+						<button type="submit" class="active">Speichern</button>
+						<button type="button" id="int-send" hidden>E-Mail senden</button>
+						<button type="button" id="int-delete" class="danger" hidden>Löschen</button>
+					</div>
+				</form>
+				<section id="zugang-panel" hidden>
+					<h2>Rolle &amp; Zugang</h2>
+					<p>Anmelden in Admin und Dashboard dürfen nur Experten mit der aktuellen Rolle „Admin“.</p>
+					<p><strong>Aktuelle Rolle:</strong> <span id="rolle-aktuell"></span></p>
+					<form id="rolle-form">
+						<label>Rolle<select name="rolle">
+								<option value="ADMIN">Admin</option>
+								<option value="BERATER">Berater</option>
+								<option value="AUSGESCHIEDEN">Ausgeschieden</option>
+							</select></label>
+						<label>Gültig ab<input type="date" name="seit" required></label>
+						<button type="submit">Rolle vergeben</button>
+					</form>
+					<table>
+						<thead>
+							<tr>
+								<th>Rolle</th>
+								<th>Seit</th>
+								<th>Vergeben von</th>
+								<th>Erfasst</th>
+								<th></th>
+							</tr>
+						</thead>
+						<tbody id="rolle-verlauf"></tbody>
+					</table>
+					<h3>Zugangsdaten</h3>
+					<form id="zugang-form">
+						<label>E-Mail (Benutzername; leer = kein Zugang)<input type="email" name="email" maxlength="254"
+								autocomplete="off"></label>
+						<label>Neues Passwort (mind. 10 Zeichen; leer = unverändert)<input type="password"
+								name="passwort" minlength="10" maxlength="200" autocomplete="new-password"></label>
+						<button type="submit">Zugang speichern</button>
+					</form>
+					<p id="zugang-message" role="status"></p>
+				</section>
+			</div>
 		</div>
 	</section>
 
@@ -365,32 +429,6 @@
 			</div>
 		</form>
 	</div>
-
-	<section id="zugang-panel" hidden>
-		<h2>Rolle &amp; Zugang</h2>
-		<p>Anmelden in Admin und Dashboard dürfen nur Experten mit der aktuellen Rolle „Admin“.</p>
-		<p><strong>Aktuelle Rolle:</strong> <span id="rolle-aktuell"></span></p>
-		<form id="rolle-form">
-			<label>Rolle<select name="rolle">
-					<option value="ADMIN">Admin</option>
-					<option value="BERATER">Berater</option>
-					<option value="AUSGESCHIEDEN">Ausgeschieden</option>
-				</select></label>
-			<label>Gültig ab<input type="date" name="seit" required></label>
-			<button type="submit">Rolle vergeben</button>
-		</form>
-		<table>
-			<thead><tr><th>Rolle</th><th>Seit</th><th>Vergeben von</th><th>Erfasst</th><th></th></tr></thead>
-			<tbody id="rolle-verlauf"></tbody>
-		</table>
-		<h3>Zugangsdaten</h3>
-		<form id="zugang-form">
-			<label>E-Mail (Benutzername; leer = kein Zugang)<input type="email" name="email" maxlength="254" autocomplete="off"></label>
-			<label>Neues Passwort (mind. 10 Zeichen; leer = unverändert)<input type="password" name="passwort" minlength="10" maxlength="200" autocomplete="new-password"></label>
-			<button type="submit">Zugang speichern</button>
-		</form>
-		<p id="zugang-message" role="status"></p>
-	</section>
 
 	<script>
 		const TYPES = {
