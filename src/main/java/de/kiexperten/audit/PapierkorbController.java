@@ -35,7 +35,9 @@ public class PapierkorbController {
 			"leistung", new String[] { "leistung", "titel" },
 			"produkt", new String[] { "produkt", "name" },
 			"experte", new String[] { "experte", "name" },
-			"interessent", new String[] { "interessent", "email" });
+			"interessent", new String[] { "interessent", "email" },
+			"termin", new String[] { "termin",
+					"concat(t.start_zeit, ' - ', t.name, ' (', t.email, ')')" });
 
 	@PersistenceContext
 	private EntityManager em;
@@ -48,7 +50,7 @@ public class PapierkorbController {
 	public List<Eintrag> liste() {
 		final List<Eintrag> result = new ArrayList<>();
 		TYPES.forEach((typ, def) -> {
-			final List<?> rows = this.em.createNativeQuery("select t.id, t." + def[1]
+			final List<?> rows = this.em.createNativeQuery("select t.id, " + (typ.equals("termin") ? def[1] : "t." + def[1])
 					+ ", t.deleted_at, e.email from " + def[0]
 					+ " t left join experte e on e.id = t.deleted_by_id where t.deleted_at is not null")
 					.getResultList();
@@ -73,7 +75,9 @@ public class PapierkorbController {
 		try {
 			final Experte experte = AuditListener.currentExperte();
 			final var restore = this.em.createNativeQuery("update " + def[0]
-					+ " set deleted_at = null, deleted_by_id = null, modified_at = :now, modified_by_id = "
+					+ " set deleted_at = null, deleted_by_id = null, modified_at = :now"
+					+ (typ.equals("termin") ? ", active_start_zeit = start_zeit" : "")
+					+ ", modified_by_id = "
 					+ (experte == null ? "null" : ":user") + " where id = :id and deleted_at is not null")
 					.setParameter("now", AuditListener.now()).setParameter("id", id);
 			if (experte != null) {

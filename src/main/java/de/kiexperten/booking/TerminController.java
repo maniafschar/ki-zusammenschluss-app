@@ -92,7 +92,7 @@ public class TerminController {
 		final LocalDate firstDay = LocalDate.now(ZONE);
 		final LocalDate lastDay = firstDay.plusDays(DAYS_AHEAD);
 		final Set<Instant> booked = new HashSet<>();
-		this.termine.findByStartZeitGreaterThanEqualAndStartZeitLessThan(
+		this.termine.findByAktiverStartZeitGreaterThanEqualAndAktiverStartZeitLessThan(
 				Zeit.utc(firstDay.atStartOfDay(ZONE).toInstant()),
 				Zeit.utc(lastDay.plusDays(1).atStartOfDay(ZONE).toInstant())).stream().filter(t -> !isExpired(t, now))
 				.forEach(t -> booked.add(Zeit.instant(t.getStartZeit())));
@@ -124,7 +124,7 @@ public class TerminController {
 		}
 
 		// An unconfirmed request whose time ran out no longer blocks the slot.
-		this.termine.findByStartZeit(start).filter(t -> isExpired(t, now)).ifPresent(t -> {
+		this.termine.findByAktiverStartZeit(start).filter(t -> isExpired(t, now)).ifPresent(t -> {
 			this.termine.delete(t);
 			this.termine.flush();
 		});
@@ -176,19 +176,21 @@ public class TerminController {
 
 	@GetMapping("/api/admin/termine")
 	List<TerminAnsicht> all() {
-		return this.termine.findAllByOrderByStartZeitAsc().stream()
+		return this.termine.findAllByDeletedAtIsNullOrderByStartZeitAsc().stream()
 				.map(t -> new TerminAnsicht(t.getId(), Zeit.instant(t.getStartZeit()), t.getName(), t.getEmail(), t.getTelefon(),
 						t.getNachricht(), isExpired(t, Zeit.nowUtc()) ? "ABGELAUFEN" : t.getStatus()))
 				.toList();
 	}
 
-	// Deleting a booking frees the slot again.
+	// Moving a booking to the trash frees its slot while keeping it recoverable.
 	@DeleteMapping("/api/admin/termine/{id}")
 	ResponseEntity<Void> cancel(@PathVariable final Long id) {
-		if (!this.termine.existsById(id)) {
+		final Termin termin = this.termine.findById(id).orElse(null);
+		if (termin == null) {
 			return ResponseEntity.notFound().build();
 		}
-		this.termine.deleteById(id);
+		termin.trash();
+		this.termine.save(termin);
 		return ResponseEntity.noContent().build();
 	}
 

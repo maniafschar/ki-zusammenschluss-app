@@ -8,11 +8,12 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface TerminRepository extends JpaRepository<Termin, Long> {
 
-	List<Termin> findByStartZeitGreaterThanEqualAndStartZeitLessThan(LocalDateTime from, LocalDateTime to);
+	List<Termin> findByAktiverStartZeitGreaterThanEqualAndAktiverStartZeitLessThan(LocalDateTime from,
+			LocalDateTime to);
 
-	List<Termin> findAllByOrderByStartZeitAsc();
+	List<Termin> findAllByDeletedAtIsNullOrderByStartZeitAsc();
 
-	Optional<Termin> findByStartZeit(LocalDateTime startZeit);
+	Optional<Termin> findByAktiverStartZeit(LocalDateTime startZeit);
 
 	Optional<Termin> findByBestaetigungsToken(String token);
 }

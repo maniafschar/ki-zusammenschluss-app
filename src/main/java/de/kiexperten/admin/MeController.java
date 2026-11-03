@@ -51,6 +51,9 @@ public class MeController {
 				"darfPasswoerterSetzen", principal.getName().equals(this.adminName),
 				// only experts with role ADMIN, not the configured superuser, may create items
 				"darfAnlegen", this.guard.allowed(principal),
+				"darfInteressentenAnlegen", this.guard.allowedForInteressent(principal),
+				"istBerater", principal.getAuthorities().stream()
+						.anyMatch(a -> a.getAuthority().equals("ROLE_BERATER")),
 				// Berater may only read
 				"nurLesen", principal.getAuthorities().stream().noneMatch(a -> a.getAuthority().equals("ROLE_ADMIN")));
 	}

@@ -78,7 +78,7 @@ public class InteressentController {
 	@PostMapping("/api/admin/interessenten")
 	ResponseEntity<InteressentAnsicht> create(@Valid @RequestBody final InteressentRequest request,
 			final java.security.Principal principal) {
-		this.guard.require(principal);
+		this.guard.requireInteressent(principal);
 		final Interessent i = new Interessent();
 		i.setMarker(newMarker());
 		apply(i, request);

@@ -2,24 +2,29 @@ package de.kiexperten.booking;
 
 import java.time.LocalDateTime;
 
+import org.hibernate.annotations.SQLRestriction;
+
+import de.kiexperten.audit.Auditable;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.PrePersist;
+import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
-import jakarta.persistence.UniqueConstraint;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
-/** A booked 30 minute slot. The unique start time guarantees a slot can only be booked once. */
+/** A booked 30 minute slot; cancelled bookings remain recoverable in the trash. */
 @Entity
-@Table(uniqueConstraints = @UniqueConstraint(columnNames = "startZeit"))
+@SQLRestriction("deleted_at is null")
+@Table
 @Getter
 @Setter
 @NoArgsConstructor
-public class Termin {
+public class Termin extends Auditable {
 
 	@Id
 	@GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -27,6 +32,9 @@ public class Termin {
 
 	@Column(nullable = false)
 	private LocalDateTime startZeit;
+
+	@Column(name = "active_start_zeit", unique = true)
+	private LocalDateTime aktiverStartZeit;
 
 	@Column(nullable = false, length = 120)
 	private String name;
@@ -49,4 +57,10 @@ public class Termin {
 
 	@Column(length = 64)
 	private String bestaetigungsToken;
+
+	@PrePersist
+	@PreUpdate
+	private void synchronisiereAktivenStart() {
+		this.aktiverStartZeit = getDeletedAt() == null ? this.startZeit : null;
+	}
 }
