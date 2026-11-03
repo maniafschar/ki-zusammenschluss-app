@@ -1,6 +1,10 @@
 package de.kiexperten.content;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import org.hibernate.annotations.SQLRestriction;
+
+import de.kiexperten.audit.Auditable;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
@@ -12,10 +16,12 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 @Entity
+@JsonIgnoreProperties({ "createdBy", "modifiedBy", "deletedAt", "deletedBy" })
+@SQLRestriction("deleted_at is null")
 @Getter
 @Setter
 @NoArgsConstructor
-public class Experte {
+public class Experte extends Auditable {
 
 	@Id
 	@GeneratedValue(strategy = GenerationType.IDENTITY)

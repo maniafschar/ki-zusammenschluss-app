@@ -2,6 +2,7 @@ package de.kiexperten.dashboard;
 
 import java.io.IOException;
 import java.math.BigInteger;
+import java.security.Principal;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Map;
@@ -36,6 +37,7 @@ import org.springframework.web.server.ResponseStatusException;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
+import de.kiexperten.audit.CreateGuard;
 import de.kiexperten.content.ExperteRepository;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
@@ -48,9 +50,11 @@ public class DashboardController {
 	private final DashboardRepository repository;
 	private final ExperteRepository experten;
 	private final ObjectMapper mapper;
+	private final CreateGuard guard;
 
 	public DashboardController(final DashboardRepository repository, final ExperteRepository experten,
-			final ObjectMapper mapper) {
+			final ObjectMapper mapper, final CreateGuard guard) {
+		this.guard = guard;
 		this.repository = repository;
 		this.experten = experten;
 		this.mapper = mapper;
@@ -116,7 +120,8 @@ public class DashboardController {
 	}
 
 	@PostMapping("/api/dashboard/wissen")
-	Wissen addWissen(@Valid @RequestBody final WissenRequest request) {
+	Wissen addWissen(@Valid @RequestBody final WissenRequest request, final Principal principal) {
+		this.guard.require(principal);
 		return toWissen(this.repository.addWissen(request.title().trim(), clean(request.content())), null);
 	}
 
@@ -174,7 +179,8 @@ public class DashboardController {
 	}
 
 	@PostMapping("/api/dashboard/todo")
-	Todo addTodo(@Valid @RequestBody final TodoRequest request) {
+	Todo addTodo(@Valid @RequestBody final TodoRequest request, final Principal principal) {
+		this.guard.require(principal);
 		return this.repository.addTodo(request.note().trim(), checkedExpert(request.expertId()), request.dueDate());
 	}
 

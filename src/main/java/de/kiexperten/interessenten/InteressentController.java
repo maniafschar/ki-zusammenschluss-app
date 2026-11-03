@@ -19,6 +19,7 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 
 import de.kiexperten.Zeit;
+import de.kiexperten.audit.CreateGuard;
 import de.kiexperten.content.Experte;
 import de.kiexperten.content.ExperteRepository;
 import jakarta.validation.Valid;
@@ -35,9 +36,11 @@ public class InteressentController {
 	private final InteressentRepository repository;
 	private final InteressentenMailService mail;
 	private final ExperteRepository experten;
+	private final CreateGuard guard;
 
 	public InteressentController(final InteressentRepository repository, final InteressentenMailService mail,
-			final ExperteRepository experten) {
+			final ExperteRepository experten, final CreateGuard guard) {
+		this.guard = guard;
 		this.experten = experten;
 		this.repository = repository;
 		this.mail = mail;
@@ -63,7 +66,7 @@ public class InteressentController {
 	@GetMapping("/api/admin/interessenten")
 	List<InteressentAnsicht> all() {
 		return this.repository.findAll().stream()
-				.sorted((a, b) -> b.getCreatedAt().compareTo(a.getCreatedAt()))
+				.sorted((a, b) -> Long.compare(b.getId(), a.getId()))
 				.map(this::view).toList();
 	}
 
@@ -73,9 +76,10 @@ public class InteressentController {
 	}
 
 	@PostMapping("/api/admin/interessenten")
-	ResponseEntity<InteressentAnsicht> create(@Valid @RequestBody final InteressentRequest request) {
+	ResponseEntity<InteressentAnsicht> create(@Valid @RequestBody final InteressentRequest request,
+			final java.security.Principal principal) {
+		this.guard.require(principal);
 		final Interessent i = new Interessent();
-		i.setCreatedAt(Zeit.nowUtc());
 		i.setMarker(newMarker());
 		apply(i, request);
 		return ResponseEntity.status(HttpStatus.CREATED).body(view(this.repository.save(i)));
@@ -90,8 +94,9 @@ public class InteressentController {
 
 	@DeleteMapping("/api/admin/interessenten/{id}")
 	ResponseEntity<Void> delete(@PathVariable final Long id) {
-		find(id);
-		this.repository.deleteById(id);
+		final Interessent i = find(id);
+		i.trash();
+		this.repository.save(i);
 		return ResponseEntity.noContent().build();
 	}
 
@@ -147,7 +152,7 @@ public class InteressentController {
 	private InteressentAnsicht view(final Interessent i) {
 		return new InteressentAnsicht(i.getId(), i.getVorname(), i.getName(), i.getFirmenname(), i.getEmail(),
 				i.getTelefon(), i.getUrl(), i.getAnrede(), betreuer(i) == null ? null : i.getBetreuerId(),
-				betreuer(i) == null ? null : betreuer(i).getName(), i.getText(), Zeit.instant(i.getCreatedAt()), Zeit.instant(i.getGesendetAm()),
+				betreuer(i) == null ? null : betreuer(i).getName(), i.getText(), Zeit.instant(i.getCreatedAt() == null ? null : i.getCreatedAt().toLocalDateTime()), Zeit.instant(i.getGesendetAm()),
 				this.mail.trackedLink(i), i.getKlickAnzahl(), Zeit.instant(i.getErsterKlick()),
 				Zeit.instant(i.getLetzterKlick()));
 	}

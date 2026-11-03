@@ -3,13 +3,14 @@ package de.kiexperten.dashboard;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 import java.math.BigInteger;
-import java.sql.Timestamp;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Objects;
 
 import org.springframework.data.annotation.Transient;
+
+import de.kiexperten.audit.Auditable;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 
@@ -21,14 +22,12 @@ import jakarta.persistence.MappedSuperclass;
 
 @MappedSuperclass
 @JsonInclude(JsonInclude.Include.NON_NULL)
-public abstract class BaseEntity {
+public abstract class BaseEntity extends Auditable {
 	@Id
 	@GeneratedValue(strategy = GenerationType.IDENTITY)
 	@Column(columnDefinition = "BIGINT")
 	private BigInteger id;
 
-	private Timestamp createdAt;
-	private Timestamp modifiedAt;
 	@Transient
 	private transient Map<String, Object> old = null;
 
@@ -38,22 +37,6 @@ public abstract class BaseEntity {
 
 	public void setId(final BigInteger id) {
 		this.id = id;
-	}
-
-	public Timestamp getCreatedAt() {
-		return this.createdAt;
-	}
-
-	public void setCreatedAt(final Timestamp createdAt) {
-		this.createdAt = createdAt;
-	}
-
-	public Timestamp getModifiedAt() {
-		return this.modifiedAt;
-	}
-
-	public void setModifiedAt(final Timestamp modifiedAt) {
-		this.modifiedAt = modifiedAt;
 	}
 
 	@Transient

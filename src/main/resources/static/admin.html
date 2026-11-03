@@ -858,6 +858,7 @@
 		<button type="button" data-type="experten">Experten</button>
 		<button type="button" data-type="leistungen">Leistungen</button>
 		<button type="button" data-type="produkte">Produkte</button>
+		<button type="button" data-type="papierkorb">Papierkorb</button>
 		<button type="button" id="script-btn" style="margin-left:auto">Bauen</button>
 	</nav>
 	<pre id="script-output" hidden></pre>
@@ -866,6 +867,12 @@
 		<p>Gebuchte Termine. Mit „Stornieren“ wird der Zeitslot wieder frei.</p>
 		<ul id="termine-list"></ul>
 		<p id="termine-message" role="status"></p>
+	</section>
+
+	<section id="trash-panel" hidden>
+		<p>Gelöschte Einträge. Mit „Wiederherstellen“ kehren sie an ihren Platz zurück.</p>
+		<ul id="trash-list"></ul>
+		<p id="trash-message" role="status"></p>
 	</section>
 
 	<section id="int-panel" hidden>
@@ -1385,6 +1392,35 @@
 			});
 		}
 
+		const TRASH_TYPES = { wissen: 'Wissen', todo: 'Todo', leistung: 'Leistung', produkt: 'Produkt', experte: 'Experte', interessent: 'Interessent' };
+
+		async function loadTrash() {
+			const list = $('trash-list');
+			list.innerHTML = '';
+			$('trash-message').textContent = '';
+			const items = await api('/ai-expert/api/admin/papierkorb');
+			if (!items.length) {
+				const li = document.createElement('li');
+				li.textContent = 'Der Papierkorb ist leer.';
+				list.appendChild(li);
+			}
+			items.forEach((t) => {
+				const li = document.createElement('li');
+				const text = document.createElement('span');
+				text.textContent = `${TRASH_TYPES[t.typ] || t.typ}: ${t.titel} – gelöscht ${new Date(t.geloeschtAm).toLocaleString('de-DE')} von ${t.geloeschtVon || '?'}`;
+				li.append(text, makeButton('Wiederherstellen', async () => {
+					try {
+						await api(`/ai-expert/api/admin/papierkorb/${t.typ}/${t.id}/wiederherstellen`, { method: 'POST' });
+						await loadTrash();
+						dashboardLoaded = false;
+					} catch (err) {
+						$('trash-message').textContent = err.status === 409 && err.body && err.body.message ? err.body.message : err.message;
+					}
+				}));
+				list.appendChild(li);
+			});
+		}
+
 		async function loadLogs() {
 			const params = new URLSearchParams();
 			const f = $('log-form');
@@ -1562,16 +1598,22 @@
 				const isTermine = btn.dataset.type === 'termine';
 				const isLogs = btn.dataset.type === 'logs';
 				const isInt = btn.dataset.type === 'interessenten';
+				const isTrash = btn.dataset.type === 'papierkorb';
+				$('trash-panel').hidden = !isTrash;
 				$('int-panel').hidden = !isInt;
 				$('termine-panel').hidden = !isTermine;
 				$('logs-panel').hidden = !isLogs;
 				const isDash = btn.dataset.type === 'dashboard';
 				$('dashboard-panel').hidden = !isDash;
 				if (isDash && !dashboardLoaded) { dashboardLoaded = true; window.loadDashboard(); }
-				$('content-layout').hidden = isTermine || isLogs || isInt || isDash;
+				$('content-layout').hidden = isTermine || isLogs || isInt || isDash || isTrash;
 				if (isDash) return;
 				if (isInt) {
 					try { intReset(); await loadInteressenten(); } catch (err) { intMessage(err.message, true); }
+					return;
+				}
+				if (isTrash) {
+					try { await loadTrash(); } catch (err) { $('trash-message').textContent = err.message; }
 					return;
 				}
 				if (isLogs) {
@@ -1598,7 +1640,7 @@
 			canSetPasswords = !!me.darfPasswoerterSetzen;
 			readOnly = !!me.nurLesen;
 			if (readOnly) {
-				['dashboard', 'termine', 'interessenten', 'logs'].forEach((t) => document.querySelector(`.tabs button[data-type="${t}"]`).remove());
+				['dashboard', 'termine', 'interessenten', 'logs', 'papierkorb'].forEach((t) => document.querySelector(`.tabs button[data-type="${t}"]`).remove());
 				$('script-btn').hidden = true;
 				$('new-btn').hidden = true;
 				form.querySelector('.actions').hidden = true;
@@ -1606,6 +1648,9 @@
 				$('dashboard-panel').hidden = true;
 				document.querySelector('.tabs button[data-type="experten"]').click();
 				return;
+			}
+			if (!me.darfAnlegen) {
+				['new-btn', 'int-new', 'wissen-new', 'todo-form'].forEach((id) => { $(id).style.display = 'none'; });
 			}
 			dashboardLoaded = true;
 			window.loadDashboard();

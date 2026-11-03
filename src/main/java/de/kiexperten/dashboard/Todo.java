@@ -2,10 +2,13 @@ package de.kiexperten.dashboard;
 
 import java.time.LocalDate;
 
+import org.hibernate.annotations.SQLRestriction;
+
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 
 @Entity
+@SQLRestriction("deleted_at is null")
 public class Todo extends BaseEntity {
 	@Column(nullable = false, length = 200)
 	private String note;

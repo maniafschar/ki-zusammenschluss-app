@@ -2,6 +2,9 @@ package de.kiexperten.interessenten;
 
 import java.time.LocalDateTime;
 
+import org.hibernate.annotations.SQLRestriction;
+
+import de.kiexperten.audit.Auditable;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
@@ -15,11 +18,12 @@ import lombok.Setter;
 
 /** A prospective customer. The marker identifies this person in the tracked link of the mail. */
 @Entity
+@SQLRestriction("deleted_at is null")
 @Table(uniqueConstraints = @UniqueConstraint(columnNames = "marker"))
 @Getter
 @Setter
 @NoArgsConstructor
-public class Interessent {
+public class Interessent extends Auditable {
 
 	@Id
 	@GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -51,9 +55,6 @@ public class Interessent {
 
 	@Column(length = 10000)
 	private String text;
-
-	@Column(nullable = false)
-	private LocalDateTime createdAt;
 
 	private LocalDateTime gesendetAm;
 

@@ -30,7 +30,8 @@ public class DashboardRepository {
 
 	public List<AnhangInfo> anhaenge() {
 		return this.em.createQuery("select new de.kiexperten.dashboard.DashboardRepository$AnhangInfo("
-				+ "a.id, a.wissensId, a.name, a.contentType, a.size) from Anhang a order by a.id",
+				+ "a.id, a.wissensId, a.name, a.contentType, a.size) from Anhang a "
+				+ "where a.wissensId in (select w.id from Wissensquelle w) order by a.id",
 				AnhangInfo.class).getResultList();
 	}
 
@@ -54,11 +55,7 @@ public class DashboardRepository {
 	}
 
 	public boolean deleteWissen(final BigInteger id) {
-		if (!this.delete(Wissensquelle.class, id))
-			return false;
-		this.em.createQuery("delete from Anhang a where a.wissensId = :id").setParameter("id", id)
-				.executeUpdate();
-		return true;
+		return this.delete(Wissensquelle.class, id);
 	}
 
 	public boolean wissenExists(final BigInteger id) {
@@ -80,7 +77,7 @@ public class DashboardRepository {
 
 	public Anhang anhang(final BigInteger wissensId, final BigInteger id) {
 		final Anhang a = this.em.find(Anhang.class, id);
-		return a != null && wissensId.equals(a.getWissensId()) ? a : null;
+		return a != null && this.wissenExists(wissensId) && wissensId.equals(a.getWissensId()) ? a : null;
 	}
 
 	public boolean deleteAnhang(final BigInteger wissensId, final BigInteger id) {
@@ -149,11 +146,12 @@ public class DashboardRepository {
 		return result.isEmpty() ? null : result.get(0);
 	}
 
-	private <T> boolean delete(final Class<T> type, final BigInteger id) {
+	/** Moves the item to the trash. */
+	private <T extends BaseEntity> boolean delete(final Class<T> type, final BigInteger id) {
 		final T entity = this.em.find(type, id);
 		if (entity == null)
 			return false;
-		this.em.remove(entity);
+		entity.trash();
 		return true;
 	}
 
