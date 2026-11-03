@@ -1,15 +1,13 @@
 package de.kiexperten.dashboard;
 
 import java.math.BigInteger;
-import java.sql.Timestamp;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
-import java.time.ZoneOffset;
 import java.util.List;
 
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
+import de.kiexperten.audit.Auditable;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 
@@ -39,7 +37,6 @@ public class DashboardRepository {
 		final Wissensquelle w = new Wissensquelle();
 		w.setTitle(title);
 		w.setContent(content);
-		w.setCreatedAt(now());
 		this.em.persist(w);
 		return w;
 	}
@@ -50,7 +47,6 @@ public class DashboardRepository {
 			return null;
 		w.setTitle(title);
 		w.setContent(content);
-		w.setModifiedAt(now());
 		return w;
 	}
 
@@ -70,7 +66,6 @@ public class DashboardRepository {
 		a.setContentType(contentType);
 		a.setSize(data.length);
 		a.setData(data);
-		a.setCreatedAt(now());
 		this.em.persist(a);
 		return new AnhangInfo(a.getId(), wissensId, name, contentType, data.length);
 	}
@@ -84,7 +79,7 @@ public class DashboardRepository {
 		final Anhang a = this.anhang(wissensId, id);
 		if (a == null)
 			return false;
-		this.em.remove(a);
+		a.trash();
 		return true;
 	}
 
@@ -97,7 +92,6 @@ public class DashboardRepository {
 		todo.setNote(note);
 		todo.setExpertId(expertId);
 		todo.setDueDate(dueDate);
-		todo.setCreatedAt(now());
 		this.em.persist(todo);
 		return todo;
 	}
@@ -114,7 +108,6 @@ public class DashboardRepository {
 			todo.setExpertId(expertId);
 			todo.setDueDate(dueDate);
 		}
-		todo.setModifiedAt(now());
 		return todo;
 	}
 
@@ -131,12 +124,10 @@ public class DashboardRepository {
 		final Info info = this.infoEntity();
 		if (info == null) {
 			final Info created = new Info();
-			created.setCreatedAt(now());
 			created.setNote(note);
 			this.em.persist(created);
 		} else {
 			info.setNote(note);
-			info.setModifiedAt(now());
 		}
 	}
 
@@ -147,7 +138,7 @@ public class DashboardRepository {
 	}
 
 	/** Moves the item to the trash. */
-	private <T extends BaseEntity> boolean delete(final Class<T> type, final BigInteger id) {
+	private <T extends Auditable> boolean delete(final Class<T> type, final BigInteger id) {
 		final T entity = this.em.find(type, id);
 		if (entity == null)
 			return false;
@@ -155,8 +146,4 @@ public class DashboardRepository {
 		return true;
 	}
 
-	// UTC wall-clock time, like all other timestamps in the database
-	private static Timestamp now() {
-		return Timestamp.valueOf(LocalDateTime.now(ZoneOffset.UTC));
-	}
 }
