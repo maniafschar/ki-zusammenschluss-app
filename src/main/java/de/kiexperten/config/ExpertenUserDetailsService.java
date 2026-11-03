@@ -36,8 +36,11 @@ class ExpertenUserDetailsService implements UserDetailsService {
 		return this.experten.findByEmailIgnoreCase(username.trim().toLowerCase(Locale.ROOT))
 				.filter(e -> e.getPasswortHash() != null)
 				.filter(e -> this.rollen.aktuelle(e.getId()) != ExpertenRolle.AUSGESCHIEDEN)
-				.map(e -> (UserDetails) User.withUsername(e.getEmail()).password(e.getPasswortHash())
-						.roles(this.rollen.aktuelle(e.getId()).name()).build())
+				.map(e -> {
+					final UserDetails user = User.withUsername(e.getEmail()).password(e.getPasswortHash())
+							.roles(this.rollen.aktuelle(e.getId()).name()).build();
+					return new ExperteUserDetails(e, user);
+				})
 				.orElseThrow(() -> new UsernameNotFoundException("unbekannt"));
 	}
 }

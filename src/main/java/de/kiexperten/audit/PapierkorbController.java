@@ -1,7 +1,6 @@
 package de.kiexperten.audit;
 
 import java.math.BigInteger;
-import java.security.Principal;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.time.LocalDateTime;
@@ -21,6 +20,7 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 
 import de.kiexperten.Zeit;
+import de.kiexperten.content.Experte;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 
@@ -48,8 +48,10 @@ public class PapierkorbController {
 	public List<Eintrag> liste() {
 		final List<Eintrag> result = new ArrayList<>();
 		TYPES.forEach((typ, def) -> {
-			final List<?> rows = this.em.createNativeQuery("select id, " + def[1] + ", deleted_at, deleted_by from "
-					+ def[0] + " where deleted_at is not null").getResultList();
+			final List<?> rows = this.em.createNativeQuery("select t.id, t." + def[1]
+					+ ", t.deleted_at, e.email from " + def[0]
+					+ " t left join experte e on e.id = t.deleted_by_id where t.deleted_at is not null")
+					.getResultList();
 			for (final Object row : rows) {
 				final Object[] c = (Object[]) row;
 				result.add(new Eintrag(typ, new BigInteger(c[0].toString()), c[1] == null ? "" : c[1].toString(),
@@ -62,18 +64,22 @@ public class PapierkorbController {
 
 	@PostMapping("/api/admin/papierkorb/{typ}/{id}/wiederherstellen")
 	@Transactional
-	public ResponseEntity<Void> wiederherstellen(@PathVariable final String typ, @PathVariable final BigInteger id,
-			final Principal principal) {
+	public ResponseEntity<Void> wiederherstellen(@PathVariable final String typ, @PathVariable final BigInteger id) {
 		final String[] def = TYPES.get(typ);
 		if (def == null) {
 			throw new ResponseStatusException(HttpStatus.NOT_FOUND);
 		}
 		final int updated;
 		try {
-			updated = this.em.createNativeQuery("update " + def[0] + " set deleted_at = null, deleted_by = null, "
-					+ "modified_at = :now, modified_by = :user where id = :id and deleted_at is not null")
-					.setParameter("now", AuditListener.now()).setParameter("user", principal.getName())
-					.setParameter("id", id).executeUpdate();
+			final Experte experte = AuditListener.currentExperte();
+			final var restore = this.em.createNativeQuery("update " + def[0]
+					+ " set deleted_at = null, deleted_by_id = null, modified_at = :now, modified_by_id = "
+					+ (experte == null ? "null" : ":user") + " where id = :id and deleted_at is not null")
+					.setParameter("now", AuditListener.now()).setParameter("id", id);
+			if (experte != null) {
+				restore.setParameter("user", experte.getId());
+			}
+			updated = restore.executeUpdate();
 		} catch (final DataIntegrityViolationException e) {
 			throw new ResponseStatusException(HttpStatus.CONFLICT,
 					"Wiederherstellen nicht möglich: Der Eintrag kollidiert mit einem vorhandenen.");
