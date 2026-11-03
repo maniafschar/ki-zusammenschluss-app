@@ -21,6 +21,7 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 
+import de.kiexperten.audit.CreateGuard;
 import de.kiexperten.content.ContentRequests.LeistungRequest;
 import de.kiexperten.content.ContentRequests.ProduktRequest;
 import jakarta.validation.Valid;
@@ -33,9 +34,11 @@ public class AdminContentController {
 	private final ProduktRepository produkte;
 	private final ExperteRepository experten;
 	private final ExpertenRollenRepository rollen;
+	private final CreateGuard guard;
 
 	public AdminContentController(LeistungRepository leistungen, ProduktRepository produkte,
-			ExperteRepository experten, ExpertenRollenRepository rollen) {
+			ExperteRepository experten, ExpertenRollenRepository rollen, CreateGuard guard) {
+		this.guard = guard;
 		this.leistungen = leistungen;
 		this.produkte = produkte;
 		this.experten = experten;
@@ -43,7 +46,9 @@ public class AdminContentController {
 	}
 
 	@PostMapping("/leistungen")
-	ResponseEntity<Leistung> createLeistung(@Valid @RequestBody LeistungRequest request) {
+	ResponseEntity<Leistung> createLeistung(@Valid @RequestBody LeistungRequest request,
+			java.security.Principal principal) {
+		this.guard.require(principal);
 		Leistung leistung = new Leistung(request.titel(), request.text(), request.position());
 		return ResponseEntity.status(HttpStatus.CREATED).body(this.leistungen.save(leistung));
 	}
@@ -59,15 +64,16 @@ public class AdminContentController {
 
 	@DeleteMapping("/leistungen/{id}")
 	ResponseEntity<Void> deleteLeistung(@PathVariable Long id) {
-		if (!this.leistungen.existsById(id)) {
-			throw notFound();
-		}
-		this.leistungen.deleteById(id);
+		Leistung leistung = this.leistungen.findById(id).orElseThrow(AdminContentController::notFound);
+		leistung.trash();
+		this.leistungen.save(leistung);
 		return ResponseEntity.noContent().build();
 	}
 
 	@PostMapping("/produkte")
-	ResponseEntity<Produkt> createProdukt(@Valid @RequestBody ProduktRequest request) {
+	ResponseEntity<Produkt> createProdukt(@Valid @RequestBody ProduktRequest request,
+			java.security.Principal principal) {
+		this.guard.require(principal);
 		Produkt produkt = new Produkt(request.name(), request.beschreibung(), request.preis(), request.position());
 		return ResponseEntity.status(HttpStatus.CREATED).body(this.produkte.save(produkt));
 	}
@@ -84,10 +90,9 @@ public class AdminContentController {
 
 	@DeleteMapping("/produkte/{id}")
 	ResponseEntity<Void> deleteProdukt(@PathVariable Long id) {
-		if (!this.produkte.existsById(id)) {
-			throw notFound();
-		}
-		this.produkte.deleteById(id);
+		Produkt produkt = this.produkte.findById(id).orElseThrow(AdminContentController::notFound);
+		produkt.trash();
+		this.produkte.save(produkt);
 		return ResponseEntity.noContent().build();
 	}
 
@@ -95,6 +100,7 @@ public class AdminContentController {
 	ResponseEntity<Experte> createExperte(@RequestParam String name, @RequestParam String rolle,
 			@RequestParam String beschreibung, @RequestParam int position, @RequestParam MultipartFile bild,
 			java.security.Principal principal) {
+		this.guard.require(principal);
 		validateExperte(name, rolle, beschreibung, position);
 		ValidatedImage image = validateImage(bild);
 		Experte experte = new Experte(name.trim(), rolle.trim(), beschreibung.trim(), position, image.data(),
@@ -125,11 +131,9 @@ public class AdminContentController {
 
 	@DeleteMapping("/experten/{id}")
 	ResponseEntity<Void> deleteExperte(@PathVariable Long id) {
-		if (!this.experten.existsById(id)) {
-			throw notFound();
-		}
-		this.experten.deleteById(id);
-		this.rollen.deleteByExperteId(id);
+		Experte experte = this.experten.findById(id).orElseThrow(AdminContentController::notFound);
+		experte.trash();
+		this.experten.save(experte);
 		return ResponseEntity.noContent().build();
 	}
 

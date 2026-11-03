@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 
+import de.kiexperten.audit.CreateGuard;
 import de.kiexperten.content.Experte;
 import de.kiexperten.content.ExperteRepository;
 import jakarta.validation.Valid;
@@ -25,10 +26,12 @@ public class MeController {
 	private final ExperteRepository experten;
 	private final PasswordEncoder encoder;
 	private final String adminName;
+	private final CreateGuard guard;
 
-	public MeController(final ExperteRepository experten, final PasswordEncoder encoder,
+	public MeController(final ExperteRepository experten, final PasswordEncoder encoder, final CreateGuard guard,
 			@Value("${app.admin.username}") final String adminName) {
 		this.adminName = adminName;
+		this.guard = guard;
 		this.experten = experten;
 		this.encoder = encoder;
 	}
@@ -46,6 +49,8 @@ public class MeController {
 				"passwortAenderbar", experte.isPresent(),
 				// the configured admin account may set the passwords of all experts
 				"darfPasswoerterSetzen", principal.getName().equals(this.adminName),
+				// only experts with role ADMIN, not the configured superuser, may create items
+				"darfAnlegen", this.guard.allowed(principal),
 				// Berater may only read
 				"nurLesen", principal.getAuthorities().stream().noneMatch(a -> a.getAuthority().equals("ROLE_ADMIN")));
 	}
