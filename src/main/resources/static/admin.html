@@ -1086,7 +1086,7 @@
 
 		let current = 'leistungen';
 		let dashboardLoaded = false;
-		let readOnly = false; // Berater: read access to experts, services and products only
+		let readOnly = false;
 		let canSetPasswords = false; // only the configured admin account may set passwords of experts
 		let editingId = null;
 
@@ -1380,7 +1380,7 @@
 				const text = document.createElement('span');
 				text.textContent = `${when} Uhr${t.status === 'BESTAETIGT' ? '' : ` [${t.status === 'ANGEFRAGT' ? 'unbestätigt' : 'abgelaufen'}]`} – ${t.name} (${t.email})` + (t.telefon ? ` – Tel. ${t.telefon}` : '') + (t.nachricht ? ` – ${t.nachricht}` : '');
 				li.append(text, makeButton('Stornieren', async () => {
-					if (!confirm('Termin wirklich stornieren? Der Slot wird wieder frei.')) return;
+					if (!confirm('Termin wirklich stornieren? Er wird in den Papierkorb verschoben und der Slot wird wieder frei.')) return;
 					try {
 						await api(`/ai-expert/api/admin/termine/${t.id}`, { method: 'DELETE' });
 						await loadTermine();
@@ -1392,7 +1392,7 @@
 			});
 		}
 
-		const TRASH_TYPES = { wissen: 'Wissen', todo: 'Todo', leistung: 'Leistung', produkt: 'Produkt', experte: 'Experte', interessent: 'Interessent' };
+		const TRASH_TYPES = { wissen: 'Wissen', todo: 'Todo', leistung: 'Leistung', produkt: 'Produkt', experte: 'Experte', interessent: 'Interessent', termin: 'Termin' };
 
 		async function loadTrash() {
 			const list = $('trash-list');
@@ -1639,6 +1639,18 @@
 			const me = await api('/ai-expert/api/admin/me');
 			canSetPasswords = !!me.darfPasswoerterSetzen;
 			readOnly = !!me.nurLesen;
+			if (me.istBerater) {
+				document.querySelectorAll('.tabs button[data-type]').forEach((button) => {
+					if (!['termine', 'interessenten'].includes(button.dataset.type)) button.remove();
+				});
+				$('script-btn').hidden = true;
+				$('new-btn').hidden = true;
+				$('dashboard-panel').hidden = true;
+				$('content-layout').hidden = true;
+				$('int-new').hidden = !me.darfInteressentenAnlegen;
+				document.querySelector('.tabs button[data-type="termine"]').click();
+				return;
+			}
 			if (readOnly) {
 				['dashboard', 'termine', 'interessenten', 'logs', 'papierkorb'].forEach((t) => document.querySelector(`.tabs button[data-type="${t}"]`).remove());
 				$('script-btn').hidden = true;
@@ -1650,8 +1662,9 @@
 				return;
 			}
 			if (!me.darfAnlegen) {
-				['new-btn', 'int-new', 'wissen-new', 'todo-form'].forEach((id) => { $(id).style.display = 'none'; });
+				['new-btn', 'wissen-new', 'todo-form'].forEach((id) => { $(id).style.display = 'none'; });
 			}
+			$('int-new').hidden = !me.darfInteressentenAnlegen;
 			dashboardLoaded = true;
 			window.loadDashboard();
 			renderFields();

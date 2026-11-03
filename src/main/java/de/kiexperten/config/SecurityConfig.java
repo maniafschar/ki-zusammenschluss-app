@@ -32,8 +32,14 @@ public class SecurityConfig {
 				.requestMatchers("/", "/index.html", "/api/leistungen", "/api/produkte", "/api/experten",
 						"/api/csrf", "/api/termine", "/api/termine/bestaetigen", "/api/r/*", "/error")
 				.permitAll()
-				// Berater: read-only access to experts (leistungen/produkte are public reads) and their own account
-				.requestMatchers(HttpMethod.GET, "/api/admin/experten", "/api/admin/experten/*/rollen")
+				.requestMatchers(HttpMethod.GET, "/api/admin/termine", "/api/admin/interessenten",
+						"/api/admin/interessenten/*")
+				.hasAnyRole("ADMIN", "BERATER")
+				.requestMatchers(HttpMethod.POST, "/api/admin/interessenten", "/api/admin/interessenten/*/senden")
+				.hasAnyRole("ADMIN", "BERATER")
+				.requestMatchers(HttpMethod.PUT, "/api/admin/interessenten/*")
+				.hasAnyRole("ADMIN", "BERATER")
+				.requestMatchers(HttpMethod.DELETE, "/api/admin/termine/*", "/api/admin/interessenten/*")
 				.hasAnyRole("ADMIN", "BERATER")
 				.requestMatchers("/api/admin/me", "/api/admin/me/passwort").hasAnyRole("ADMIN", "BERATER")
 				.requestMatchers("/api/admin/**", "/api/dashboard/**").hasRole("ADMIN")
