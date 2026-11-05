@@ -30,7 +30,7 @@ public class SecurityConfig {
 
 		http.authorizeHttpRequests(auth -> auth
 				.requestMatchers("/", "/index.html", "/api/leistungen", "/api/produkte", "/api/experten",
-						"/api/csrf", "/api/termine", "/api/termine/bestaetigen", "/api/r/*", "/error")
+						"/api/csrf", "/api/ki/chat", "/api/termine", "/api/termine/bestaetigen", "/api/r/*", "/error")
 				.permitAll()
 				.requestMatchers(HttpMethod.GET, "/api/admin/termine", "/api/admin/interessenten",
 						"/api/admin/interessenten/*")

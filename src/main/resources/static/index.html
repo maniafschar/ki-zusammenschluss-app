@@ -501,6 +501,13 @@
 				height: 560px;
 			}
 		}
+		.voice { text-align: center; }
+		.voice canvas { width: 100%; max-width: 420px; height: 160px; display: block; margin: 0 auto 16px; }
+		.voice .mic { width: 72px; height: 72px; border-radius: 50%; border: 0; background: var(--accent); color: #fff; font-size: 28px; cursor: pointer; }
+		.voice .mic.rec { background: #d64545; }
+		.voice .mic:disabled { opacity: .5; cursor: default; }
+		.voice-text { max-width: 640px; margin: 16px auto 0; color: var(--muted); min-height: 3em; }
+		.voice-text b { color: var(--text); }
 	</style>
 </head>
 
@@ -512,6 +519,7 @@
 			<a href="#leistungen">Leistungen</a>
 			<a href="#produkte">Produkte</a>
 			<a href="#experten">Experten</a>
+			<a href="#sprechen">Sprechen</a>
 			<a href="#ablauf">Ablauf</a>
 			<a href="#kontakt">Kontakt</a>
 		</div>
@@ -595,6 +603,13 @@
 	<section id="experten" class="alt" hidden>
 		<h2>Unsere Experten</h2>
 		<div class="pillars" id="experten-liste"></div>
+	</section>
+
+		<section id="sprechen" class="voice">
+		<h2>Sprechen Sie direkt mit unserer KI</h2>
+		<canvas id="voice-canvas" width="840" height="320" role="img" aria-label="Animation der KI-Stimme"></canvas>
+		<button id="voice-mic" class="mic" type="button" aria-label="Sprechen">🎤</button>
+		<p class="voice-text" id="voice-text" aria-live="polite">Tippen Sie auf das Mikrofon und stellen Sie Ihre Frage.</p>
 	</section>
 
 	<section id="ablauf" class="alt">
@@ -1069,6 +1084,94 @@
 			});
 		}, { threshold: 0.3 });
 		document.querySelectorAll('.risk').forEach((el) => observer.observe(el));
+		(function voiceChat() {
+			const mic = document.getElementById('voice-mic');
+			const text = document.getElementById('voice-text');
+			const canvas = document.getElementById('voice-canvas');
+			const ctx = canvas.getContext('2d');
+			const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+			const synth = window.speechSynthesis;
+			if (!SR || !synth) {
+				mic.disabled = true;
+				text.textContent = 'Ihr Browser unterstützt keine Spracheingabe.';
+			}
+			const history = [];
+			let state = 'idle'; // idle | listening | thinking | speaking
+			let level = 0;
+
+			function draw(t) {
+				const w = canvas.width, h = canvas.height, bars = 32;
+				ctx.clearRect(0, 0, w, h);
+				const target = state === 'speaking' ? 0.5 + 0.5 * Math.random() : state === 'thinking' ? 0.25 : state === 'listening' ? 0.12 : 0.05;
+				level += (target - level) * 0.15;
+				ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim();
+				for (let i = 0; i < bars; i++) {
+					const wave = Math.sin(t / 220 + i * 0.5) * 0.5 + 0.5;
+					const bh = Math.max(6, h * (0.15 + 0.85 * wave) * level * (1 - Math.abs(i - bars / 2) / bars));
+					const x = (i + 0.5) * (w / bars);
+					ctx.beginPath();
+					ctx.roundRect(x - 8, (h - bh) / 2, 16, bh, 8);
+					ctx.fill();
+				}
+				requestAnimationFrame(draw);
+			}
+			requestAnimationFrame(draw);
+
+			function speak(reply) {
+				const u = new SpeechSynthesisUtterance(reply);
+				u.lang = 'de-DE';
+				u.onstart = () => { state = 'speaking'; };
+				u.onend = u.onerror = () => { state = 'idle'; mic.disabled = false; };
+				synth.cancel();
+				synth.speak(u);
+			}
+
+			async function ask(question) {
+				state = 'thinking';
+				mic.disabled = true;
+				text.innerHTML = '<b>Sie:</b> ' + esc(question) + '<br>Die KI denkt nach …';
+				history.push({ role: 'user', content: question });
+				try {
+					await fetch('/ai-expert/api/csrf', { credentials: 'same-origin' });
+					const token = decodeURIComponent((document.cookie.match(/(?:^|; )XSRF-TOKEN=([^;]*)/) || [])[1] || '');
+					const res = await fetch('/ai-expert/api/ki/chat', {
+						method: 'POST',
+						credentials: 'same-origin',
+						headers: { 'Content-Type': 'application/json', 'X-XSRF-TOKEN': token },
+						body: JSON.stringify({ messages: history.slice(-10) })
+					});
+					if (!res.ok) throw new Error(res.status);
+					const { reply } = await res.json();
+					history.push({ role: 'assistant', content: reply });
+					text.innerHTML = '<b>Sie:</b> ' + esc(question) + '<br><b>KI:</b> ' + esc(reply);
+					speak(reply);
+				} catch (e) {
+					history.pop();
+					state = 'idle';
+					mic.disabled = false;
+					text.textContent = e.message === '429' ? 'Bitte einen Moment warten und erneut versuchen.' : 'Die KI ist gerade nicht erreichbar.';
+				}
+			}
+
+			mic.addEventListener('click', () => {
+				synth.cancel();
+				const rec = new SR();
+				rec.lang = 'de-DE';
+				rec.interimResults = true;
+				let finalText = '';
+				rec.onstart = () => { state = 'listening'; mic.classList.add('rec'); text.textContent = 'Ich höre zu …'; };
+				rec.onresult = (e) => {
+					finalText = Array.from(e.results).map((r) => r[0].transcript).join(' ');
+					text.innerHTML = '<b>Sie:</b> ' + esc(finalText);
+				};
+				rec.onerror = () => { state = 'idle'; text.textContent = 'Spracheingabe nicht möglich (Mikrofon erlaubt?).'; };
+				rec.onend = () => {
+					mic.classList.remove('rec');
+					if (finalText.trim()) ask(finalText.trim()); else if (state === 'listening') state = 'idle';
+				};
+				rec.start();
+			});
+		})();
 	</script>
 
 </body>
