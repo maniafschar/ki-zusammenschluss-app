@@ -1784,7 +1784,8 @@
 							if (done && !completed) throw new Error('Die KI-Antwort wurde unterbrochen.');
 						}
 					} finally {
-						await reader.cancel();
+						if (!completed) await reader.cancel();
+						reader.releaseLock();
 					}
 					if (!reply.trim()) throw new Error('Die KI hat keine Antwort geliefert.');
 					history.push({ role: 'assistant', content: reply.trim() });
