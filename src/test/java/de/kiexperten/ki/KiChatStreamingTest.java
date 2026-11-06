@@ -18,16 +18,18 @@ import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
-import com.sun.net.httpserver.HttpServer;
-import de.kiexperten.Zeit;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.transaction.annotation.Transactional;
+
+import com.sun.net.httpserver.HttpServer;
+
+import de.kiexperten.Zeit;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties = {
 		"spring.datasource.url=jdbc:h2:mem:ki-stream-test",
@@ -53,7 +55,9 @@ class KiChatStreamingTest {
 					final byte[] body = "{\"choices\":[{\"message\":{\"content\":\"<think>geheim</think>Antwort.\"}}]}"
 							.getBytes(StandardCharsets.UTF_8);
 					exchange.sendResponseHeaders(200, body.length);
-					try (var out = exchange.getResponseBody()) { out.write(body); }
+					try (var out = exchange.getResponseBody()) {
+						out.write(body);
+					}
 					return;
 				}
 				exchange.getResponseHeaders().set("Content-Type", "text/event-stream; charset=utf-8");
@@ -64,16 +68,18 @@ class KiChatStreamingTest {
 							+ "data: {\"choices\":[{\"delta\":{\"content\":\"nk>Erster Satz. \"}}]}\r\n\r\n")
 							.getBytes(StandardCharsets.UTF_8));
 					out.flush();
-					if (!continueStream.await(5, TimeUnit.SECONDS)) throw new IllegalStateException("Test timeout");
+					if (!continueStream.await(5, TimeUnit.SECONDS))
+						throw new IllegalStateException("Test timeout");
 					out.write(("data: {\"choices\":[{\"delta\":{\"content\":\"Zweiter Satz.\"}}]}\n\n"
-							+ (request.contains("abbruch") ? "" : "data: [DONE]\n\n")).getBytes(StandardCharsets.UTF_8));
-				} catch (InterruptedException e) {
+							+ (request.contains("abbruch") ? "" : "data: [DONE]\n\n"))
+							.getBytes(StandardCharsets.UTF_8));
+				} catch (final InterruptedException e) {
 					Thread.currentThread().interrupt();
 					throw new IllegalStateException(e);
 				}
 			});
 			upstream.start();
-		} catch (Exception e) {
+		} catch (final Exception e) {
 			throw new ExceptionInInitializerError(e);
 		}
 	}
@@ -98,12 +104,14 @@ class KiChatStreamingTest {
 	ChatProtokollService protokollService;
 
 	private HttpResponse<java.io.InputStream> request(final String question) throws Exception {
-		return request(question, null);
+		return this.request(question, null);
 	}
 
 	private HttpResponse<java.io.InputStream> request(final String question, final UUID gespraechId) throws Exception {
-		final String auth = Base64.getEncoder().encodeToString("admin:local-test-password".getBytes(StandardCharsets.UTF_8));
-		return HttpClient.newHttpClient().send(HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + port + "/api/ki/chat/stream"))
+		final String auth = Base64.getEncoder()
+				.encodeToString("admin:local-test-password".getBytes(StandardCharsets.UTF_8));
+		return HttpClient.newHttpClient().send(HttpRequest
+				.newBuilder(URI.create("http://127.0.0.1:" + this.port + "/api/ki/chat/stream"))
 				.header("Authorization", "Basic " + auth)
 				.header("X-API-Client", "test")
 				.header("Content-Type", "application/json")
@@ -116,7 +124,7 @@ class KiChatStreamingTest {
 	void streamsBeforeCompletionAndHidesSplitThinkTags() throws Exception {
 		continueStream = new CountDownLatch(1);
 		try {
-			final var response = request("test");
+			final var response = this.request("test");
 			assertEquals(200, response.statusCode());
 			try (var reader = new BufferedReader(new InputStreamReader(response.body(), StandardCharsets.UTF_8))) {
 				assertEquals("event: delta", reader.readLine());
@@ -130,7 +138,8 @@ class KiChatStreamingTest {
 				assertTrue(rest.contains("event: done"));
 			}
 			final String id = response.headers().firstValue("X-Chat-Id").orElseThrow();
-			final var entry = protokolle.findAll().stream().filter(p -> p.getGespraechId().equals(id)).findFirst().orElseThrow();
+			final var entry = this.protokolle.findAll().stream().filter(p -> p.getGespraechId().equals(id)).findFirst()
+					.orElseThrow();
 			assertEquals("test", entry.getNachricht());
 			assertEquals("Erster Satz. Zweiter Satz.", entry.getAntwort());
 			assertEquals("ABGESCHLOSSEN", entry.getStatus());
@@ -142,12 +151,13 @@ class KiChatStreamingTest {
 	@Test
 	void reportsTruncatedUpstream() throws Exception {
 		continueStream = new CountDownLatch(0);
-		final var response = request("abbruch");
+		final var response = this.request("abbruch");
 		final String stream = new String(response.body().readAllBytes(), StandardCharsets.UTF_8);
 		assertTrue(stream.contains("event: error"));
 		assertFalse(stream.contains("event: done"));
 		final String id = response.headers().firstValue("X-Chat-Id").orElseThrow();
-		final var entry = protokolle.findAll().stream().filter(p -> p.getGespraechId().equals(id)).findFirst().orElseThrow();
+		final var entry = this.protokolle.findAll().stream().filter(p -> p.getGespraechId().equals(id)).findFirst()
+				.orElseThrow();
 		assertEquals("FEHLER", entry.getStatus());
 		assertEquals("Erster Satz. Zweiter Satz.", entry.getAntwort());
 	}
@@ -163,18 +173,22 @@ class KiChatStreamingTest {
 		previous.setNachricht("vorhandener Chat");
 		previous.setAntwort("vorhandene Antwort");
 		previous.setStatus("ABGESCHLOSSEN");
-		protokolle.saveAndFlush(previous);
+		this.protokolle.saveAndFlush(previous);
 		for (final String question : new String[] { "erste", "zweite" }) {
-			final var response = request(question, id);
+			final var response = this.request(question, id);
 			response.body().readAllBytes();
 			assertEquals(id.toString(), response.headers().firstValue("X-Chat-Id").orElseThrow());
 		}
-		assertEquals(3, protokolle.findAll().stream().filter(p -> p.getGespraechId().equals(id.toString())).count());
-		final URI uri = URI.create("http://127.0.0.1:" + port + "/api/admin/chats");
+		assertEquals(3,
+				this.protokolle.findAll().stream().filter(p -> p.getGespraechId().equals(id.toString())).count());
+		final URI uri = URI.create("http://127.0.0.1:" + this.port + "/api/admin/chats");
 		final HttpClient client = HttpClient.newHttpClient();
-		assertEquals(401, client.send(HttpRequest.newBuilder(uri).GET().build(), HttpResponse.BodyHandlers.ofString()).statusCode());
-		final String auth = Base64.getEncoder().encodeToString("admin:local-test-password".getBytes(StandardCharsets.UTF_8));
-		final var admin = client.send(HttpRequest.newBuilder(uri).header("Authorization", "Basic " + auth).GET().build(),
+		assertEquals(401, client.send(HttpRequest.newBuilder(uri).GET().build(), HttpResponse.BodyHandlers.ofString())
+				.statusCode());
+		final String auth = Base64.getEncoder()
+				.encodeToString("admin:local-test-password".getBytes(StandardCharsets.UTF_8));
+		final var admin = client.send(
+				HttpRequest.newBuilder(uri).header("Authorization", "Basic " + auth).GET().build(),
 				HttpResponse.BodyHandlers.ofString());
 		assertEquals(200, admin.statusCode());
 		assertTrue(admin.body().contains(id.toString()));
@@ -183,9 +197,10 @@ class KiChatStreamingTest {
 
 	@Test
 	void legacyEndpointRecordsChat() throws Exception {
-		final String auth = Base64.getEncoder().encodeToString("admin:local-test-password".getBytes(StandardCharsets.UTF_8));
+		final String auth = Base64.getEncoder()
+				.encodeToString("admin:local-test-password".getBytes(StandardCharsets.UTF_8));
 		final var response = HttpClient.newHttpClient().send(HttpRequest.newBuilder(
-				URI.create("http://127.0.0.1:" + port + "/api/ki/chat"))
+				URI.create("http://127.0.0.1:" + this.port + "/api/ki/chat"))
 				.header("Authorization", "Basic " + auth).header("X-API-Client", "test")
 				.header("Content-Type", "application/json")
 				.POST(HttpRequest.BodyPublishers.ofString("{\"messages\":[{\"role\":\"user\",\"content\":\"alt\"},"
@@ -193,17 +208,18 @@ class KiChatStreamingTest {
 				.build(), HttpResponse.BodyHandlers.ofString());
 		assertEquals(200, response.statusCode());
 		assertEquals("{\"reply\":\"Antwort.\"}", response.body());
-		final var entry = protokolle.findAll().stream().filter(p -> p.getNachricht().equals("legacy")).findFirst().orElseThrow();
+		final var entry = this.protokolle.findAll().stream().filter(p -> p.getNachricht().equals("legacy")).findFirst()
+				.orElseThrow();
 		assertEquals("Antwort.", entry.getAntwort());
 		assertEquals("ABGESCHLOSSEN", entry.getStatus());
 	}
 
 	@Test
 	void upstreamFailureIsRecorded() throws Exception {
-		final var response = request("upstream-fehler");
+		final var response = this.request("upstream-fehler");
 		response.body().close();
 		assertEquals(502, response.statusCode());
-		final var entry = protokolle.findAll().stream().filter(p -> p.getNachricht().equals("upstream-fehler"))
+		final var entry = this.protokolle.findAll().stream().filter(p -> p.getNachricht().equals("upstream-fehler"))
 				.findFirst().orElseThrow();
 		assertEquals("FEHLER", entry.getStatus());
 	}
@@ -212,29 +228,29 @@ class KiChatStreamingTest {
 	@Transactional
 	void removesEntriesAtThirtyDayBoundaryOnly() {
 		final LocalDateTime now = Zeit.nowUtc();
-		final LocalDateTime cutoff = now.minusDays(30);
-		final ChatProtokoll older = entryAt(cutoff.minusSeconds(1));
-		final ChatProtokoll boundary = entryAt(cutoff);
-		final ChatProtokoll newer = entryAt(cutoff.plusSeconds(1));
-		protokolle.saveAndFlush(older);
-		protokolle.saveAndFlush(boundary);
-		protokolle.saveAndFlush(newer);
-		protokollService.loescheBis(cutoff);
-		protokolle.flush();
-		assertFalse(protokolle.existsById(older.getId()));
-		assertFalse(protokolle.existsById(boundary.getId()));
-		assertTrue(protokolle.existsById(newer.getId()));
+		final LocalDateTime cutoff = now.minusDays(7);
+		final ChatProtokoll older = this.entryAt(cutoff.minusSeconds(1));
+		final ChatProtokoll boundary = this.entryAt(cutoff);
+		final ChatProtokoll newer = this.entryAt(cutoff.plusSeconds(1));
+		this.protokolle.saveAndFlush(older);
+		this.protokolle.saveAndFlush(boundary);
+		this.protokolle.saveAndFlush(newer);
+		this.protokollService.loescheBis(cutoff);
+		this.protokolle.flush();
+		assertFalse(this.protokolle.existsById(older.getId()));
+		assertFalse(this.protokolle.existsById(boundary.getId()));
+		assertTrue(this.protokolle.existsById(newer.getId()));
 	}
 
 	@Test
 	@Transactional
 	void scheduledCleanupUsesThirtyDayRetention() {
 		final LocalDateTime now = Zeit.nowUtc();
-		final ChatProtokoll expired = protokolle.saveAndFlush(entryAt(now.minusDays(31)));
-		final ChatProtokoll retained = protokolle.saveAndFlush(entryAt(now.minusDays(29)));
-		protokollService.loescheAbgelaufene();
-		assertFalse(protokolle.existsById(expired.getId()));
-		assertTrue(protokolle.existsById(retained.getId()));
+		final ChatProtokoll expired = this.protokolle.saveAndFlush(this.entryAt(now.minusDays(8)));
+		final ChatProtokoll retained = this.protokolle.saveAndFlush(this.entryAt(now.minusDays(6)));
+		this.protokollService.loescheAbgelaufene();
+		assertFalse(this.protokolle.existsById(expired.getId()));
+		assertTrue(this.protokolle.existsById(retained.getId()));
 	}
 
 	private ChatProtokoll entryAt(final LocalDateTime time) {
