@@ -226,12 +226,29 @@
 			transform: translateX(0);
 		}
 
-		nav.is-collapsed .nav-links.is-open a:nth-child(1) { transition-delay: .04s; }
-		nav.is-collapsed .nav-links.is-open a:nth-child(2) { transition-delay: .08s; }
-		nav.is-collapsed .nav-links.is-open a:nth-child(3) { transition-delay: .12s; }
-		nav.is-collapsed .nav-links.is-open a:nth-child(4) { transition-delay: .16s; }
-		nav.is-collapsed .nav-links.is-open a:nth-child(5) { transition-delay: .20s; }
-		nav.is-collapsed .nav-links.is-open a:nth-child(6) { transition-delay: .24s; }
+		nav.is-collapsed .nav-links.is-open a:nth-child(1) {
+			transition-delay: .04s;
+		}
+
+		nav.is-collapsed .nav-links.is-open a:nth-child(2) {
+			transition-delay: .08s;
+		}
+
+		nav.is-collapsed .nav-links.is-open a:nth-child(3) {
+			transition-delay: .12s;
+		}
+
+		nav.is-collapsed .nav-links.is-open a:nth-child(4) {
+			transition-delay: .16s;
+		}
+
+		nav.is-collapsed .nav-links.is-open a:nth-child(5) {
+			transition-delay: .20s;
+		}
+
+		nav.is-collapsed .nav-links.is-open a:nth-child(6) {
+			transition-delay: .24s;
+		}
 
 		nav.is-collapsed .nav-links a::after {
 			content: '↗';
@@ -779,7 +796,6 @@
 		<canvas id="voice-canvas" width="840" height="320" role="img" aria-label="Animation der KI-Stimme"></canvas>
 		<canvas id="voice-webgl" role="img" aria-label="Animation der KI-Stimme" hidden></canvas>
 		<button id="voice-mic" class="mic" type="button" aria-label="Sprechen" title="Frage stellen">🎤</button>
-		<button id="welcome-replay" class="replay" type="button" hidden>Begrüßung erneut anhören</button>
 		<p class="voice-text" id="voice-text" aria-live="polite"></p>
 	</section>
 
