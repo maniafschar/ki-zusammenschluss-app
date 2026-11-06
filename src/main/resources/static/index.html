@@ -26,7 +26,8 @@
 			scroll-behavior: smooth;
 		}
 
-		section[id], header[id] {
+		section[id],
+		header[id] {
 			scroll-margin-top: 80px;
 		}
 
@@ -144,7 +145,8 @@
 			box-shadow: 0 0 18px rgba(54, 177, 255, .4);
 		}
 
-		.nav-toggle[hidden], .nav-links[hidden] {
+		.nav-toggle[hidden],
+		.nav-links[hidden] {
 			display: none;
 		}
 
@@ -193,7 +195,8 @@
 			color: #fff;
 		}
 
-		nav a:focus-visible, .nav-toggle:focus-visible {
+		nav a:focus-visible,
+		.nav-toggle:focus-visible {
 			outline: 2px solid #75dfff;
 			outline-offset: -2px;
 		}
@@ -588,7 +591,9 @@
 		}
 
 		@media (prefers-reduced-motion: reduce) {
-			.nav-toggle span, nav.is-collapsed .nav-links a {
+
+			.nav-toggle span,
+			nav.is-collapsed .nav-links a {
 				transition: none;
 			}
 
@@ -604,6 +609,7 @@
 		}
 
 		@media (max-width: 640px) {
+
 			header,
 			section {
 				padding: 72px 6%;
@@ -619,10 +625,12 @@
 		}
 
 		.voice.welcome {
-			min-height: 100vh;
+			height: 100vh;
+			height: 100dvh;
+			overflow-y: auto;
 			display: flex;
 			flex-direction: column;
-			justify-content: center;
+			justify-content: safe center;
 			align-items: center;
 			color: #eef7ff;
 			background:
@@ -633,10 +641,14 @@
 			padding-top: 112px;
 		}
 
+		.voice.welcome > * {
+			flex-shrink: 0;
+		}
+
 		.voice canvas {
 			width: 100%;
 			max-width: 560px;
-			height: clamp(280px, 42vw, 430px);
+			height: clamp(160px, 30vh, 430px);
 			display: block;
 			margin: 0 auto 16px;
 			filter: drop-shadow(0 0 16px rgba(49, 143, 255, .3));
@@ -1333,7 +1345,7 @@
 			const ctx = canvas.getContext('2d');
 			const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
 			const synth = window.speechSynthesis;
-			const welcome = 'Willkommen zum KI Experten Team, wir sind ein unabhängiges Team von top Spezialisten, jeder auf seinem Gebiet. Uns alle vereint die Art, wie wir denken das KI in Unternehmen den größten Profit erbringt. Du kannst mir gerne Fragen stellen oder einfach sagen, dass ich Dir mehr über uns erzählen soll...';
+			const welcome = 'Willkommen beim KI Experten Team! Wir sind ein unabhängiges Team von top Spezialisten, jeder auf seinem Gebiet. Uns alle vereint die Art, wie wir denken das KI in Unternehmen den größten Profit erbringt. Du kannst mir gerne Fragen stellen oder einfach sagen, dass ich Dir mehr über uns erzählen soll...';
 			if (!SR || !synth) {
 				mic.disabled = true;
 				mic.title = !SR ? 'Ihr Browser unterstützt keine Spracheingabe'
