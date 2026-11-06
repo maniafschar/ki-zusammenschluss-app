@@ -5,7 +5,6 @@
 	<meta charset="UTF-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
 	<title>KI-Experten Zusammenschluss | KI inhouse</title>
-	<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/vis-network@9.1.9/styles/vis-network.min.css">
 	<style>
 		:root {
 			--bg: #f7fbf9;
@@ -26,8 +25,7 @@
 			scroll-behavior: smooth;
 		}
 
-		section[id],
-		header[id] {
+		section[id] {
 			scroll-margin-top: 80px;
 		}
 
@@ -44,21 +42,12 @@
 			line-height: 1.6;
 		}
 
-		header,
 		section {
 			padding: 88px 8%;
 		}
 
 		section[hidden] {
 			display: none;
-		}
-
-		header {
-			min-height: 100vh;
-			background: linear-gradient(160deg, #e3f7f0 0%, #fff7ec 100%);
-			display: flex;
-			flex-direction: column;
-			justify-content: center;
 		}
 
 		nav {
@@ -281,49 +270,210 @@
 			margin-bottom: 24px;
 		}
 
-		.spider-heading {
-			font-size: 1.5rem;
-			margin: 8px 0 0;
-			color: var(--text);
+		.inhouse {
+			color: #eef7ff;
+			background:
+				radial-gradient(ellipse at 50% 43%, rgba(19, 84, 175, .48), transparent 46%),
+				radial-gradient(circle, rgba(91, 177, 255, .16) 1px, transparent 1.5px),
+				linear-gradient(145deg, #071124, #0b1c42 55%, #060e20);
+			background-size: auto, 12px 12px, auto;
+		}
+
+		.inhouse-inner {
+			max-width: 1200px;
+			margin: 0 auto;
+		}
+
+		.inhouse-eyebrow {
+			color: #8de8ff;
+			font-weight: 600;
+			margin-bottom: 12px;
+		}
+
+		.inhouse h2 {
+			font-size: clamp(1.15rem, 2.4vw, 1.6rem);
+			font-weight: 500;
+			color: #c6dbef;
+			margin: 16px 0 24px;
 		}
 
 		.spider {
-			width: 100%;
-			margin: 4px 0 0;
+			position: relative;
+			margin: 20px 0 32px;
 		}
 
-		.spider-network {
-			width: 100%;
-			height: 390px;
-			border-radius: 18px;
-		}
-
-		.spider-fallback {
-			display: grid;
-			grid-template-columns: repeat(2, minmax(0, 1fr));
-			gap: 10px;
-		}
-
-		.spider-fallback strong {
-			grid-column: 1 / -1;
-			justify-self: center;
-			padding: 12px 24px;
-			border-radius: 999px;
-			background: var(--accent);
-			color: #ffffff;
-		}
-
-		.spider-fallback-benefit {
-			display: grid;
-			place-content: center;
-			min-height: 72px;
-			border: 1px solid #d9ece6;
-			border-radius: 12px;
-			background: #ffffff;
-			box-shadow: 0 5px 16px rgba(29, 43, 58, 0.07);
+		.spider summary {
+			position: relative;
+			z-index: 2;
+			display: flex;
+			flex-direction: column;
+			align-items: center;
+			justify-content: center;
+			gap: 5px;
+			width: 180px;
+			min-height: 180px;
+			margin: 0 auto;
+			padding: 20px;
+			list-style: none;
 			text-align: center;
-			font-size: 0.92rem;
-			font-weight: 650;
+			cursor: pointer;
+			border: 1px solid #86e9ff;
+			border-radius: 50%;
+			background: radial-gradient(circle at 35% 30%, #245a99, #0b2450 65%, #071124);
+			box-shadow: 0 0 0 8px rgba(79, 190, 255, .08), 0 0 40px rgba(52, 164, 255, .35), inset 0 0 24px rgba(98, 222, 255, .16);
+			transition: box-shadow .25s ease, transform .25s ease;
+		}
+
+		.spider summary::-webkit-details-marker {
+			display: none;
+		}
+
+		.spider summary:hover {
+			transform: scale(1.04);
+			box-shadow: 0 0 0 8px rgba(79, 190, 255, .12), 0 0 55px rgba(52, 190, 255, .55), inset 0 0 24px rgba(98, 222, 255, .2);
+		}
+
+		.spider summary:focus-visible {
+			outline: 3px solid #fff;
+			outline-offset: 6px;
+		}
+
+		.spider-title {
+			font-size: 1.25rem;
+			font-weight: 750;
+			letter-spacing: .08em;
+		}
+
+		.spider-action {
+			color: #c6eaff;
+			font-size: .85rem;
+			line-height: 1.35;
+		}
+
+		.spider-action-close,
+		.spider[open] .spider-action-open {
+			display: none;
+		}
+
+		.spider[open] .spider-action-close {
+			display: block;
+		}
+
+		.spider:not([open]) .spider-benefits,
+		.spider:not([open]) .spider-lines {
+			display: none;
+		}
+
+		.spider-benefits {
+			position: relative;
+			display: grid;
+			grid-template-columns: minmax(0, 1fr) 200px minmax(0, 1fr);
+			gap: 18px 24px;
+			padding: 10px 0;
+			list-style: none;
+		}
+
+		.spider[open] summary {
+			position: absolute;
+			top: 50%;
+			left: 50%;
+			translate: -50% -50%;
+		}
+
+		.spider-lines {
+			position: absolute;
+			inset: 0;
+			width: 100%;
+			height: 100%;
+			pointer-events: none;
+		}
+
+		.spider-lines line {
+			stroke: #65d9ff;
+			stroke-width: .4;
+			opacity: .65;
+			stroke-dasharray: 100;
+			animation: spider-line .8s ease both;
+		}
+
+		.spider-benefit {
+			z-index: 1;
+			display: flex;
+			align-items: center;
+			gap: 14px;
+			min-height: 82px;
+			padding: 16px 20px;
+			border: 1px solid rgba(115, 214, 255, .5);
+			border-radius: 6px 20px 6px 20px;
+			background: linear-gradient(135deg, #153761, #0b1c3b);
+			box-shadow: 0 8px 28px rgba(2, 9, 28, .4), inset 0 0 18px rgba(65, 171, 255, .08);
+			font-weight: 600;
+			line-height: 1.4;
+			animation: spider-reveal .55s both;
+		}
+
+		.spider-benefit:nth-of-type(odd) { grid-column: 1; }
+		.spider-benefit:nth-of-type(even) { grid-column: 3; }
+		.spider-benefit:nth-of-type(1), .spider-benefit:nth-of-type(2) { grid-row: 1; }
+		.spider-benefit:nth-of-type(3), .spider-benefit:nth-of-type(4) { grid-row: 2; }
+		.spider-benefit:nth-of-type(5), .spider-benefit:nth-of-type(6) { grid-row: 3; }
+		.spider-benefit:nth-of-type(2) { animation-delay: .08s; }
+		.spider-benefit:nth-of-type(3) { animation-delay: .16s; }
+		.spider-benefit:nth-of-type(4) { animation-delay: .24s; }
+		.spider-benefit:nth-of-type(5) { animation-delay: .32s; }
+		.spider-benefit:nth-of-type(6) { animation-delay: .40s; }
+
+		.spider-icon {
+			flex: 0 0 auto;
+			font-size: 1.4rem;
+		}
+
+		@keyframes spider-reveal {
+			from { opacity: 0; transform: translateY(12px) scale(.96); }
+			to { opacity: 1; transform: none; }
+		}
+
+		@keyframes spider-line {
+			from { stroke-dashoffset: 100; }
+			to { stroke-dashoffset: 0; }
+		}
+
+		@media (max-width: 760px) {
+			.spider[open] summary {
+				position: relative;
+				top: auto;
+				left: auto;
+				translate: none;
+			}
+
+			.spider-benefits {
+				grid-template-columns: minmax(0, 1fr);
+				gap: 12px;
+				padding: 24px 0 0;
+			}
+
+			.spider-benefits::before {
+				content: '';
+				position: absolute;
+				top: 0;
+				bottom: 0;
+				left: 50%;
+				width: 2px;
+				background: linear-gradient(#65d9ff, #9474ff, transparent);
+			}
+
+			.spider-benefit:nth-of-type(n) {
+				grid-column: 1;
+				grid-row: auto;
+				min-height: 64px;
+			}
+
+			.spider-lines { display: none; }
+		}
+
+		@media (prefers-reduced-motion: reduce) {
+			.spider summary { transition: none; }
+			.spider-benefit, .spider-lines line { animation: none; }
 		}
 
 		.lead {
@@ -678,14 +828,10 @@
 
 		@media (max-width: 640px) {
 
-			header,
 			section {
 				padding: 72px 6%;
 			}
 
-			.spider-network {
-				height: 560px;
-			}
 		}
 
 		.voice {
@@ -820,26 +966,37 @@
 		</p>
 	</section>
 
-	<header id="inhouse">
-		<p style="color: var(--accent); font-weight: 600; margin-bottom: 12px;">Wir sind freiberufliche KI-Experten. Aus
-			Überzeugung.</p>
-		<h1>KI, in House?</h1>
-		<h2>Warum es die beste Lösung für KMU Unternehmen ist:</h2>
-		<div class="spider">
-			<div id="spider-network" class="spider-network" role="img"
-				aria-label="Interaktive Grafik: In House mit Vorteilen rundherum" hidden></div>
-			<div id="spider-fallback" class="spider-fallback" role="list" aria-label="Vorteile von KI in House">
-				<strong>KI, in House</strong>
-				<div class="spider-fallback-benefit" role="listitem">🔒 Ihre Daten bleiben bei Ihnen</div>
-				<div class="spider-fallback-benefit" role="listitem">💶 Planbare Kosten</div>
-				<div class="spider-fallback-benefit" role="listitem">🛡️ Volle Datenkontrolle</div>
-				<div class="spider-fallback-benefit" role="listitem">🔓 Unabhängig von Cloud-Anbietern</div>
-				<div class="spider-fallback-benefit" role="listitem">🧩 Auf Ihre Abläufe zugeschnitten</div>
-				<div class="spider-fallback-benefit" role="listitem">⚡ Schnell und jederzeit verfügbar</div>
-			</div>
+	<section id="inhouse" class="inhouse" aria-labelledby="inhouse-title">
+		<div class="inhouse-inner">
+			<p class="inhouse-eyebrow">Wir sind freiberufliche KI-Experten. Aus Überzeugung.</p>
+			<h1 id="inhouse-title">KI, in House?</h1>
+			<h2>Warum es die beste Lösung für KMU Unternehmen ist:</h2>
+			<details class="spider">
+				<summary>
+					<span class="spider-title">IN HOUSE</span>
+					<span class="spider-action spider-action-open">Vorteile entdecken +</span>
+					<span class="spider-action spider-action-close">Vorteile schließen −</span>
+				</summary>
+				<svg class="spider-lines" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+					<line x1="50" y1="50" x2="17" y2="17" />
+					<line x1="50" y1="50" x2="83" y2="17" />
+					<line x1="50" y1="50" x2="17" y2="50" />
+					<line x1="50" y1="50" x2="83" y2="50" />
+					<line x1="50" y1="50" x2="17" y2="83" />
+					<line x1="50" y1="50" x2="83" y2="83" />
+				</svg>
+				<ul class="spider-benefits" aria-label="Vorteile von KI in House">
+					<li class="spider-benefit"><span class="spider-icon" aria-hidden="true">🔒</span>Ihre Daten bleiben bei Ihnen</li>
+					<li class="spider-benefit"><span class="spider-icon" aria-hidden="true">💶</span>Planbare Kosten</li>
+					<li class="spider-benefit"><span class="spider-icon" aria-hidden="true">🛡️</span>Volle Datenkontrolle</li>
+					<li class="spider-benefit"><span class="spider-icon" aria-hidden="true">🔓</span>Unabhängig von Cloud-Anbietern</li>
+					<li class="spider-benefit"><span class="spider-icon" aria-hidden="true">🧩</span>Auf Ihre Abläufe zugeschnitten</li>
+					<li class="spider-benefit"><span class="spider-icon" aria-hidden="true">⚡</span>Schnell und jederzeit verfügbar</li>
+				</ul>
+			</details>
+			<a class="btn" href="#kontakt">Gemeinsam starten</a>
 		</div>
-		<a class="btn" href="#kontakt">Gemeinsam starten</a>
-	</header>
+	</section>
 
 	<section id="pillars" class="alt">
 		<h2>Warum Sie mit uns sicher planen können</h2>
@@ -952,7 +1109,6 @@
 				style="color: var(--muted);">Datenschutz</a></p>
 	</footer>
 
-	<script src="https://cdn.jsdelivr.net/npm/vis-network@9.1.9/standalone/umd/vis-network.min.js" defer></script>
 	<script>
 		(function navigation() {
 			const nav = document.querySelector('nav');
@@ -1010,215 +1166,6 @@
 		const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({
 			'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
 		}[c]));
-
-		function startSpider() {
-			const container = document.getElementById('spider-network');
-			const fallback = document.getElementById('spider-fallback');
-
-			const benefits = [
-				{ id: 'privacy', label: '🔒  Daten bleiben bei Ihnen', x: -1, y: -1 },
-				{ id: 'costs', label: '💶  Planbare Kosten', x: 1, y: -1 },
-				{ id: 'control', label: '🛡️  Volle Datenkontrolle', x: -1, y: 0 },
-				{ id: 'independence', label: '🔓  Unabhängig von Cloud-Anbietern', x: 1, y: 0 },
-				{ id: 'tailored', label: '🧩  Auf Ihre Abläufe zugeschnitten', x: -1, y: 1 },
-				{ id: 'availability', label: '⚡  Schnell und jederzeit verfügbar', x: 1, y: 1 }
-			];
-			const nodes = new window.vis.DataSet([{
-				id: 'in-house',
-				label: 'IN HOUSE',
-				x: 0,
-				y: 0,
-				fixed: true,
-				shape: 'box',
-				margin: 18,
-				physics: false,
-				color: { background: '#0f9d7a', border: '#ffffff' },
-				borderWidth: 3,
-				font: { color: '#ffffff', size: 22, face: 'system-ui', bold: true }
-			}]);
-			const edges = new window.vis.DataSet();
-			const network = new window.vis.Network(container, { nodes, edges }, {
-				autoResize: true,
-				interaction: {
-					dragNodes: true,
-					dragView: true,
-					zoomView: false,
-					hover: true,
-					tooltipDelay: 200
-				},
-				physics: { enabled: false },
-				nodes: {
-					shape: 'box',
-					margin: { top: 24, right: 28, bottom: 24, left: 28 },
-					widthConstraint: { maximum: 220 },
-					borderWidth: 1,
-					borderWidthSelected: 2,
-					color: { background: 'transparent', border: 'none', highlight: { background: '#eaf6f1' } },
-					font: { color: '#1d2b3a', size: 16, face: 'system-ui', multi: true },
-					shadow: { enabled: true, color: 'rgba(29, 43, 58, 0.12)', size: 12, x: 0, y: 5 }
-				},
-				edges: {
-					color: { color: '#8bcbbb', highlight: '#0f9d7a' },
-					width: 2,
-					smooth: { enabled: true, type: 'continuous' }
-				}
-			});
-
-			function positionFor(benefit) {
-				const mobile = window.matchMedia('(max-width: 640px)').matches;
-				const width = container.clientWidth;
-				const height = container.clientHeight;
-				return {
-					x: benefit.x * width * (mobile ? 0.39 : 0.34),
-					y: benefit.y * height * (mobile ? 0.31 : 0.34)
-				};
-			}
-
-			function addBenefit(benefit) {
-				const position = positionFor(benefit);
-				nodes.add({
-					id: benefit.id,
-					label: benefit.label,
-					x: position.x,
-					y: position.y,
-					physics: false,
-					shape: 'box',
-					margin: { top: 24, right: 28, bottom: 24, left: 28 },
-					widthConstraint: {
-						maximum: window.matchMedia('(max-width: 640px)').matches ? 150 : 220
-					},
-					font: {
-						color: '#1d2b3a',
-						size: window.matchMedia('(max-width: 640px)').matches ? 14 : 16,
-						face: 'system-ui'
-					},
-					color: { background: '#ffffff', border: '#a9d8cb' }
-				});
-				edges.add({ from: 'in-house', to: benefit.id });
-
-				if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-					nodes.update({ id: benefit.id, margin: { top: 24, right: 28, bottom: 24, left: 28 }, font: { size: 16 } });
-					return;
-				}
-
-				const start = performance.now();
-				const duration = 360;
-				function pop(now) {
-					const progress = Math.min((now - start) / duration, 1);
-					const eased = 1 - Math.pow(1 - progress, 3);
-					nodes.update({
-						id: benefit.id,
-						font: {
-							size: Math.round(2
-								+ (window.matchMedia('(max-width: 640px)').matches ? 12 : 14) * eased)
-						}
-					});
-					if (progress < 1) requestAnimationFrame(pop);
-				}
-				requestAnimationFrame(pop);
-			}
-
-			// Level one = the fitted view with "In House" at the center; zoom-out stops here.
-			let minScale = null;
-			let bounds = null;
-			let clamping = false;
-
-			function settleView() {
-				// Symmetric fit around (0,0) so "In House" ends up exactly in the middle.
-				let halfW = 1;
-				let halfH = 1;
-				nodes.getIds().forEach((id) => {
-					const box = network.getBoundingBox(id);
-					halfW = Math.max(halfW, Math.abs(box.left), Math.abs(box.right));
-					halfH = Math.max(halfH, Math.abs(box.top), Math.abs(box.bottom));
-				});
-				minScale = Math.min(
-					container.clientWidth / (2 * halfW * 1.08),
-					container.clientHeight / (2 * halfH * 1.08)
-				);
-				network.moveTo({ position: { x: 0, y: 0 }, scale: minScale, animation: false });
-				bounds = {
-					x: container.clientWidth / (2 * minScale),
-					y: container.clientHeight / (2 * minScale)
-				};
-			}
-
-			function clampView() {
-				if (minScale === null || clamping) return;
-				clamping = true;
-				const scale = Math.max(network.getScale(), minScale);
-				const pos = network.getViewPosition();
-				const maxX = Math.max(bounds.x - container.clientWidth / (2 * scale), 0);
-				const maxY = Math.max(bounds.y - container.clientHeight / (2 * scale), 0);
-				const x = Math.min(Math.max(pos.x, -maxX), maxX);
-				const y = Math.min(Math.max(pos.y, -maxY), maxY);
-				if (scale !== network.getScale() || x !== pos.x || y !== pos.y) {
-					network.moveTo({ position: { x, y }, scale, animation: false });
-				}
-				clamping = false;
-			}
-
-			function clampNodes(ids) {
-				if (minScale === null) return;
-				const positions = network.getPositions(ids);
-				ids.forEach((id) => {
-					if (id === 'in-house' || !positions[id]) return;
-					const box = network.getBoundingBox(id);
-					const halfW = (box.right - box.left) / 2;
-					const halfH = (box.bottom - box.top) / 2;
-					const x = Math.min(Math.max(positions[id].x, -bounds.x + halfW), bounds.x - halfW);
-					const y = Math.min(Math.max(positions[id].y, -bounds.y + halfH), bounds.y - halfH);
-					if (x !== positions[id].x || y !== positions[id].y) network.moveNode(id, x, y);
-				});
-			}
-
-			network.on('zoom', clampView);
-			// Clamp every frame so nothing can be dragged or panned out of the box.
-			network.on('afterDrawing', () => {
-				if (minScale === null) return;
-				const before = JSON.stringify(network.getViewPosition());
-				clampNodes(nodes.getIds());
-				clampView();
-				if (before !== JSON.stringify(network.getViewPosition())) network.redraw();
-			});
-			window.addEventListener('resize', () => {
-				if (minScale !== null) window.setTimeout(settleView, 200);
-			});
-
-			container.hidden = false;
-			fallback.style.display = 'none';
-			// The network was created while hidden, so re-measure and center it before the animation starts.
-			network.setSize('100%', container.clientHeight + 'px');
-			network.redraw();
-			{
-				const w = container.clientWidth;
-				const h = container.clientHeight;
-				const spanX = Math.max(...benefits.map((b) => Math.abs(positionFor(b).x))) + 120;
-				const spanY = Math.max(...benefits.map((b) => Math.abs(positionFor(b).y))) + 40;
-				network.moveTo({
-					position: { x: 0, y: 0 },
-					scale: Math.min(w / (2 * spanX * 1.08), h / (2 * spanY * 1.08)),
-					animation: false
-				});
-			}
-			let index = 0;
-			function revealNext() {
-				if (index >= benefits.length) {
-					settleView();
-					return;
-				}
-				addBenefit(benefits[index]);
-				index += 1;
-				window.setTimeout(revealNext, index < benefits.length ? 1500 : 600);
-			}
-
-			if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-				benefits.forEach(addBenefit);
-				settleView();
-			} else {
-				window.setTimeout(revealNext, 1500);
-			}
-		}
 
 		function startBooking() {
 			const MONTHS = ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August',
@@ -1417,7 +1364,6 @@
 			`<p class="role">${esc(e.rolle)}</p><p>${esc(e.beschreibung)}</p></article>`);
 
 		startBooking();
-		window.addEventListener('load', startSpider, { once: true });
 
 		const observer = new IntersectionObserver((entries) => {
 			entries.forEach((e) => {
