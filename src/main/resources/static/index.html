@@ -796,6 +796,7 @@
 		<canvas id="voice-canvas" width="840" height="320" role="img" aria-label="Animation der KI-Stimme"></canvas>
 		<canvas id="voice-webgl" role="img" aria-label="Animation der KI-Stimme" hidden></canvas>
 		<button id="voice-mic" class="mic" type="button" aria-label="Sprechen" title="Frage stellen">🎤</button>
+		<button id="welcome-replay" class="replay" type="button" hidden></button>
 		<p class="voice-text" id="voice-text" aria-live="polite"></p>
 	</section>
 
@@ -1657,7 +1658,7 @@
 					return;
 				}
 				text.textContent = welcome;
-				replay.hidden = false;
+				//replay.hidden = false;
 				speak(welcome);
 			}
 
