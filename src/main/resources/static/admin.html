@@ -848,6 +848,7 @@
 		<button type="button" data-type="termine">Termine</button>
 		<button type="button" data-type="interessenten">Interessenten</button>
 		<button type="button" data-type="logs">Logs</button>
+		<button type="button" data-type="chats">Chats</button>
 		<button type="button" data-type="experten">Experten</button>
 		<button type="button" data-type="leistungen">Leistungen</button>
 		<button type="button" data-type="produkte">Produkte</button>
@@ -922,6 +923,16 @@
 				</thead>
 				<tbody></tbody>
 			</table>
+		</div>
+	</section>
+
+	<section id="chats-panel" hidden>
+		<p>Gespeicherte Gespräche, neueste Nachrichten zuerst. Einträge mit derselben Gesprächs-ID gehören zusammen.</p>
+		<p id="chats-message" role="status"></p>
+		<ul id="chats-list"></ul>
+		<div class="actions">
+			<button type="button" id="chats-prev">Neuere</button>
+			<button type="button" id="chats-next">Ältere</button>
 		</div>
 	</section>
 
@@ -1414,6 +1425,44 @@
 			});
 		}
 
+		let chatPage = 0;
+		async function loadChats() {
+			$('chats-message').textContent = 'Chats werden geladen …';
+			const page = await api('/ai-expert/api/admin/chats?seite=' + chatPage);
+			const list = $('chats-list');
+			list.replaceChildren();
+			page.content.forEach((entry) => {
+				const li = document.createElement('li');
+				const details = document.createElement('details');
+				const summary = document.createElement('summary');
+				summary.textContent = `${new Date(entry.zeitpunkt).toLocaleString('de-DE')} · ${entry.status} · ${entry.gespraechId}`;
+				details.appendChild(summary);
+				[[entry.rolle === 'user' ? 'Frage' : 'Nachricht (' + entry.rolle + ')', entry.nachricht],
+				['KI-Antwort', entry.antwort || '–']].forEach(([label, value]) => {
+					const p = document.createElement('p');
+					const strong = document.createElement('strong');
+					strong.textContent = label + ': ';
+					p.style.whiteSpace = 'pre-wrap';
+					p.style.overflowWrap = 'anywhere';
+					p.append(strong, document.createTextNode(value));
+					details.appendChild(p);
+				});
+				li.appendChild(details);
+				list.appendChild(li);
+			});
+			$('chats-message').textContent = page.totalElements
+				? `${page.totalElements} Einträge · Seite ${page.number + 1} von ${page.totalPages}`
+				: 'Keine Chats vorhanden.';
+			$('chats-prev').disabled = page.first;
+			$('chats-next').disabled = page.last;
+		}
+		$('chats-prev').addEventListener('click', () => {
+			if (chatPage > 0) { chatPage--; loadChats().catch((err) => { $('chats-message').textContent = err.message; }); }
+		});
+		$('chats-next').addEventListener('click', () => {
+			chatPage++; loadChats().catch((err) => { $('chats-message').textContent = err.message; });
+		});
+
 		async function loadLogs() {
 			const params = new URLSearchParams();
 			const f = $('log-form');
@@ -1590,16 +1639,18 @@
 				document.querySelectorAll('.tabs button[data-type]').forEach((b) => b.classList.toggle('active', b === btn));
 				const isTermine = btn.dataset.type === 'termine';
 				const isLogs = btn.dataset.type === 'logs';
+				const isChats = btn.dataset.type === 'chats';
 				const isInt = btn.dataset.type === 'interessenten';
 				const isTrash = btn.dataset.type === 'papierkorb';
 				$('trash-panel').hidden = !isTrash;
 				$('int-panel').hidden = !isInt;
 				$('termine-panel').hidden = !isTermine;
 				$('logs-panel').hidden = !isLogs;
+				$('chats-panel').hidden = !isChats;
 				const isDash = btn.dataset.type === 'dashboard';
 				$('dashboard-panel').hidden = !isDash;
 				if (isDash && !dashboardLoaded) { dashboardLoaded = true; window.loadDashboard(); }
-				$('content-layout').hidden = isTermine || isLogs || isInt || isDash || isTrash;
+				$('content-layout').hidden = isTermine || isLogs || isChats || isInt || isDash || isTrash;
 				if (isDash) return;
 				if (isInt) {
 					try { intReset(); await loadInteressenten(); } catch (err) { intMessage(err.message, true); }
@@ -1611,6 +1662,11 @@
 				}
 				if (isLogs) {
 					try { await loadLogs(); } catch (err) { $('log-message').textContent = err.message; }
+					return;
+				}
+				if (isChats) {
+					chatPage = 0;
+					try { await loadChats(); } catch (err) { $('chats-message').textContent = err.message; }
 					return;
 				}
 				if (isTermine) {
@@ -1645,7 +1701,7 @@
 				return;
 			}
 			if (readOnly) {
-				['dashboard', 'termine', 'interessenten', 'logs', 'papierkorb'].forEach((t) => document.querySelector(`.tabs button[data-type="${t}"]`).remove());
+				['dashboard', 'termine', 'interessenten', 'logs', 'chats', 'papierkorb'].forEach((t) => document.querySelector(`.tabs button[data-type="${t}"]`).remove());
 				$('script-btn').hidden = true;
 				$('new-btn').hidden = true;
 				form.querySelector('.actions').hidden = true;

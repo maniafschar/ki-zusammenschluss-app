@@ -13,6 +13,7 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
+import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
@@ -21,6 +22,7 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 
@@ -39,6 +41,18 @@ class KiChatStreamingTest {
 			upstream = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
 			upstream.createContext("/chat/completions", exchange -> {
 				final String request = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
+				if (request.contains("upstream-fehler")) {
+					exchange.sendResponseHeaders(503, -1);
+					exchange.close();
+					return;
+				}
+				if (request.contains("\"stream\":false")) {
+					final byte[] body = "{\"choices\":[{\"message\":{\"content\":\"<think>geheim</think>Antwort.\"}}]}"
+							.getBytes(StandardCharsets.UTF_8);
+					exchange.sendResponseHeaders(200, body.length);
+					try (var out = exchange.getResponseBody()) { out.write(body); }
+					return;
+				}
 				exchange.getResponseHeaders().set("Content-Type", "text/event-stream; charset=utf-8");
 				exchange.sendResponseHeaders(200, 0);
 				try (var out = exchange.getResponseBody()) {
@@ -74,13 +88,21 @@ class KiChatStreamingTest {
 	@LocalServerPort
 	int port;
 
+	@Autowired
+	ChatProtokollRepository protokolle;
+
 	private HttpResponse<java.io.InputStream> request(final String question) throws Exception {
+		return request(question, null);
+	}
+
+	private HttpResponse<java.io.InputStream> request(final String question, final UUID gespraechId) throws Exception {
 		final String auth = Base64.getEncoder().encodeToString("admin:local-test-password".getBytes(StandardCharsets.UTF_8));
 		return HttpClient.newHttpClient().send(HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + port + "/api/ki/chat/stream"))
 				.header("Authorization", "Basic " + auth)
 				.header("X-API-Client", "test")
 				.header("Content-Type", "application/json")
-				.POST(HttpRequest.BodyPublishers.ofString("{\"messages\":[{\"role\":\"user\",\"content\":\"" + question + "\"}]}"))
+				.POST(HttpRequest.BodyPublishers.ofString("{\"messages\":[{\"role\":\"user\",\"content\":\"" + question
+						+ "\"}]" + (gespraechId == null ? "" : ",\"gespraechId\":\"" + gespraechId + "\"") + "}"))
 				.build(), HttpResponse.BodyHandlers.ofInputStream());
 	}
 
@@ -101,6 +123,11 @@ class KiChatStreamingTest {
 				assertTrue(rest.contains("Zweiter Satz."));
 				assertTrue(rest.contains("event: done"));
 			}
+			final String id = response.headers().firstValue("X-Chat-Id").orElseThrow();
+			final var entry = protokolle.findAll().stream().filter(p -> p.getGespraechId().equals(id)).findFirst().orElseThrow();
+			assertEquals("test", entry.getNachricht());
+			assertEquals("Erster Satz. Zweiter Satz.", entry.getAntwort());
+			assertEquals("ABGESCHLOSSEN", entry.getStatus());
 		} finally {
 			continueStream.countDown();
 		}
@@ -113,5 +140,57 @@ class KiChatStreamingTest {
 		final String stream = new String(response.body().readAllBytes(), StandardCharsets.UTF_8);
 		assertTrue(stream.contains("event: error"));
 		assertFalse(stream.contains("event: done"));
+		final String id = response.headers().firstValue("X-Chat-Id").orElseThrow();
+		final var entry = protokolle.findAll().stream().filter(p -> p.getGespraechId().equals(id)).findFirst().orElseThrow();
+		assertEquals("FEHLER", entry.getStatus());
+		assertEquals("Erster Satz. Zweiter Satz.", entry.getAntwort());
+	}
+
+	@Test
+	void retainsConversationIdAndProtectsAdminEndpoint() throws Exception {
+		continueStream = new CountDownLatch(0);
+		final UUID id = UUID.randomUUID();
+		for (final String question : new String[] { "erste", "zweite" }) {
+			final var response = request(question, id);
+			response.body().readAllBytes();
+			assertEquals(id.toString(), response.headers().firstValue("X-Chat-Id").orElseThrow());
+		}
+		assertEquals(2, protokolle.findAll().stream().filter(p -> p.getGespraechId().equals(id.toString())).count());
+		final URI uri = URI.create("http://127.0.0.1:" + port + "/api/admin/chats");
+		final HttpClient client = HttpClient.newHttpClient();
+		assertEquals(401, client.send(HttpRequest.newBuilder(uri).GET().build(), HttpResponse.BodyHandlers.ofString()).statusCode());
+		final String auth = Base64.getEncoder().encodeToString("admin:local-test-password".getBytes(StandardCharsets.UTF_8));
+		final var admin = client.send(HttpRequest.newBuilder(uri).header("Authorization", "Basic " + auth).GET().build(),
+				HttpResponse.BodyHandlers.ofString());
+		assertEquals(200, admin.statusCode());
+		assertTrue(admin.body().contains(id.toString()));
+		assertTrue(admin.body().contains("erste"));
+	}
+
+	@Test
+	void recordsLegacyEndpointWithoutChangingResponse() throws Exception {
+		final String auth = Base64.getEncoder().encodeToString("admin:local-test-password".getBytes(StandardCharsets.UTF_8));
+		final var response = HttpClient.newHttpClient().send(HttpRequest.newBuilder(
+				URI.create("http://127.0.0.1:" + port + "/api/ki/chat"))
+				.header("Authorization", "Basic " + auth).header("X-API-Client", "test")
+				.header("Content-Type", "application/json")
+				.POST(HttpRequest.BodyPublishers.ofString("{\"messages\":[{\"role\":\"user\",\"content\":\"alt\"},"
+						+ "{\"role\":\"assistant\",\"content\":\"alte Antwort\"},{\"role\":\"user\",\"content\":\"legacy\"}]}"))
+				.build(), HttpResponse.BodyHandlers.ofString());
+		assertEquals(200, response.statusCode());
+		assertEquals("{\"reply\":\"Antwort.\"}", response.body());
+		final var entry = protokolle.findAll().stream().filter(p -> p.getNachricht().equals("legacy")).findFirst().orElseThrow();
+		assertEquals("Antwort.", entry.getAntwort());
+		assertEquals("ABGESCHLOSSEN", entry.getStatus());
+	}
+
+	@Test
+	void recordsUpstreamFailure() throws Exception {
+		final var response = request("upstream-fehler");
+		response.body().close();
+		assertEquals(502, response.statusCode());
+		final var entry = protokolle.findAll().stream().filter(p -> p.getNachricht().equals("upstream-fehler"))
+				.findFirst().orElseThrow();
+		assertEquals("FEHLER", entry.getStatus());
 	}
 }

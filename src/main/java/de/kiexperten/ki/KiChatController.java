@@ -14,6 +14,7 @@ import java.security.cert.X509Certificate;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 import javax.net.ssl.SSLContext;
@@ -35,9 +36,11 @@ import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBo
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
+import de.kiexperten.Zeit;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 
 /** Proxy zur lokalen KI, damit der API-Key nie im Browser landet. */
@@ -57,8 +60,10 @@ public class KiChatController {
 	private final String completionsPath;
 	private final String apiKey;
 	private final String model;
+	private final ChatProtokollRepository protokolle;
 
 	public KiChatController(
+			final ChatProtokollRepository protokolle,
 			@Value("${app.ki.base-url:https://100.65.185.69/v1}") final String baseUrl,
 			@Value("${app.ki.completions-path:/chat/completions}") final String completionsPath,
 			@Value("${app.ki.api-key:}") final String apiKey,
@@ -68,6 +73,7 @@ public class KiChatController {
 		this.completionsPath = completionsPath;
 		this.apiKey = apiKey;
 		this.model = model;
+		this.protokolle = protokolle;
 		final HttpClient.Builder builder = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10));
 		if (trustAll) {
 			// nur für den internen Server mit selbstsigniertem Zertifikat
@@ -93,7 +99,7 @@ public class KiChatController {
 	public record ChatMessage(@NotBlank @Size(max = 20) String role, @NotBlank @Size(max = 2000) String content) {
 	}
 
-	public record ChatRequest(@Size(min = 1, max = 20) List<@Valid ChatMessage> messages) {
+	public record ChatRequest(@NotNull @Size(min = 1, max = 20) List<@NotNull @Valid ChatMessage> messages, UUID gespraechId) {
 	}
 
 	public record ChatResponse(String reply) {
@@ -103,30 +109,59 @@ public class KiChatController {
 	public ChatResponse chat(@RequestBody @Valid final ChatRequest request, final HttpServletRequest http)
 			throws Exception {
 		final var body = createBody(request, http, false);
-		final HttpResponse<String> res = client.send(upstreamRequest(body), HttpResponse.BodyHandlers.ofString());
-		if (res.statusCode() != 200)
-			throw new ResponseStatusException(HttpStatus.BAD_GATEWAY);
-		final JsonNode content = mapper.readTree(res.body()).at("/choices/0/message/content");
-		if (content.isMissingNode() || content.isNull())
-			throw new ResponseStatusException(HttpStatus.BAD_GATEWAY);
-		// Denkblöcke entfernen, falls der Server sie im Content mitliefert
-		return new ChatResponse(content.asText().replaceAll("(?s)<think>.*?</think>", "").trim());
+		final ChatProtokoll protokoll = beginneProtokoll(request);
+		try {
+			final HttpResponse<String> res = client.send(upstreamRequest(body), HttpResponse.BodyHandlers.ofString());
+			if (res.statusCode() != 200) throw new ResponseStatusException(HttpStatus.BAD_GATEWAY);
+			final JsonNode content = mapper.readTree(res.body()).at("/choices/0/message/content");
+			if (content.isMissingNode() || content.isNull()) throw new ResponseStatusException(HttpStatus.BAD_GATEWAY);
+			final String reply = content.asText().replaceAll("(?s)<think>.*?</think>", "").trim();
+			speichereProtokoll(protokoll, reply, "ABGESCHLOSSEN");
+			return new ChatResponse(reply);
+		} catch (IOException | InterruptedException | RuntimeException e) {
+			speichereProtokoll(protokoll, null, "FEHLER");
+			throw e;
+		}
 	}
 
 	@PostMapping(value = "/api/ki/chat/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
 	public ResponseEntity<StreamingResponseBody> stream(@RequestBody @Valid final ChatRequest request,
 			final HttpServletRequest http) throws Exception {
 		final var body = createBody(request, http, true);
-		final HttpResponse<InputStream> response = client.send(upstreamRequest(body),
-				HttpResponse.BodyHandlers.ofInputStream());
-		if (response.statusCode() != 200) {
-			response.body().close();
-			log.warn("KI-Stream antwortete mit HTTP {}", response.statusCode());
-			throw new ResponseStatusException(HttpStatus.BAD_GATEWAY);
+		final ChatProtokoll protokoll = beginneProtokoll(request);
+		final HttpResponse<InputStream> response;
+		try {
+			response = client.send(upstreamRequest(body), HttpResponse.BodyHandlers.ofInputStream());
+			if (response.statusCode() != 200) {
+				response.body().close();
+				log.warn("KI-Stream antwortete mit HTTP {}", response.statusCode());
+				throw new ResponseStatusException(HttpStatus.BAD_GATEWAY);
+			}
+		} catch (IOException | InterruptedException | RuntimeException e) {
+			speichereProtokoll(protokoll, null, "FEHLER");
+			throw e;
 		}
-		final StreamingResponseBody stream = output -> forwardStream(response.body(), output);
+		final StreamingResponseBody stream = output -> forwardStream(response.body(), output, protokoll);
 		return ResponseEntity.ok().header("Cache-Control", "no-cache, no-transform")
-				.header("X-Accel-Buffering", "no").contentType(MediaType.TEXT_EVENT_STREAM).body(stream);
+				.header("X-Accel-Buffering", "no").header("X-Chat-Id", protokoll.getGespraechId())
+				.contentType(MediaType.TEXT_EVENT_STREAM).body(stream);
+	}
+
+	private ChatProtokoll beginneProtokoll(final ChatRequest request) {
+		final ChatMessage nachricht = request.messages().get(request.messages().size() - 1);
+		final ChatProtokoll protokoll = new ChatProtokoll();
+		protokoll.setGespraechId((request.gespraechId() == null ? UUID.randomUUID() : request.gespraechId()).toString());
+		protokoll.setZeitpunkt(Zeit.nowUtc());
+		protokoll.setRolle(nachricht.role());
+		protokoll.setNachricht(nachricht.content());
+		protokoll.setStatus("LAEUFT");
+		return protokolle.saveAndFlush(protokoll);
+	}
+
+	private void speichereProtokoll(final ChatProtokoll protokoll, final String antwort, final String status) {
+		protokoll.setAntwort(antwort);
+		protokoll.setStatus(status);
+		protokolle.saveAndFlush(protokoll);
 	}
 
 	private com.fasterxml.jackson.databind.node.ObjectNode createBody(final ChatRequest request,
@@ -134,7 +169,7 @@ public class KiChatController {
 		if (apiKey.isBlank())
 			throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE);
 		limit(http.getRemoteAddr());
-		if (request.messages() == null)
+		if (request.messages() == null || request.messages().isEmpty())
 			throw new ResponseStatusException(HttpStatus.BAD_REQUEST);
 		final var messages = mapper.createArrayNode();
 		messages.addObject().put("role", "system").put("content", SYSTEM_PROMPT);
@@ -166,8 +201,9 @@ public class KiChatController {
 		output.flush();
 	}
 
-	private void forwardStream(final InputStream input, final OutputStream output) {
+	private void forwardStream(final InputStream input, final OutputStream output, final ChatProtokoll protokoll) {
 		final ThinkFilter filter = new ThinkFilter();
+		final StringBuilder antwort = new StringBuilder();
 		boolean done = false;
 		try (BufferedReader reader = new BufferedReader(new InputStreamReader(input, StandardCharsets.UTF_8))) {
 			final StringBuilder data = new StringBuilder();
@@ -186,7 +222,10 @@ public class KiChatController {
 					final JsonNode content = chunk.at("/choices/0/delta/content");
 					if (content.isTextual()) {
 						final String visible = filter.accept(content.asText());
-						if (!visible.isEmpty()) sendEvent(output, "delta", visible);
+						if (!visible.isEmpty()) {
+							sendEvent(output, "delta", visible);
+							antwort.append(visible);
+						}
 					}
 				} else if (line.startsWith("data:")) {
 					if (!data.isEmpty()) data.append('\n');
@@ -195,10 +234,19 @@ public class KiChatController {
 			}
 			if (!done) throw new IOException("KI-Stream wurde vorzeitig beendet");
 			final String rest = filter.finish();
-			if (!rest.isEmpty()) sendEvent(output, "delta", rest);
+			if (!rest.isEmpty()) {
+				sendEvent(output, "delta", rest);
+				antwort.append(rest);
+			}
+			speichereProtokoll(protokoll, antwort.toString(), "ABGESCHLOSSEN");
 			sendEvent(output, "done", "");
 		} catch (IOException | RuntimeException e) {
 			log.warn("KI-Stream fehlgeschlagen", e);
+			try {
+				speichereProtokoll(protokoll, antwort.toString(), "FEHLER");
+			} catch (RuntimeException dbError) {
+				log.error("Chatprotokoll konnte nicht gespeichert werden", dbError);
+			}
 			try {
 				sendEvent(output, "error", "Die KI-Antwort wurde unterbrochen.");
 			} catch (IOException writeError) {
