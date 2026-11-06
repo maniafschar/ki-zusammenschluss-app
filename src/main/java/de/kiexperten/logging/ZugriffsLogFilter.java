@@ -18,6 +18,8 @@ import org.springframework.web.util.ContentCachingResponseWrapper;
 import de.kiexperten.Zeit;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
+import jakarta.servlet.AsyncEvent;
+import jakarta.servlet.AsyncListener;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 
@@ -41,6 +43,11 @@ public class ZugriffsLogFilter extends OncePerRequestFilter {
 	protected void doFilterInternal(final HttpServletRequest request, final HttpServletResponse response,
 			final FilterChain chain) throws ServletException, IOException {
 		final long start = System.nanoTime();
+		if ("POST".equals(request.getMethod())
+				&& (request.getContextPath() + "/api/ki/chat/stream").equals(request.getRequestURI())) {
+			logStream(request, response, chain, start);
+			return;
+		}
 		final ContentCachingResponseWrapper wrapped = new ContentCachingResponseWrapper(response);
 		Throwable failure = null;
 		try {
@@ -56,6 +63,52 @@ public class ZugriffsLogFilter extends OncePerRequestFilter {
 			final long bytes = wrapped.getContentSize();
 			wrapped.copyBodyToResponse();
 			write(request, wrapped, bytes, (System.nanoTime() - start) / 1_000_000, failure);
+		}
+	}
+
+	private void logStream(final HttpServletRequest request, final HttpServletResponse response,
+			final FilterChain chain, final long start) throws ServletException, IOException {
+		Throwable failure = null;
+		boolean asyncRegistered = false;
+		try {
+			chain.doFilter(request, response);
+			if (request.isAsyncStarted()) {
+				request.getAsyncContext().addListener(new AsyncListener() {
+					private Throwable asyncFailure;
+
+					@Override
+					public void onComplete(final AsyncEvent event) {
+						write(request, response, -1, (System.nanoTime() - start) / 1_000_000, asyncFailure);
+					}
+
+					@Override
+					public void onTimeout(final AsyncEvent event) {
+						asyncFailure = new IOException("KI-Stream-Zeitüberschreitung");
+					}
+
+					@Override
+					public void onError(final AsyncEvent event) {
+						asyncFailure = event.getThrowable();
+					}
+
+					@Override
+					public void onStartAsync(final AsyncEvent event) {
+						event.getAsyncContext().addListener(this);
+					}
+				});
+				asyncRegistered = true;
+				return;
+			}
+		} catch (final ServletException | IOException | RuntimeException | Error e) {
+			failure = e;
+			throw e;
+		} finally {
+			if (!asyncRegistered) {
+				if (failure == null && request.getAttribute(DispatcherServlet.class.getName() + ".EXCEPTION") instanceof final Throwable t) {
+					failure = t;
+				}
+				write(request, response, -1, (System.nanoTime() - start) / 1_000_000, failure);
+			}
 		}
 	}
 

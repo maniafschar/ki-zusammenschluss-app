@@ -1433,6 +1433,7 @@
 			}
 			const history = [];
 			let state = 'idle'; // idle | listening | thinking | speaking
+			let speechGeneration = 0;
 			let level = 0;
 			let visual = null;
 			let visible = true;
@@ -1652,11 +1653,15 @@
 
 			function speak(reply) {
 				if (!synth) return false;
+				const generation = ++speechGeneration;
 				const u = new SpeechSynthesisUtterance(reply);
 				u.lang = 'de-DE';
-				u.onstart = () => { state = 'speaking'; };
-				u.onend = () => { state = 'idle'; mic.disabled = !SR; };
-				u.onerror = () => { state = 'idle'; mic.disabled = !SR; };
+				u.onstart = () => { if (generation === speechGeneration) state = 'speaking'; };
+				u.onend = u.onerror = () => {
+					if (generation !== speechGeneration) return;
+					state = 'idle';
+					mic.disabled = !SR;
+				};
 				synth.cancel();
 				synth.speak(u);
 				return true;
@@ -1681,30 +1686,126 @@
 				mic.disabled = true;
 				text.innerHTML = '<b>Sie:</b> ' + esc(question) + '<br>Die KI denkt nach …';
 				history.push({ role: 'user', content: question });
+				let reply = '';
+				let unsaid = '';
+				let streaming = true;
+				let speaking = false;
+				let speechFailed = false;
+				const queue = [];
+				let active = true;
+
+				function renderReply() {
+					text.innerHTML = '<b>Sie:</b> ' + esc(question) + '<br><b>KI:</b> ' + esc(reply)
+						+ (speechFailed ? '<br>Die Sprachausgabe ist fehlgeschlagen.' : '');
+				}
+
+				function speakNext() {
+					if (!active || speaking || !queue.length) {
+						if (active && !streaming && !speaking && !queue.length) {
+							state = 'idle';
+							mic.disabled = !SR;
+						}
+						return;
+					}
+					speaking = true;
+					const utterance = new SpeechSynthesisUtterance(queue.shift());
+					utterance.lang = 'de-DE';
+					utterance.onstart = () => { if (active) state = 'speaking'; };
+					utterance.onend = () => {
+						if (!active) return;
+						speaking = false;
+						if (streaming && !queue.length) state = 'thinking';
+						speakNext();
+					};
+					utterance.onerror = (event) => {
+						if (!active) return;
+						console.error('Sprachausgabe fehlgeschlagen:', event.error);
+						speaking = false;
+						speechFailed = true;
+						queue.length = 0;
+						renderReply();
+						speakNext();
+					};
+					synth.speak(utterance);
+				}
+
+				function addText(chunk) {
+					reply += chunk;
+					unsaid += chunk;
+					renderReply();
+					if (speechFailed) return;
+					const sentences = unsaid.match(/^([\s\S]*?[.!?]+(?:["»”]?(?:\s+|$)))/);
+					if (sentences) {
+						queue.push(sentences[1].trim());
+						unsaid = unsaid.slice(sentences[1].length);
+						while (true) {
+							const next = unsaid.match(/^([\s\S]*?[.!?]+(?:["»”]?(?:\s+|$)))/);
+							if (!next) break;
+							queue.push(next[1].trim());
+							unsaid = unsaid.slice(next[1].length);
+						}
+						speakNext();
+					}
+				}
+
 				try {
 					await fetch('/ai-expert/api/csrf', { credentials: 'same-origin' });
 					const token = decodeURIComponent((document.cookie.match(/(?:^|; )XSRF-TOKEN=([^;]*)/) || [])[1] || '');
-					const res = await fetch('/ai-expert/api/ki/chat', {
+					const res = await fetch('/ai-expert/api/ki/chat/stream', {
 						method: 'POST',
 						credentials: 'same-origin',
 						headers: { 'Content-Type': 'application/json', 'X-XSRF-TOKEN': token },
 						body: JSON.stringify({ messages: history.slice(-10) })
 					});
 					if (!res.ok) throw new Error(res.status);
-					const { reply } = await res.json();
-					history.push({ role: 'assistant', content: reply });
-					text.innerHTML = '<b>Sie:</b> ' + esc(question) + '<br><b>KI:</b> ' + esc(reply);
-					speak(reply);
+					if (!res.body) throw new Error('Streaming wird nicht unterstützt');
+					const reader = res.body.getReader();
+					const decoder = new TextDecoder();
+					let buffer = '';
+					let completed = false;
+					try {
+						while (!completed) {
+							const { value, done } = await reader.read();
+							buffer += decoder.decode(value, { stream: !done });
+							let boundary;
+							while ((boundary = buffer.indexOf('\n\n')) !== -1) {
+								const event = buffer.slice(0, boundary);
+								buffer = buffer.slice(boundary + 2);
+								const lines = event.split('\n');
+								const type = lines.find((line) => line.startsWith('event:'))?.slice(6).trim();
+								const data = lines.filter((line) => line.startsWith('data:'))
+									.map((line) => line.slice(5).trimStart()).join('\n');
+								if (!data) continue;
+								const payload = JSON.parse(data);
+								if (type === 'delta') addText(payload.text);
+								if (type === 'error') throw new Error(payload.text);
+								if (type === 'done') { completed = true; break; }
+							}
+							if (done && !completed) throw new Error('Die KI-Antwort wurde unterbrochen.');
+						}
+					} finally {
+						await reader.cancel();
+					}
+					if (!reply.trim()) throw new Error('Die KI hat keine Antwort geliefert.');
+					history.push({ role: 'assistant', content: reply.trim() });
+					streaming = false;
+					if (!speechFailed && unsaid.trim()) queue.push(unsaid.trim());
+					speakNext();
 				} catch (e) {
+					active = false;
+					synth.cancel();
 					history.pop();
 					state = 'idle';
-					mic.disabled = false;
-					text.textContent = e.message === '429' ? 'Bitte einen Moment warten und erneut versuchen.' : 'Die KI ist gerade nicht erreichbar.';
+					mic.disabled = !SR;
+					console.error('KI-Antwort fehlgeschlagen:', e);
+					const message = e.message === '429' ? 'Bitte einen Moment warten und erneut versuchen.' : 'Die KI-Antwort konnte nicht vollständig geladen werden.';
+					text.innerHTML = '<b>Sie:</b> ' + esc(question) + (reply ? '<br><b>KI:</b> ' + esc(reply) : '') + '<br>' + esc(message);
 				}
 			}
 
 			mic.addEventListener('click', () => {
 				if (!SR || !synth) return;
+				speechGeneration++;
 				synth.cancel();
 				state = 'idle';
 				const rec = new SR();
