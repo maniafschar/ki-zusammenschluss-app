@@ -1160,6 +1160,59 @@
 			const core = document.getElementById('spider-core');
 			const action = core.querySelector('.spider-action');
 			const panel = document.getElementById('spider-panel');
+			const lines = panel.querySelector('.spider-lines');
+			const connectors = lines.querySelectorAll('line');
+			const benefits = panel.querySelectorAll('.spider-benefit');
+			const activeTransitions = new Map();
+			let frame = null;
+
+			function updateConnectors() {
+				frame = null;
+				const bounds = lines.getBoundingClientRect();
+				if (bounds.width && bounds.height) {
+					const center = core.getBoundingClientRect();
+					const x1 = (center.left + center.width / 2 - bounds.left) / bounds.width * 100;
+					const y1 = (center.top + center.height / 2 - bounds.top) / bounds.height * 100;
+					const targets = Array.from(benefits, (benefit) =>
+						benefit.querySelector('.spider-benefit-toggle').getBoundingClientRect());
+					targets.forEach((target, index) => {
+						const line = connectors[index];
+						line.setAttribute('x1', x1);
+						line.setAttribute('y1', y1);
+						line.setAttribute('x2', (target.left + target.width / 2 - bounds.left) / bounds.width * 100);
+						line.setAttribute('y2', (target.top + target.height / 2 - bounds.top) / bounds.height * 100);
+					});
+				}
+				if (activeTransitions.size) scheduleConnectors();
+			}
+
+			function scheduleConnectors() {
+				if (frame === null) frame = requestAnimationFrame(updateConnectors);
+			}
+
+			const resizeObserver = new ResizeObserver(() => {
+				if (frame !== null) cancelAnimationFrame(frame);
+				updateConnectors();
+			});
+			[core, lines, ...benefits].forEach((element) => resizeObserver.observe(element));
+			// ResizeObserver does not report the legs' transform animations.
+			spider.addEventListener('transitionrun', (event) => {
+				if (!event.target.matches('.spider-core, .spider-benefit, .spider-benefit-details')) return;
+				if (!activeTransitions.has(event.target)) activeTransitions.set(event.target, new Set());
+				activeTransitions.get(event.target).add(event.propertyName);
+				scheduleConnectors();
+			});
+			function finishTransition(event) {
+				const properties = activeTransitions.get(event.target);
+				if (!properties) return;
+				properties.delete(event.propertyName);
+				if (!properties.size) activeTransitions.delete(event.target);
+				scheduleConnectors();
+			}
+			spider.addEventListener('transitionend', finishTransition);
+			spider.addEventListener('transitioncancel', finishTransition);
+			scheduleConnectors();
+
 			core.addEventListener('click', () => {
 				const open = !spider.classList.contains('is-open');
 				spider.classList.toggle('is-open', open);
