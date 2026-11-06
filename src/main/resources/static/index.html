@@ -731,11 +731,11 @@
 			height: 72px;
 			border-radius: 50%;
 			border: 0;
-			background: rgba(255, 181, 0, 0.7);
+			background: rgba(255, 181, 0, 0.4);
 			color: #fff;
 			font-size: 28px;
 			cursor: pointer;
-			box-shadow: 0 0 24px rgba(255, 181, 0, .4);
+			box-shadow: 0 0 24px rgba(255, 181, 0, 0.4);
 			line-height: 0;
 		}
 
@@ -788,16 +788,16 @@
 		<button class="nav-toggle" type="button" aria-label="Menü öffnen" aria-controls="main-nav-links"
 			aria-expanded="false" hidden><span></span><span></span><span></span></button>
 		<div id="main-nav-links" class="nav-links">
+			<a href="#inhouse">in House</a>
 			<a href="#leistungen">Leistungen</a>
 			<a href="#produkte">Produkte</a>
 			<a href="#experten">Experten</a>
-			<a href="#sprechen">Sprechen</a>
 			<a href="#ablauf">Ablauf</a>
 			<a href="#kontakt">Kontakt</a>
 		</div>
 	</nav>
 
-	<section id="sprechen" class="voice welcome">
+	<section id="home" class="voice welcome">
 		<canvas id="voice-canvas" width="840" height="320" role="img" aria-label="Animation der KI-Stimme"></canvas>
 		<canvas id="voice-webgl" role="img" aria-label="Animation der KI-Stimme" hidden></canvas>
 		<button id="voice-mic" class="mic" type="button" aria-label="Sprechen" title="Frage stellen">
@@ -811,7 +811,7 @@
 		<p class="voice-text" id="voice-text" aria-live="polite"></p>
 	</section>
 
-	<header id="home">
+	<header id="inhouse">
 		<p style="color: var(--accent); font-weight: 600; margin-bottom: 12px;">Wir sind freiberufliche KI-Experten. Aus
 			Überzeugung.</p>
 		<h1>KI, in House?</h1>
