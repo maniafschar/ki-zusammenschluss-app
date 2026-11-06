@@ -758,7 +758,7 @@
 			cursor: default;
 		}
 
-		.voice .replay {
+		.voice .start {
 			display: block;
 			margin: 16px auto 0;
 			padding: 10px 18px;
@@ -770,7 +770,7 @@
 			cursor: pointer;
 		}
 
-		.voice .replay[hidden] {
+		.voice .start[hidden] {
 			display: none;
 		}
 
@@ -817,14 +817,19 @@
 	<section id="home" class="voice welcome">
 		<canvas id="voice-canvas" width="840" height="320" role="img" aria-label="Animation der KI-Stimme"></canvas>
 		<canvas id="voice-webgl" role="img" aria-label="Animation der KI-Stimme" hidden></canvas>
-		<button id="voice-mic" class="mic" type="button" aria-label="Sprechen" title="Frage stellen">
+		<button id="voice-mic" class="mic" type="button" aria-label="Sprechen" title="Frage stellen" hidden>
 			<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.8"
 				stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
 				<rect x="9" y="3" width="6" height="10" rx="3" />
 				<path d="M6 11.5a6 6 0 0 0 12 0M12 17.5v3M9 20.5h6" />
 			</svg>
 		</button>
-		<button id="welcome-replay" class="replay" type="button"></button>
+		<button id="welcome-start" class="start" type="button">
+			<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.8"
+				stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+				<rect x="9" y="3" width="6" height="10" rx="3" />
+			</svg>
+		</button>
 		<p class="voice-text" id="voice-text" aria-live="polite" aria-label="Gesprächsverlauf" tabindex="0"></p>
 		<p class="voice-privacy">Der Chat wird zur Weiterentwicklung 7 Tage gespeichert. Audiodaten
 			werden nicht gespeichert. Trotz dass die KI bei uns in House läuft, teile keine vertraulichen Daten.
@@ -1439,7 +1444,7 @@
 		(function voiceChat() {
 			const mic = document.getElementById('voice-mic');
 			const text = document.getElementById('voice-text');
-			const replay = document.getElementById('welcome-replay');
+			const start = document.getElementById('welcome-start');
 			const canvas = document.getElementById('voice-canvas');
 			const webglCanvas = document.getElementById('voice-webgl');
 			const ctx = canvas.getContext('2d');
@@ -1690,17 +1695,17 @@
 
 			function playWelcome() {
 				if (!synth) {
-					replay.hidden = true;
+					start.hidden = true;
 					text.textContent = 'Ihr Browser unterstützt keine Sprachausgabe. ' + welcome;
 					return;
 				}
 				text.textContent = welcome;
-				//replay.hidden = false;
+				start.hidden = true;
+				document.getElementById('voice-mic').hidden = false;
 				speak(welcome);
 			}
 
-			replay.addEventListener('click', playWelcome);
-			window.addEventListener('load', playWelcome, { once: true });
+			start.addEventListener('click', playWelcome, { once: true });
 
 			async function ask(question) {
 				state = 'thinking';
