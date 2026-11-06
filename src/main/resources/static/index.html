@@ -294,45 +294,60 @@
 		}
 
 		.spider {
+			--ease: cubic-bezier(.22, 1, .36, 1);
 			position: relative;
 			margin: 20px 0 32px;
 		}
 
-		.spider summary {
+		.spider-stage {
 			position: relative;
+		}
+
+		.spider-core {
+			position: absolute;
+			top: 50%;
+			left: 50%;
 			z-index: 2;
+			translate: -50% -50%;
 			display: flex;
 			flex-direction: column;
 			align-items: center;
 			justify-content: center;
 			gap: 5px;
 			width: 180px;
-			min-height: 180px;
-			margin: 0 auto;
+			height: 180px;
 			padding: 20px;
-			list-style: none;
+			font: inherit;
+			color: #eef7ff;
 			text-align: center;
 			cursor: pointer;
-			color: #eef7ff;
 			border: 1px solid #86e9ff;
 			border-radius: 50%;
 			background: radial-gradient(circle at 35% 30%, #245a99, #0b2450 65%, #071124);
 			box-shadow: 0 0 0 8px rgba(79, 190, 255, .08), 0 0 40px rgba(52, 164, 255, .35), inset 0 0 24px rgba(98, 222, 255, .16);
-			transition: box-shadow .25s ease, transform .25s ease;
+			-webkit-tap-highlight-color: transparent;
+			-webkit-appearance: none;
+			appearance: none;
+			user-select: none;
+			transition: box-shadow .6s var(--ease), scale .6s var(--ease);
 		}
 
-		.spider summary::-webkit-details-marker {
-			display: none;
-		}
-
-		.spider summary:hover {
-			transform: scale(1.04);
+		.spider-core:hover {
+			scale: 1.04;
 			box-shadow: 0 0 0 8px rgba(79, 190, 255, .12), 0 0 55px rgba(52, 190, 255, .55), inset 0 0 24px rgba(98, 222, 255, .2);
 		}
 
-		.spider summary:focus-visible {
+		.spider-core:focus {
+			outline: none;
+		}
+
+		.spider-core:focus-visible {
 			outline: 3px solid #245a99;
 			outline-offset: 6px;
+		}
+
+		.spider.is-open .spider-core {
+			box-shadow: 0 0 0 14px rgba(79, 190, 255, .1), 0 0 60px rgba(52, 190, 255, .5), inset 0 0 28px rgba(98, 222, 255, .22);
 		}
 
 		.spider-title {
@@ -347,18 +362,18 @@
 			line-height: 1.35;
 		}
 
-		.spider-action-close,
-		.spider[open] .spider-action-open {
-			display: none;
+		.spider-panel {
+			visibility: hidden;
+			transition: visibility 0s linear 1.6s;
 		}
 
-		.spider[open] .spider-action-close {
-			display: block;
+		.spider.is-open .spider-panel {
+			visibility: visible;
+			transition-delay: 0s;
 		}
 
-		.spider:not([open]) .spider-benefits,
-		.spider:not([open]) .spider-lines {
-			display: none;
+		.spider-panel-inner {
+			position: relative;
 		}
 
 		.spider-benefits {
@@ -368,13 +383,6 @@
 			gap: 18px 24px;
 			padding: 10px 0;
 			list-style: none;
-		}
-
-		.spider[open] summary {
-			position: absolute;
-			top: 50%;
-			left: 50%;
-			translate: -50% -50%;
 		}
 
 		.spider-lines {
@@ -388,9 +396,19 @@
 		.spider-lines line {
 			stroke: #65d9ff;
 			stroke-width: .4;
-			opacity: .65;
+			stroke-linecap: round;
 			stroke-dasharray: 100;
-			animation: spider-line .3s ease-out both;
+			stroke-dashoffset: 100;
+			opacity: 0;
+			transition: stroke-dashoffset .5s ease-in, opacity .4s ease;
+			transition-delay: calc((5 - var(--i)) * .15s + .1s);
+		}
+
+		.spider.is-open .spider-lines line {
+			stroke-dashoffset: 0;
+			opacity: .65;
+			transition: stroke-dashoffset .9s var(--ease), opacity .6s ease;
+			transition-delay: calc(.25s + var(--i) * .5s);
 		}
 
 		.spider-benefit {
@@ -407,54 +425,62 @@
 			color: #eef7ff;
 			font-weight: 600;
 			line-height: 1.4;
-			animation: spider-reveal .45s cubic-bezier(.16, 1, .3, 1) both;
+			opacity: 0;
+			transform: translate(var(--tx), var(--ty)) scale(.2);
+			transition: opacity .45s ease, transform .6s cubic-bezier(.5, 0, .75, 0);
+			transition-delay: calc((5 - var(--i)) * .15s);
 		}
 
-		.spider-benefit:nth-of-type(odd) { grid-column: 1; }
-		.spider-benefit:nth-of-type(even) { grid-column: 3; }
-		.spider-benefit:nth-of-type(1), .spider-benefit:nth-of-type(2) { grid-row: 1; }
-		.spider-benefit:nth-of-type(3), .spider-benefit:nth-of-type(4) { grid-row: 2; }
-		.spider-benefit:nth-of-type(5), .spider-benefit:nth-of-type(6) { grid-row: 3; }
-		.spider-lines line:nth-child(1) { animation-delay: .45s; }
-		.spider-lines line:nth-child(2) { animation-delay: .9s; }
-		.spider-lines line:nth-child(3) { animation-delay: 1.35s; }
-		.spider-lines line:nth-child(4) { animation-delay: 1.8s; }
-		.spider-lines line:nth-child(5) { animation-delay: 2.25s; }
-		.spider-lines line:nth-child(6) { animation-delay: 2.7s; }
-		.spider-benefit:nth-of-type(1) { animation-delay: .65s; }
-		.spider-benefit:nth-of-type(2) { animation-delay: 1.1s; }
-		.spider-benefit:nth-of-type(3) { animation-delay: 1.55s; }
-		.spider-benefit:nth-of-type(4) { animation-delay: 2s; }
-		.spider-benefit:nth-of-type(5) { animation-delay: 2.45s; }
-		.spider-benefit:nth-of-type(6) { animation-delay: 2.9s; }
+		.spider.is-open .spider-benefit {
+			opacity: 1;
+			transform: none;
+			transition: opacity .7s ease, transform 1s var(--ease);
+			transition-delay: calc(.45s + var(--i) * .5s);
+		}
+
+		.spider-benefit:nth-of-type(odd) { grid-column: 1; --tx: calc(50% + 124px); }
+		.spider-benefit:nth-of-type(even) { grid-column: 3; --tx: calc(-50% - 124px); }
+		.spider-benefit:nth-of-type(1), .spider-benefit:nth-of-type(2) { grid-row: 1; --ty: calc(100% + 18px); }
+		.spider-benefit:nth-of-type(3), .spider-benefit:nth-of-type(4) { grid-row: 2; --ty: 0px; }
+		.spider-benefit:nth-of-type(5), .spider-benefit:nth-of-type(6) { grid-row: 3; --ty: calc(-100% - 18px); }
 
 		.spider-icon {
 			flex: 0 0 auto;
 			font-size: 1.4rem;
 		}
 
-		@keyframes spider-reveal {
-			from { opacity: 0; transform: translateY(12px) scale(.96); }
-			to { opacity: 1; transform: none; }
-		}
-
-		@keyframes spider-line {
-			from { stroke-dashoffset: 100; }
-			to { stroke-dashoffset: 0; }
-		}
-
 		@media (max-width: 760px) {
-			.spider[open] summary {
+			.spider-core {
 				position: relative;
 				top: auto;
 				left: auto;
 				translate: none;
+				display: flex;
+				margin: 0 auto;
+			}
+
+			.spider-panel {
+				display: grid;
+				grid-template-rows: 0fr;
+				transition: grid-template-rows .7s var(--ease) .9s, visibility 0s linear 1.6s;
+			}
+
+			.spider.is-open .spider-panel {
+				grid-template-rows: 1fr;
+				transition: grid-template-rows .8s var(--ease), visibility 0s;
+			}
+
+			.spider-panel-inner {
+				min-height: 0;
+				overflow: hidden;
+				margin: 0 -12px;
+				padding: 0 12px;
 			}
 
 			.spider-benefits {
 				grid-template-columns: minmax(0, 1fr);
 				gap: 12px;
-				padding: 24px 0 0;
+				padding: 24px 0 8px;
 			}
 
 			.spider-benefits::before {
@@ -465,20 +491,35 @@
 				left: 50%;
 				width: 2px;
 				background: linear-gradient(#65d9ff, #9474ff, transparent);
+				transform: scaleY(0);
+				transform-origin: top;
+				transition: transform .6s ease-in .2s;
+			}
+
+			.spider.is-open .spider-benefits::before {
+				transform: scaleY(1);
+				transition: transform 2.8s linear .4s;
 			}
 
 			.spider-benefit:nth-of-type(n) {
 				grid-column: 1;
 				grid-row: auto;
 				min-height: 64px;
+				--tx: 0px;
+				--ty: -18px;
+			}
+
+			.spider-benefit {
+				transform: translate(var(--tx), var(--ty)) scale(.94);
 			}
 
 			.spider-lines { display: none; }
 		}
 
 		@media (prefers-reduced-motion: reduce) {
-			.spider summary { transition: none; }
-			.spider-benefit, .spider-lines line { animation: none; }
+			.spider *, .spider-panel {
+				transition: none !important;
+			}
 		}
 
 		.lead {
@@ -976,29 +1017,35 @@
 			<p class="inhouse-eyebrow">Wir sind freiberufliche KI-Experten. Aus Überzeugung.</p>
 			<h1 id="inhouse-title">KI, in House?</h1>
 			<h2>Warum es die beste Lösung für KMU Unternehmen ist:</h2>
-			<details class="spider">
-				<summary>
-					<span class="spider-title">IN HOUSE</span>
-					<span class="spider-action spider-action-open">Vorteile entdecken +</span>
-					<span class="spider-action spider-action-close">Vorteile schließen −</span>
-				</summary>
-				<svg class="spider-lines" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
-					<line x1="50" y1="50" x2="17" y2="17" />
-					<line x1="50" y1="50" x2="83" y2="17" />
-					<line x1="50" y1="50" x2="17" y2="50" />
-					<line x1="50" y1="50" x2="83" y2="50" />
-					<line x1="50" y1="50" x2="17" y2="83" />
-					<line x1="50" y1="50" x2="83" y2="83" />
-				</svg>
-				<ul class="spider-benefits" aria-label="Vorteile von KI in House">
-					<li class="spider-benefit"><span class="spider-icon" aria-hidden="true">🔒</span>Ihre Daten bleiben bei Ihnen</li>
-					<li class="spider-benefit"><span class="spider-icon" aria-hidden="true">💶</span>Planbare Kosten</li>
-					<li class="spider-benefit"><span class="spider-icon" aria-hidden="true">🛡️</span>Volle Datenkontrolle</li>
-					<li class="spider-benefit"><span class="spider-icon" aria-hidden="true">🔓</span>Unabhängig von Cloud-Anbietern</li>
-					<li class="spider-benefit"><span class="spider-icon" aria-hidden="true">🧩</span>Auf Ihre Abläufe zugeschnitten</li>
-					<li class="spider-benefit"><span class="spider-icon" aria-hidden="true">⚡</span>Schnell und jederzeit verfügbar</li>
-				</ul>
-			</details>
+			<div id="spider" class="spider">
+				<div class="spider-stage">
+					<button id="spider-core" class="spider-core" type="button" aria-expanded="false"
+						aria-controls="spider-panel">
+						<span class="spider-title">IN HOUSE</span>
+						<span class="spider-action">Vorteile entdecken +</span>
+					</button>
+					<div id="spider-panel" class="spider-panel" aria-label="Vorteile von KI in House" role="region">
+						<div class="spider-panel-inner">
+							<svg class="spider-lines" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+								<line pathLength="100" style="--i:0" x1="50" y1="50" x2="17" y2="17" />
+								<line pathLength="100" style="--i:1" x1="50" y1="50" x2="83" y2="17" />
+								<line pathLength="100" style="--i:2" x1="50" y1="50" x2="17" y2="50" />
+								<line pathLength="100" style="--i:3" x1="50" y1="50" x2="83" y2="50" />
+								<line pathLength="100" style="--i:4" x1="50" y1="50" x2="17" y2="83" />
+								<line pathLength="100" style="--i:5" x1="50" y1="50" x2="83" y2="83" />
+							</svg>
+							<ul class="spider-benefits">
+								<li class="spider-benefit" style="--i:0"><span class="spider-icon" aria-hidden="true">🔒</span>Ihre Daten bleiben bei Ihnen</li>
+								<li class="spider-benefit" style="--i:1"><span class="spider-icon" aria-hidden="true">💶</span>Planbare Kosten</li>
+								<li class="spider-benefit" style="--i:2"><span class="spider-icon" aria-hidden="true">🛡️</span>Volle Datenkontrolle</li>
+								<li class="spider-benefit" style="--i:3"><span class="spider-icon" aria-hidden="true">🔓</span>Unabhängig von Cloud-Anbietern</li>
+								<li class="spider-benefit" style="--i:4"><span class="spider-icon" aria-hidden="true">🧩</span>Auf Ihre Abläufe zugeschnitten</li>
+								<li class="spider-benefit" style="--i:5"><span class="spider-icon" aria-hidden="true">⚡</span>Schnell und jederzeit verfügbar</li>
+							</ul>
+						</div>
+					</div>
+				</div>
+			</div>
 			<a class="btn" href="#kontakt">Gemeinsam starten</a>
 		</div>
 	</section>
@@ -1115,34 +1162,16 @@
 	</footer>
 
 	<script>
-		(function spiderExpansion() {
-			const spider = document.querySelector('.spider');
-			const summary = spider.querySelector('summary');
-			const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
-			let expansion;
-
-			function stopExpansion() {
-				if (expansion) expansion.cancel();
-				expansion = null;
-				spider.style.overflow = '';
-			}
-
-			summary.addEventListener('click', (event) => {
-				stopExpansion();
-				if (spider.open || reducedMotion.matches || typeof spider.animate !== 'function') return;
-
-				event.preventDefault();
-				const initialHeight = spider.offsetHeight;
-				spider.open = true;
-				const finalHeight = spider.offsetHeight;
-				spider.style.overflow = 'hidden';
-				expansion = spider.animate(
-					[{ height: initialHeight + 'px' }, { height: finalHeight + 'px' }],
-					{ duration: 450, easing: 'cubic-bezier(.16, 1, .3, 1)' }
-				);
-				expansion.onfinish = stopExpansion;
+		(function spiderToggle() {
+			const spider = document.getElementById('spider');
+			const core = document.getElementById('spider-core');
+			const action = core.querySelector('.spider-action');
+			core.addEventListener('click', () => {
+				const open = !spider.classList.contains('is-open');
+				spider.classList.toggle('is-open', open);
+				core.setAttribute('aria-expanded', String(open));
+				action.textContent = open ? 'Vorteile schließen −' : 'Vorteile entdecken +';
 			});
-			window.addEventListener('resize', stopExpansion);
 		})();
 
 		(function navigation() {
