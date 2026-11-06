@@ -26,8 +26,8 @@
 			scroll-behavior: smooth;
 		}
 
-		section[id] {
-			scroll-margin-top: 40px;
+		section[id], header[id] {
+			scroll-margin-top: 80px;
 		}
 
 		@media (prefers-reduced-motion: reduce) {
@@ -72,17 +72,130 @@
 			background: rgba(247, 251, 249, 0.92);
 			backdrop-filter: blur(8px);
 			z-index: 10;
+			gap: 24px;
 		}
 
 		nav strong {
 			color: var(--accent);
+			white-space: nowrap;
 		}
 
 		nav a {
 			color: var(--muted);
 			text-decoration: none;
-			margin-left: 24px;
 			font-size: 0.95rem;
+		}
+
+		.nav-links,
+		.nav-measure {
+			display: flex;
+			align-items: center;
+			gap: 24px;
+			white-space: nowrap;
+		}
+
+		.nav-measure {
+			position: fixed;
+			top: -9999px;
+			left: 0;
+			width: max-content;
+			visibility: hidden;
+			font-size: 0.95rem;
+		}
+
+		.nav-toggle {
+			display: inline-flex;
+			flex-direction: column;
+			align-items: center;
+			justify-content: center;
+			gap: 5px;
+			width: 44px;
+			height: 44px;
+			border: 1px solid rgba(115, 214, 255, .6);
+			border-radius: 12px;
+			background: linear-gradient(145deg, #102d52, #071629);
+			box-shadow: 0 4px 16px rgba(8, 41, 79, .2), inset 0 0 12px rgba(65, 171, 255, .12);
+			cursor: pointer;
+		}
+
+		.nav-toggle span {
+			width: 20px;
+			height: 2px;
+			border-radius: 2px;
+			background: #a7eaff;
+			box-shadow: 0 0 7px rgba(75, 201, 255, .65);
+			transition: transform .2s ease, opacity .2s ease;
+		}
+
+		.nav-toggle[aria-expanded="true"] span:first-child {
+			transform: translateY(7px) rotate(45deg);
+		}
+
+		.nav-toggle[aria-expanded="true"] span:nth-child(2) {
+			opacity: 0;
+		}
+
+		.nav-toggle[aria-expanded="true"] span:last-child {
+			transform: translateY(-7px) rotate(-45deg);
+		}
+
+		.nav-toggle:hover {
+			border-color: #9deaff;
+			box-shadow: 0 0 18px rgba(54, 177, 255, .4);
+		}
+
+		.nav-toggle[hidden], .nav-links[hidden] {
+			display: none;
+		}
+
+		nav.is-collapsed .nav-links:not([hidden]) {
+			position: absolute;
+			top: calc(100% + 8px);
+			right: 8%;
+			left: auto;
+			display: flex;
+			flex-direction: column;
+			align-items: stretch;
+			gap: 4px;
+			width: min(320px, 84vw);
+			padding: 14px;
+			max-height: calc(100vh - 100px);
+			overflow-y: auto;
+			border: 1px solid rgba(106, 197, 255, .42);
+			border-radius: 16px;
+			background: linear-gradient(145deg, rgba(15, 43, 81, .97), rgba(5, 15, 35, .97));
+			box-shadow: 0 16px 40px rgba(2, 14, 34, .4), 0 0 22px rgba(42, 153, 241, .14);
+			backdrop-filter: blur(18px);
+		}
+
+		nav.is-collapsed .nav-links a {
+			display: flex;
+			align-items: center;
+			justify-content: space-between;
+			min-height: 46px;
+			padding: 10px 14px;
+			border: 1px solid transparent;
+			border-radius: 9px;
+			color: #dcefff;
+			transition: background .2s ease, border-color .2s ease, color .2s ease;
+		}
+
+		nav.is-collapsed .nav-links a::after {
+			content: '↗';
+			color: #6ecbff;
+			font-size: 1.1rem;
+		}
+
+		nav.is-collapsed .nav-links a:hover,
+		nav.is-collapsed .nav-links a:focus-visible {
+			border-color: rgba(99, 208, 255, .4);
+			background: rgba(64, 162, 225, .16);
+			color: #fff;
+		}
+
+		nav a:focus-visible, .nav-toggle:focus-visible {
+			outline: 2px solid #75dfff;
+			outline-offset: -2px;
 		}
 
 		nav a:hover {
@@ -475,6 +588,10 @@
 		}
 
 		@media (prefers-reduced-motion: reduce) {
+			.nav-toggle span, nav.is-collapsed .nav-links a {
+				transition: none;
+			}
+
 			.cloud {
 				animation: none;
 			}
@@ -487,11 +604,6 @@
 		}
 
 		@media (max-width: 640px) {
-			nav a {
-				margin-left: 12px;
-				font-size: 0.85rem;
-			}
-
 			header,
 			section {
 				padding: 72px 6%;
@@ -501,13 +613,86 @@
 				height: 560px;
 			}
 		}
-		.voice { text-align: center; }
-		.voice canvas { width: 100%; max-width: 420px; height: 160px; display: block; margin: 0 auto 16px; }
-		.voice .mic { width: 72px; height: 72px; border-radius: 50%; border: 0; background: var(--accent); color: #fff; font-size: 28px; cursor: pointer; }
-		.voice .mic.rec { background: #d64545; }
-		.voice .mic:disabled { opacity: .5; cursor: default; }
-		.voice-text { max-width: 640px; margin: 16px auto 0; color: var(--muted); min-height: 3em; }
-		.voice-text b { color: var(--text); }
+
+		.voice {
+			text-align: center;
+		}
+
+		.voice.welcome {
+			min-height: 100vh;
+			display: flex;
+			flex-direction: column;
+			justify-content: center;
+			align-items: center;
+			color: #eef7ff;
+			background:
+				radial-gradient(ellipse at 50% 43%, rgba(19, 84, 175, .48), transparent 46%),
+				radial-gradient(circle, rgba(91, 177, 255, .16) 1px, transparent 1.5px),
+				linear-gradient(145deg, #071124, #0b1c42 55%, #060e20);
+			background-size: auto, 12px 12px, auto;
+			padding-top: 112px;
+		}
+
+		.voice canvas {
+			width: 100%;
+			max-width: 560px;
+			height: clamp(280px, 42vw, 430px);
+			display: block;
+			margin: 0 auto 16px;
+			filter: drop-shadow(0 0 16px rgba(49, 143, 255, .3));
+		}
+
+		.voice canvas[hidden] {
+			display: none;
+		}
+
+		.voice .mic {
+			width: 72px;
+			height: 72px;
+			border-radius: 50%;
+			border: 0;
+			background: #176fce;
+			color: #fff;
+			font-size: 28px;
+			cursor: pointer;
+			box-shadow: 0 0 24px rgba(37, 145, 255, .4);
+		}
+
+		.voice .mic.rec {
+			background: #d64545;
+		}
+
+		.voice .mic:disabled {
+			opacity: .5;
+			cursor: default;
+		}
+
+		.voice .replay {
+			display: block;
+			margin: 16px auto 0;
+			padding: 10px 18px;
+			border: 1px solid #78c8ff;
+			border-radius: 999px;
+			background: rgba(8, 29, 65, .8);
+			color: #e4f6ff;
+			font: inherit;
+			cursor: pointer;
+		}
+
+		.voice .replay[hidden] {
+			display: none;
+		}
+
+		.voice-text {
+			max-width: 640px;
+			margin: 16px auto 0;
+			color: #c6dbef;
+			min-height: 3em;
+		}
+
+		.voice-text b {
+			color: #fff;
+		}
 	</style>
 </head>
 
@@ -515,7 +700,9 @@
 
 	<nav>
 		<strong><a href="#home">KI-Experten</a></strong>
-		<div>
+		<button class="nav-toggle" type="button" aria-label="Menü öffnen" aria-controls="main-nav-links"
+			aria-expanded="false" hidden><span></span><span></span><span></span></button>
+		<div id="main-nav-links" class="nav-links">
 			<a href="#leistungen">Leistungen</a>
 			<a href="#produkte">Produkte</a>
 			<a href="#experten">Experten</a>
@@ -524,6 +711,15 @@
 			<a href="#kontakt">Kontakt</a>
 		</div>
 	</nav>
+
+	<section id="sprechen" class="voice welcome">
+		<h1>Willkommen beim KI Experten Team</h1>
+		<canvas id="voice-canvas" width="840" height="320" role="img" aria-label="Animation der KI-Stimme"></canvas>
+		<canvas id="voice-webgl" role="img" aria-label="Animation der KI-Stimme" hidden></canvas>
+		<button id="voice-mic" class="mic" type="button" aria-label="Sprechen" title="Frage stellen">🎤</button>
+		<button id="welcome-replay" class="replay" type="button" hidden>Begrüßung erneut anhören</button>
+		<p class="voice-text" id="voice-text" aria-live="polite"></p>
+	</section>
 
 	<header id="home">
 		<p style="color: var(--accent); font-weight: 600; margin-bottom: 12px;">Wir sind freiberufliche KI-Experten. Aus
@@ -605,13 +801,6 @@
 		<div class="pillars" id="experten-liste"></div>
 	</section>
 
-		<section id="sprechen" class="voice">
-		<h2>Sprechen Sie direkt mit unserer KI</h2>
-		<canvas id="voice-canvas" width="840" height="320" role="img" aria-label="Animation der KI-Stimme"></canvas>
-		<button id="voice-mic" class="mic" type="button" aria-label="Sprechen">🎤</button>
-		<p class="voice-text" id="voice-text" aria-live="polite">Tippen Sie auf das Mikrofon und stellen Sie Ihre Frage.</p>
-	</section>
-
 	<section id="ablauf" class="alt">
 		<h2>So einfach starten wir</h2>
 		<ol class="steps">
@@ -666,6 +855,57 @@
 
 	<script src="https://cdn.jsdelivr.net/npm/vis-network@9.1.9/standalone/umd/vis-network.min.js" defer></script>
 	<script>
+		(function navigation() {
+			const nav = document.querySelector('nav');
+			const brand = nav.querySelector('strong');
+			const toggle = nav.querySelector('.nav-toggle');
+			const links = document.getElementById('main-nav-links');
+			const measure = links.cloneNode(true);
+			measure.removeAttribute('id');
+			measure.className = 'nav-measure';
+			measure.setAttribute('aria-hidden', 'true');
+			measure.setAttribute('inert', '');
+			document.body.appendChild(measure);
+			let collapsed = false;
+
+			function setOpen(open) {
+				links.hidden = collapsed && !open;
+				toggle.setAttribute('aria-expanded', String(open));
+				toggle.setAttribute('aria-label', open ? 'Menü schließen' : 'Menü öffnen');
+			}
+
+			function updateLayout() {
+				const style = getComputedStyle(nav);
+				const available = nav.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
+				const needsMenu = brand.getBoundingClientRect().width + measure.scrollWidth + parseFloat(style.columnGap) > available;
+				if (needsMenu === collapsed) return;
+				const hadFocus = nav.contains(document.activeElement);
+				collapsed = needsMenu;
+				nav.classList.toggle('is-collapsed', collapsed);
+				toggle.hidden = !collapsed;
+				setOpen(false);
+				if (hadFocus) (collapsed ? toggle : links.querySelector('a')).focus();
+			}
+
+			toggle.addEventListener('click', () => setOpen(toggle.getAttribute('aria-expanded') !== 'true'));
+			links.addEventListener('click', (event) => {
+				if (collapsed && event.target.closest('a')) setOpen(false);
+			});
+			document.addEventListener('click', (event) => {
+				if (collapsed && !nav.contains(event.target)) setOpen(false);
+			});
+			document.addEventListener('keydown', (event) => {
+				if (event.key === 'Escape' && collapsed && toggle.getAttribute('aria-expanded') === 'true') {
+					setOpen(false);
+					toggle.focus();
+				}
+			});
+			new ResizeObserver(updateLayout).observe(nav);
+			window.addEventListener('resize', updateLayout);
+			document.fonts.ready.then(updateLayout);
+			updateLayout();
+		})();
+
 		const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({
 			'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
 		}[c]));
@@ -1087,44 +1327,262 @@
 		(function voiceChat() {
 			const mic = document.getElementById('voice-mic');
 			const text = document.getElementById('voice-text');
+			const replay = document.getElementById('welcome-replay');
 			const canvas = document.getElementById('voice-canvas');
+			const webglCanvas = document.getElementById('voice-webgl');
 			const ctx = canvas.getContext('2d');
 			const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
 			const synth = window.speechSynthesis;
+			const welcome = 'Willkommen zum KI Experten Team, wir sind ein unabhängiges Team von top Spezialisten, jeder auf seinem Gebiet. Uns alle vereint die Art, wie wir denken das KI in Unternehmen den größten Profit erbringt. Du kannst mir gerne Fragen stellen oder einfach sagen, dass ich Dir mehr über uns erzählen soll...';
 			if (!SR || !synth) {
 				mic.disabled = true;
-				text.textContent = 'Ihr Browser unterstützt keine Spracheingabe.';
+				mic.title = !SR ? 'Ihr Browser unterstützt keine Spracheingabe'
+					: 'Ihr Browser unterstützt keine Sprachausgabe';
 			}
 			const history = [];
 			let state = 'idle'; // idle | listening | thinking | speaking
 			let level = 0;
+			let visual = null;
+			let visible = true;
+			let frame = null;
+			const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
 
 			function draw(t) {
-				const w = canvas.width, h = canvas.height, bars = 32;
-				ctx.clearRect(0, 0, w, h);
-				const target = state === 'speaking' ? 0.5 + 0.5 * Math.random() : state === 'thinking' ? 0.25 : state === 'listening' ? 0.12 : 0.05;
-				level += (target - level) * 0.15;
-				ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim();
-				for (let i = 0; i < bars; i++) {
-					const wave = Math.sin(t / 220 + i * 0.5) * 0.5 + 0.5;
-					const bh = Math.max(6, h * (0.15 + 0.85 * wave) * level * (1 - Math.abs(i - bars / 2) / bars));
-					const x = (i + 0.5) * (w / bars);
-					ctx.beginPath();
-					ctx.roundRect(x - 8, (h - bh) / 2, 16, bh, 8);
-					ctx.fill();
+				frame = null;
+				if (!visible) return;
+				if (visual) {
+					visual.draw(t, reducedMotion.matches ? 'idle' : state, reducedMotion.matches);
+				} else if (ctx) {
+					const w = canvas.width, h = canvas.height, bars = 32;
+					ctx.clearRect(0, 0, w, h);
+					const target = reducedMotion.matches ? 0.15 : state === 'speaking' ? 0.5 + 0.5 * Math.random() : state === 'thinking' ? 0.25 : state === 'listening' ? 0.12 : 0.05;
+					level += (target - level) * 0.15;
+					ctx.fillStyle = '#79d4ff';
+					for (let i = 0; i < bars; i++) {
+						const wave = Math.sin((reducedMotion.matches ? 0 : t / 220) + i * 0.5) * 0.5 + 0.5;
+						const bh = Math.max(6, h * (0.15 + 0.85 * wave) * level * (1 - Math.abs(i - bars / 2) / bars));
+						const x = (i + 0.5) * (w / bars);
+						ctx.beginPath();
+						ctx.roundRect(x - 8, (h - bh) / 2, 16, bh, 8);
+						ctx.fill();
+					}
 				}
-				requestAnimationFrame(draw);
+				if (!reducedMotion.matches) frame = requestAnimationFrame(draw);
 			}
-			requestAnimationFrame(draw);
+
+			function requestDraw() {
+				if (visible && frame === null) frame = requestAnimationFrame(draw);
+			}
+
+			const voiceObserver = new IntersectionObserver(([entry]) => {
+				visible = entry.isIntersecting;
+				if (visible) requestDraw();
+				else if (frame !== null) {
+					cancelAnimationFrame(frame);
+					frame = null;
+				}
+			});
+			voiceObserver.observe(document.getElementById('sprechen'));
+			reducedMotion.addEventListener('change', requestDraw);
+			requestDraw();
+
+			import('https://cdn.jsdelivr.net/npm/three@0.160.1/build/three.module.js')
+				.then((THREE) => {
+					const renderer = new THREE.WebGLRenderer({ canvas: webglCanvas, alpha: true, antialias: true });
+					renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+					const scene = new THREE.Scene();
+					const camera = new THREE.OrthographicCamera(-3, 3, 3, -3, 0.1, 100);
+					camera.position.z = 6;
+					const orb = new THREE.Group();
+					scene.add(orb);
+
+					const glowCanvas = document.createElement('canvas');
+					glowCanvas.width = glowCanvas.height = 128;
+					const glowContext = glowCanvas.getContext('2d');
+					const gradient = glowContext.createRadialGradient(64, 64, 0, 64, 64, 64);
+					gradient.addColorStop(0, 'rgba(255,255,255,1)');
+					gradient.addColorStop(.12, 'rgba(160,225,255,.9)');
+					gradient.addColorStop(.4, 'rgba(45,145,255,.25)');
+					gradient.addColorStop(1, 'rgba(0,60,255,0)');
+					glowContext.fillStyle = gradient;
+					glowContext.fillRect(0, 0, 128, 128);
+					const glowTexture = new THREE.CanvasTexture(glowCanvas);
+					const glow = new THREE.Sprite(new THREE.SpriteMaterial({
+						map: glowTexture, color: 0x8bcfff, transparent: true,
+						blending: THREE.AdditiveBlending, depthWrite: false
+					}));
+					glow.scale.set(2.2, 2.2, 1);
+					orb.add(glow);
+
+					const rings = [];
+					function addRing(radius, segments, gap, color, opacity, speed) {
+						const vertices = [];
+						for (let i = 0; i < segments; i++) {
+							const from = i * Math.PI * 2 / segments;
+							const to = (i + 1 - gap) * Math.PI * 2 / segments;
+							vertices.push(Math.cos(from) * radius, Math.sin(from) * radius, 0,
+								Math.cos(to) * radius, Math.sin(to) * radius, 0);
+						}
+						const geometry = new THREE.BufferGeometry();
+						geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
+						const ring = new THREE.LineSegments(geometry, new THREE.LineBasicMaterial({
+							color, transparent: true, opacity, blending: THREE.AdditiveBlending, depthWrite: false
+						}));
+						orb.add(ring);
+						rings.push({ ring, speed });
+					}
+					addRing(2.08, 180, 0, 0x448dff, .55, .08);
+					addRing(1.98, 80, .38, 0x66eeff, .75, -.18);
+					addRing(1.83, 110, .1, 0x956bff, .65, .22);
+					addRing(1.59, 64, .5, 0x32e5d0, .6, -.28);
+					addRing(1.32, 24, .7, 0xff9ad5, .65, .32);
+					addRing(.72, 80, 0, 0x9fe5ff, .8, .26);
+					addRing(.59, 36, .35, 0xbc8fff, .85, -.4);
+					addRing(.42, 8, .15, 0xbfefff, .8, .38);
+
+					const ticks = [];
+					for (let i = 0; i < 144; i++) {
+						const angle = i * Math.PI * 2 / 144;
+						const innerRadius = i % 12 === 0 ? 1.85 : 1.91;
+						ticks.push(Math.cos(angle) * innerRadius, Math.sin(angle) * innerRadius, 0,
+							Math.cos(angle) * 1.96, Math.sin(angle) * 1.96, 0);
+					}
+					const tickGeometry = new THREE.BufferGeometry();
+					tickGeometry.setAttribute('position', new THREE.Float32BufferAttribute(ticks, 3));
+					const tickRing = new THREE.LineSegments(tickGeometry, new THREE.LineBasicMaterial({
+						color: 0x76beff, transparent: true, opacity: .65,
+						blending: THREE.AdditiveBlending, depthWrite: false
+					}));
+					orb.add(tickRing);
+
+					const positions = [];
+					const colors = [];
+					const particlePaths = [];
+					const palette = [0x64caff, 0x9c7dff, 0x54f0df, 0xff87cb, 0xa6eaff];
+					for (let i = 0; i < 1500; i++) {
+						const angle = Math.random() * Math.PI * 2;
+						const radius = .25 + Math.sqrt(Math.random()) * 1.58;
+						const depth = (Math.random() - .5) * .35;
+						particlePaths.push({ angle, radius, depth, speed: .1 + Math.random() * .25, phase: Math.random() * Math.PI * 2 });
+						positions.push(Math.cos(angle) * radius, Math.sin(angle) * radius, depth);
+						const color = new THREE.Color(palette[Math.floor(Math.random() * palette.length)]);
+						colors.push(color.r, color.g, color.b);
+					}
+					const geometry = new THREE.BufferGeometry();
+					geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+					geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+					const particles = new THREE.Points(geometry, new THREE.PointsMaterial({
+						map: glowTexture, vertexColors: true, size: 6, sizeAttenuation: false, transparent: true, opacity: .95,
+						blending: THREE.AdditiveBlending, depthWrite: false
+					}));
+					orb.add(particles);
+
+					const sparksGeometry = new THREE.BufferGeometry();
+					const sparkPositions = new Float32Array(24 * 3);
+					sparksGeometry.setAttribute('position', new THREE.BufferAttribute(sparkPositions, 3));
+					const sparks = new THREE.Points(sparksGeometry, new THREE.PointsMaterial({
+						map: glowTexture, color: 0xffffff, size: 13, sizeAttenuation: false,
+						transparent: true, opacity: .9, blending: THREE.AdditiveBlending, depthWrite: false
+					}));
+					orb.add(sparks);
+
+					const core = new THREE.Mesh(
+						new THREE.IcosahedronGeometry(.2, 2),
+						new THREE.MeshBasicMaterial({ color: 0xc3eeff, wireframe: true, transparent: true, opacity: .9 })
+					);
+					orb.add(core);
+
+					function resize() {
+						const width = webglCanvas.clientWidth;
+						const height = webglCanvas.clientHeight;
+						if (!width || !height) return;
+						renderer.setSize(width, height, false);
+						const aspect = width / height;
+						const halfHeight = 2.45 / Math.min(aspect, 1);
+						camera.left = -halfHeight * aspect;
+						camera.right = halfHeight * aspect;
+						camera.top = halfHeight;
+						camera.bottom = -halfHeight;
+						camera.updateProjectionMatrix();
+						requestDraw();
+					}
+
+					visual = {
+						draw(t, currentState, still) {
+							const time = still ? 0 : t * 0.001;
+							const intensity = currentState === 'speaking' ? .26 : currentState === 'thinking' ? .16 : currentState === 'listening' ? .1 : .05;
+							const pulse = 1 + Math.sin(time * 3) * intensity;
+							core.scale.setScalar(pulse);
+							core.rotation.set(time * .35, time * .5, time * .2);
+							glow.scale.setScalar(2.2 * pulse);
+							glow.material.color.setHSL(.56 + .09 * Math.sin(time * .5), .95, .75);
+							const positions = geometry.attributes.position;
+							particlePaths.forEach((path, i) => {
+								const angle = path.angle + time * path.speed * (path.radius < 1 ? 1 : -1);
+								const radius = path.radius * (1 + intensity * .35 * Math.sin(time * 2 + path.phase));
+								positions.setXYZ(i, Math.cos(angle) * radius, Math.sin(angle) * radius, path.depth);
+							});
+							positions.needsUpdate = true;
+							for (let i = 0; i < 24; i++) {
+								const angle = i * Math.PI * 2 / 24 + time * (i % 2 ? .5 : -.35);
+								const radius = .8 + (i % 4) * .29 + .1 * Math.sin(time * 2 + i);
+								sparkPositions[i * 3] = Math.cos(angle) * radius;
+								sparkPositions[i * 3 + 1] = Math.sin(angle) * radius;
+								sparkPositions[i * 3 + 2] = .25;
+							}
+							sparksGeometry.attributes.position.needsUpdate = true;
+							sparks.material.opacity = .65 + .25 * Math.sin(time * 2) ** 2;
+							tickRing.rotation.z = -time * .04;
+							rings.forEach(({ ring, speed }, i) => {
+								ring.rotation.z = time * speed;
+								ring.scale.setScalar(1 + .015 * Math.sin(time * 2 + i));
+							});
+							renderer.render(scene, camera);
+						}
+					};
+					canvas.hidden = true;
+					webglCanvas.hidden = false;
+					window.addEventListener('resize', resize);
+					webglCanvas.addEventListener('webglcontextlost', () => {
+						console.warn('WebGL-Kontext verloren; die einfache Sprachvisualisierung wird verwendet.');
+						window.removeEventListener('resize', resize);
+						visual = null;
+						webglCanvas.hidden = true;
+						canvas.hidden = false;
+						renderer.dispose();
+						requestDraw();
+					}, { once: true });
+					resize();
+				})
+				.catch((err) => {
+					console.warn('Three.js-Animation nicht verfügbar; die einfache Sprachvisualisierung wird verwendet.', err);
+				});
 
 			function speak(reply) {
+				if (!synth) return false;
 				const u = new SpeechSynthesisUtterance(reply);
 				u.lang = 'de-DE';
 				u.onstart = () => { state = 'speaking'; };
-				u.onend = u.onerror = () => { state = 'idle'; mic.disabled = false; };
+				u.onend = () => { state = 'idle'; mic.disabled = !SR; };
+				u.onerror = () => { state = 'idle'; mic.disabled = !SR; };
 				synth.cancel();
 				synth.speak(u);
+				return true;
 			}
+
+			function playWelcome() {
+				if (!synth) {
+					replay.hidden = true;
+					text.textContent = 'Ihr Browser unterstützt keine Sprachausgabe. ' + welcome;
+					return;
+				}
+				text.textContent = welcome;
+				replay.hidden = false;
+				speak(welcome);
+			}
+
+			replay.addEventListener('click', playWelcome);
+			window.addEventListener('load', playWelcome, { once: true });
 
 			async function ask(question) {
 				state = 'thinking';
@@ -1154,7 +1612,9 @@
 			}
 
 			mic.addEventListener('click', () => {
+				if (!SR || !synth) return;
 				synth.cancel();
+				state = 'idle';
 				const rec = new SR();
 				rec.lang = 'de-DE';
 				rec.interimResults = true;
@@ -1171,6 +1631,7 @@
 				};
 				rec.start();
 			});
+
 		})();
 	</script>
 
