@@ -59,8 +59,10 @@ public class KiChatController {
 	private final String completionsPath;
 	private final String apiKey;
 	private final String model;
+	private final ChatProtokollService protokolle;
 
 	public KiChatController(
+			final ChatProtokollService protokolle,
 			@Value("${app.ki.base-url:https://100.65.185.69/v1}") final String baseUrl,
 			@Value("${app.ki.completions-path:/chat/completions}") final String completionsPath,
 			@Value("${app.ki.api-key:}") final String apiKey,
@@ -70,6 +72,7 @@ public class KiChatController {
 		this.completionsPath = completionsPath;
 		this.apiKey = apiKey;
 		this.model = model;
+		this.protokolle = protokolle;
 		final HttpClient.Builder builder = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10));
 		if (trustAll) {
 			// nur für den internen Server mit selbstsigniertem Zertifikat
@@ -105,27 +108,51 @@ public class KiChatController {
 	public ChatResponse chat(@RequestBody @Valid final ChatRequest request, final HttpServletRequest http)
 			throws Exception {
 		final var body = createBody(request, http, false);
-		final HttpResponse<String> res = client.send(upstreamRequest(body), HttpResponse.BodyHandlers.ofString());
-		if (res.statusCode() != 200) throw new ResponseStatusException(HttpStatus.BAD_GATEWAY);
-		final JsonNode content = mapper.readTree(res.body()).at("/choices/0/message/content");
-		if (content.isMissingNode() || content.isNull()) throw new ResponseStatusException(HttpStatus.BAD_GATEWAY);
-		return new ChatResponse(content.asText().replaceAll("(?s)<think>.*?</think>", "").trim());
+		final ChatProtokoll protokoll = protokolle.beginne(request);
+		try {
+			final HttpResponse<String> res = client.send(upstreamRequest(body), HttpResponse.BodyHandlers.ofString());
+			if (res.statusCode() != 200) throw new ResponseStatusException(HttpStatus.BAD_GATEWAY);
+			final JsonNode content = mapper.readTree(res.body()).at("/choices/0/message/content");
+			if (content.isMissingNode() || content.isNull()) throw new ResponseStatusException(HttpStatus.BAD_GATEWAY);
+			final String reply = content.asText().replaceAll("(?s)<think>.*?</think>", "").trim();
+			protokolle.abschliessen(protokoll, reply, "ABGESCHLOSSEN");
+			return new ChatResponse(reply);
+		} catch (IOException | InterruptedException | RuntimeException e) {
+			protokolliereFehler(protokoll, null, e);
+			throw e;
+		}
 	}
 
 	@PostMapping(value = "/api/ki/chat/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
 	public ResponseEntity<StreamingResponseBody> stream(@RequestBody @Valid final ChatRequest request,
 			final HttpServletRequest http) throws Exception {
 		final var body = createBody(request, http, true);
-		final HttpResponse<InputStream> response = client.send(upstreamRequest(body), HttpResponse.BodyHandlers.ofInputStream());
-		if (response.statusCode() != 200) {
-			response.body().close();
-			log.warn("KI-Stream antwortete mit HTTP {}", response.statusCode());
-			throw new ResponseStatusException(HttpStatus.BAD_GATEWAY);
+		final ChatProtokoll protokoll = protokolle.beginne(request);
+		final HttpResponse<InputStream> response;
+		try {
+			response = client.send(upstreamRequest(body), HttpResponse.BodyHandlers.ofInputStream());
+			if (response.statusCode() != 200) {
+				response.body().close();
+				log.warn("KI-Stream antwortete mit HTTP {}", response.statusCode());
+				throw new ResponseStatusException(HttpStatus.BAD_GATEWAY);
+			}
+		} catch (IOException | InterruptedException | RuntimeException e) {
+			protokolliereFehler(protokoll, null, e);
+			throw e;
 		}
-		final StreamingResponseBody stream = output -> forwardStream(response.body(), output);
+		final StreamingResponseBody stream = output -> forwardStream(response.body(), output, protokoll);
 		return ResponseEntity.ok().header("Cache-Control", "no-cache, no-transform")
-				.header("X-Accel-Buffering", "no")
+				.header("X-Accel-Buffering", "no").header("X-Chat-Id", protokoll.getGespraechId())
 				.contentType(MediaType.TEXT_EVENT_STREAM).body(stream);
+	}
+
+	private void protokolliereFehler(final ChatProtokoll protokoll, final String antwort, final Exception ursache) {
+		try {
+			protokolle.abschliessen(protokoll, antwort, "FEHLER");
+		} catch (RuntimeException fehler) {
+			log.error("Chatprotokoll konnte nicht aktualisiert werden", fehler);
+			ursache.addSuppressed(fehler);
+		}
 	}
 
 	private com.fasterxml.jackson.databind.node.ObjectNode createBody(final ChatRequest request,
@@ -165,8 +192,9 @@ public class KiChatController {
 		output.flush();
 	}
 
-	private void forwardStream(final InputStream input, final OutputStream output) {
+	private void forwardStream(final InputStream input, final OutputStream output, final ChatProtokoll protokoll) {
 		final ThinkFilter filter = new ThinkFilter();
+		final StringBuilder antwort = new StringBuilder();
 		boolean done = false;
 		try (BufferedReader reader = new BufferedReader(new InputStreamReader(input, StandardCharsets.UTF_8))) {
 			final StringBuilder data = new StringBuilder();
@@ -185,7 +213,10 @@ public class KiChatController {
 					final JsonNode content = chunk.at("/choices/0/delta/content");
 					if (content.isTextual()) {
 						final String visible = filter.accept(content.asText());
-						if (!visible.isEmpty()) sendEvent(output, "delta", visible);
+						if (!visible.isEmpty()) {
+							sendEvent(output, "delta", visible);
+							antwort.append(visible);
+						}
 					}
 				} else if (line.startsWith("data:")) {
 					if (!data.isEmpty()) data.append('\n');
@@ -194,10 +225,15 @@ public class KiChatController {
 			}
 			if (!done) throw new IOException("KI-Stream wurde vorzeitig beendet");
 			final String rest = filter.finish();
-			if (!rest.isEmpty()) sendEvent(output, "delta", rest);
+			if (!rest.isEmpty()) {
+				sendEvent(output, "delta", rest);
+				antwort.append(rest);
+			}
+			protokolle.abschliessen(protokoll, antwort.toString(), "ABGESCHLOSSEN");
 			sendEvent(output, "done", "");
 		} catch (IOException | RuntimeException e) {
 			log.warn("KI-Stream fehlgeschlagen", e);
+			protokolliereFehler(protokoll, antwort.toString(), e);
 			try {
 				sendEvent(output, "error", "Die KI-Antwort wurde unterbrochen.");
 			} catch (IOException writeError) {

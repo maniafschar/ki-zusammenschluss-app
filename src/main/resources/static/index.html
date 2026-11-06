@@ -827,8 +827,9 @@
 		</button>
 		<button id="welcome-replay" class="replay" type="button" hidden></button>
 		<p class="voice-text" id="voice-text" aria-live="polite" aria-label="Gesprächsverlauf" tabindex="0"></p>
-		<p class="voice-privacy">Ihre Fragen werden zur Beantwortung an den KI-Dienst übermittelt. Bitte teilen Sie
-			keine vertraulichen Daten.</p>
+		<p class="voice-privacy">Fragen und Antworten werden als Textprotokoll gespeichert und nach 30 Tagen bei
+			laufendem Betrieb stündlich gelöscht. Unsere Anwendung speichert keine Audiodaten. Die
+			Spracherkennung kann über einen Dienst Ihres Browsers erfolgen. Bitte teilen Sie keine vertraulichen Daten.</p>
 	</section>
 
 	<header id="inhouse">
@@ -1452,6 +1453,7 @@
 					: 'Ihr Browser unterstützt keine Sprachausgabe';
 			}
 			const history = [];
+			let gespraechId = null;
 			let state = 'idle'; // idle | listening | thinking | speaking
 			let speechGeneration = 0;
 			let level = 0;
@@ -1777,9 +1779,10 @@
 						method: 'POST',
 						credentials: 'same-origin',
 						headers: { 'Content-Type': 'application/json', 'X-XSRF-TOKEN': token },
-						body: JSON.stringify({ messages: history.slice(-10) })
+						body: JSON.stringify({ messages: history.slice(-10), gespraechId })
 					});
 					if (!res.ok) throw new Error(res.status);
+					gespraechId = res.headers.get('X-Chat-Id') || gespraechId;
 					if (!res.body) throw new Error('Streaming wird nicht unterstützt');
 					const reader = res.body.getReader();
 					const decoder = new TextDecoder();
