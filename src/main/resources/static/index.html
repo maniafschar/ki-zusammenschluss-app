@@ -70,8 +70,11 @@
 			justify-content: space-between;
 			align-items: center;
 			padding: 16px 8%;
-			background: rgba(247, 251, 249, 0.92);
-			backdrop-filter: blur(8px);
+			background: linear-gradient(145deg, rgba(15, 43, 81, .97), rgba(5, 15, 35, .97));
+			border-bottom: 1px solid rgba(126, 223, 255, .55);
+			box-shadow: 0 8px 28px rgba(2, 12, 30, .38), 0 1px 12px rgba(70, 190, 255, .2);
+			-webkit-backdrop-filter: blur(16px);
+			backdrop-filter: blur(16px);
 			z-index: 10;
 			gap: 24px;
 		}
@@ -82,7 +85,7 @@
 		}
 
 		nav a {
-			color: var(--muted);
+			color: var(--surface);
 			text-decoration: none;
 			font-size: 0.95rem;
 		}
@@ -199,10 +202,6 @@
 		.nav-toggle:focus-visible {
 			outline: 2px solid #75dfff;
 			outline-offset: -2px;
-		}
-
-		nav a:hover {
-			color: var(--text);
 		}
 
 		h1 {
@@ -641,7 +640,7 @@
 			padding-top: 112px;
 		}
 
-		.voice.welcome > * {
+		.voice.welcome>* {
 			flex-shrink: 0;
 		}
 
