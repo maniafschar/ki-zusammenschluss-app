@@ -698,7 +698,6 @@
 			overflow-y: auto;
 			display: flex;
 			flex-direction: column;
-			justify-content: safe center;
 			align-items: center;
 			color: #eef7ff;
 			background:
@@ -707,6 +706,7 @@
 				linear-gradient(145deg, #071124, #0b1c42 55%, #060e20);
 			background-size: auto, 12px 12px, auto;
 			padding-top: 112px;
+			padding-bottom: 12px;
 		}
 
 		.voice.welcome>* {
@@ -716,7 +716,9 @@
 		.voice canvas {
 			width: 100%;
 			max-width: 560px;
-			height: clamp(160px, 30vh, 430px);
+			height: clamp(0px, 30vh, 430px);
+			height: clamp(0px, 30dvh, 430px);
+			min-height: 0;
 			display: block;
 			margin: 0 auto 16px;
 			filter: drop-shadow(0 0 16px rgba(49, 143, 255, .3));
@@ -724,6 +726,10 @@
 
 		.voice canvas[hidden] {
 			display: none;
+		}
+
+		.voice.welcome > canvas {
+			flex-shrink: 1;
 		}
 
 		.voice .mic {
@@ -769,10 +775,15 @@
 		}
 
 		.voice-text {
+			width: 100%;
 			max-width: 640px;
+			flex: 1 1 0;
+			min-height: 3em;
 			margin: 16px auto 0;
 			color: #c6dbef;
-			min-height: 3em;
+			overflow-y: auto;
+			overflow-wrap: anywhere;
+			overscroll-behavior: contain;
 		}
 
 		.voice-text b {
@@ -815,8 +826,9 @@
 			</svg>
 		</button>
 		<button id="welcome-replay" class="replay" type="button" hidden></button>
-		<p class="voice-text" id="voice-text" aria-live="polite"></p>
-		<p class="voice-privacy">Ihre Fragen werden zur Beantwortung an den KI-Dienst übermittelt. Bitte teilen Sie keine vertraulichen Daten.</p>
+		<p class="voice-text" id="voice-text" aria-live="polite" aria-label="Gesprächsverlauf" tabindex="0"></p>
+		<p class="voice-privacy">Ihre Fragen werden zur Beantwortung an den KI-Dienst übermittelt. Bitte teilen Sie
+			keine vertraulichen Daten.</p>
 	</section>
 
 	<header id="inhouse">
@@ -1703,8 +1715,10 @@
 				let active = true;
 
 				function renderReply() {
+					const follow = text.scrollHeight - text.scrollTop - text.clientHeight <= 2;
 					text.innerHTML = '<b>Sie:</b> ' + esc(question) + '<br><b>KI:</b> ' + esc(reply)
 						+ (speechFailed ? '<br>Die Sprachausgabe ist fehlgeschlagen.' : '');
+					if (follow) text.scrollTop = text.scrollHeight;
 				}
 
 				function speakNext() {
