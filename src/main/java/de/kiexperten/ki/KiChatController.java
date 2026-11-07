@@ -24,6 +24,7 @@ import javax.net.ssl.X509TrustManager;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -39,6 +40,7 @@ import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBo
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
 
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
@@ -52,21 +54,23 @@ public class KiChatController {
 
 	private static final int MAX_PER_MINUTE = 10;
 	private static final Logger log = LoggerFactory.getLogger(KiChatController.class);
-	private static final String SYSTEM_PROMPT = "Du bist der Sprachassistent von freiberuflichen KI-Experten "
-			+ "für KMU (KI in House). Antworte auf Deutsch, freundlich und sehr kurz (max. 3 Sätze + Liste für Folgefragen). "
-			+ "Ziel ist es, folgende Punkte mit dem Benutzer zu erarbeiten:\n"
-			+ "* Welche Branche arbeitet er\n"
-			+ "* Welche Software verwendet er hautpsächlich\n"
-			+ "* Welche Anforderunegn möchte er mit Hilfe der KI umsetzen\n"
-			+ "* \n"
-			+ "Weiße nichttechnische Fragen höflich zurück und beschränke Dich lediglich auf die Punkte oben und "
-			+ "Unternehmenssoftware wie Email, Excel, Workflows, SAP, CRM, ERP, etc. und wie man diese mit Hilfe "
-			+ "der KI optimieren kann. Zeigt der Benutzer echtes Interesse an KI Lösungen für sein Unternehmen "
-			+ "und hast Du die Liste oben abgearbeitet, teile ihm mit, dass wir sehr gerne mit ihm einen Termin "
-			+ "vereinbaren würden. Weiß ihn dann darauf hin, dass er einen Termine am Ende der "
-			+ "Seite vereinbaren kann. Bist Du allerdings noch nicht fertig mit den Punkten, dann schalge ihm "
-			+ "stets 3 Optionen für Folgethemen, aus die der Benutzer eine auswählen kann.";
+	private static final String LEGACY_SYSTEM_PROMPT = "Du bist der deutschsprachige Assistent des freiberuflichen KI-Experten-Teams für KMU. "
+			+ "Antworte freundlich und knapp (höchstens 3 Sätze). Führe das Gespräch als Multiple-Choice-Dialog: "
+			+ "Stelle pro Antwort genau eine Folgefrage und biete dafür genau 3 nummerierte Auswahlmöglichkeiten an. Freitext ist erlaubt. "
+			+ "Kläre diese vier Punkte: Branche, hauptsächlich genutzte Software, gewünschte KI-Unterstützung und Dringlichkeit beziehungsweise Zeitrahmen. "
+			+ "Frage nur nach noch offenen Punkten und behaupte nicht, der Dialog sei abgeschlossen, bevor alle vier geklärt sind. "
+			+ "Lenke fachfremde Fragen höflich zum aktuellen Punkt zurück. Wenn alle Punkte geklärt sind und Interesse besteht, "
+			+ "lade zu einem Termin am Seitenende ein.";
 
+	private static final String REQUIREMENTS_SYSTEM_PROMPT = "Du bist der deutschsprachige Assistent für die strukturierte Erhebung von Anforderungen an Softwareprojekte. "
+			+ "Nutze für jeden Gesprächsschritt die MCP-Werkzeuge. Rufe zuerst get_next_requirement_step mit der Gesprächs-ID auf. "
+			+ "Wenn der vorherige Assistent bereits eine Frage gestellt hat, bewerte die letzte Nutzeraussage anhand der Akzeptanzkriterien des aktuellen Schritts und rufe record_requirement_answer auf. "
+			+ "Die Einschätzung, ob eine Antwort genügt, triffst du selbst. Bei unklaren oder unvollständigen Antworten darfst du den Schritt nicht abschließen; stelle dann eine konkrete Rückfrage. "
+			+ "Gehe nur in der vom MCP-Server gelieferten Reihenfolge vor und stelle pro Antwort genau eine Multiple-Choice-Frage mit den vom Server gelieferten Optionen. Ergänze bei Bedarf eine Freitextoption. "
+			+ "Der Fragenkatalog umfasst sieben Pflichtschritte und darf erst nach deren Abschluss als fertig gelten. Fasse danach die Anforderungen knapp zusammen und lade zu einem Termin am Ende der Seite ein. "
+			+ "Beantworte keine sachfremden Fragen; führe freundlich zum aktuellen Anforderungsschritt zurück. Halte Antworten kurz.";
+	private static final int MAX_TOOL_ROUNDS = 5;
+	private static final int MAX_TOOL_CALLS = 10;
 	private final ObjectMapper mapper = new ObjectMapper();
 	private final Map<String, long[]> hits = new ConcurrentHashMap<>();
 	private final HttpClient client;
@@ -81,9 +85,11 @@ public class KiChatController {
 	private final String speechVoice;
 	private final String speechFormat;
 	private final ChatProtokollService protokolle;
+	private final RequirementsMcpGateway requirementsMcp;
 
 	public KiChatController(
 			final ChatProtokollService protokolle,
+			final ObjectProvider<RequirementsMcpGateway> requirementsMcp,
 			@Value("${app.ki.base-url:https://100.65.185.69/v1}") final String baseUrl,
 			@Value("${app.ki.completions-path:/chat/completions}") final String completionsPath,
 			@Value("${app.ki.transcriptions-path:/audio/transcriptions}") final String transcriptionsPath,
@@ -106,6 +112,7 @@ public class KiChatController {
 		this.speechVoice = speechVoice;
 		this.speechFormat = speechFormat;
 		this.protokolle = protokolle;
+		this.requirementsMcp = requirementsMcp.getIfAvailable();
 		final HttpClient.Builder builder = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10));
 		if (trustAll) {
 			// nur für den internen Server mit selbstsigniertem Zertifikat
@@ -235,17 +242,10 @@ public class KiChatController {
 	@PostMapping("/api/ki/chat")
 	public ChatResponse chat(@RequestBody @Valid final ChatRequest request, final HttpServletRequest http)
 			throws Exception {
-		final var body = this.createBody(request, http, false);
 		final ChatProtokoll protokoll = this.protokolle.beginne(request);
 		try {
-			final HttpResponse<String> res = this.client.send(this.upstreamRequest(body),
-					HttpResponse.BodyHandlers.ofString());
-			if (res.statusCode() != 200)
-				throw new ResponseStatusException(HttpStatus.BAD_GATEWAY);
-			final JsonNode content = this.mapper.readTree(res.body()).at("/choices/0/message/content");
-			if (content.isMissingNode() || content.isNull())
-				throw new ResponseStatusException(HttpStatus.BAD_GATEWAY);
-			final String reply = content.asText().replaceAll("(?s)<think>.*?</think>", "").trim();
+			final var body = this.createBody(request, http, false);
+			final String reply = this.completeWithTools(body, protokoll.getGespraechId());
 			this.protokolle.abschliessen(protokoll, reply, "ABGESCHLOSSEN");
 			return new ChatResponse(reply);
 		} catch (IOException | InterruptedException | RuntimeException e) {
@@ -257,8 +257,30 @@ public class KiChatController {
 	@PostMapping(value = "/api/ki/chat/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
 	public ResponseEntity<StreamingResponseBody> stream(@RequestBody @Valid final ChatRequest request,
 			final HttpServletRequest http) throws Exception {
-		final var body = this.createBody(request, http, true);
 		final ChatProtokoll protokoll = this.protokolle.beginne(request);
+		if (this.requirementsMcp != null) {
+			final var toolBody = this.createBody(request, http, false);
+			final StreamingResponseBody toolStream = output -> {
+				try {
+					final String reply = this.completeWithTools(toolBody, protokoll.getGespraechId());
+					this.protokolle.abschliessen(protokoll, reply, "ABGESCHLOSSEN");
+					this.sendEvent(output, "delta", reply);
+					this.sendEvent(output, "done", "");
+				} catch (final IOException | InterruptedException | RuntimeException e) {
+					if (e instanceof InterruptedException)
+						Thread.currentThread().interrupt();
+					this.protokolliereFehler(protokoll, null, e);
+					this.sendEvent(output, "error", "Die KI-Antwort konnte nicht vollständig geladen werden.");
+				} catch (final Exception e) {
+					this.protokolliereFehler(protokoll, null, e);
+					this.sendEvent(output, "error", "Die KI-Antwort konnte nicht vollständig geladen werden.");
+				}
+			};
+			return ResponseEntity.ok().header("Cache-Control", "no-cache, no-transform")
+					.header("X-Accel-Buffering", "no").header("X-Chat-Id", protokoll.getGespraechId())
+					.contentType(MediaType.TEXT_EVENT_STREAM).body(toolStream);
+		}
+		final var body = this.createBody(request, http, true);
 		final HttpResponse<InputStream> response;
 		try {
 			response = this.client.send(this.upstreamRequest(body), HttpResponse.BodyHandlers.ofInputStream());
@@ -294,7 +316,8 @@ public class KiChatController {
 		if (request.messages() == null || request.messages().isEmpty())
 			throw new ResponseStatusException(HttpStatus.BAD_REQUEST);
 		final var messages = this.mapper.createArrayNode();
-		messages.addObject().put("role", "system").put("content", SYSTEM_PROMPT);
+		messages.addObject().put("role", "system").put("content",
+				this.requirementsMcp == null ? LEGACY_SYSTEM_PROMPT : REQUIREMENTS_SYSTEM_PROMPT);
 		for (final ChatMessage m : request.messages()) {
 			if (!"user".equals(m.role()) && !"assistant".equals(m.role()))
 				throw new ResponseStatusException(HttpStatus.BAD_REQUEST);
@@ -306,7 +329,55 @@ public class KiChatController {
 		body.put("stream", stream);
 		body.put("max_tokens", 1500);
 		body.putObject("chat_template_kwargs").put("enable_thinking", true);
+		if (this.requirementsMcp != null) {
+			body.set("tools", this.requirementsMcp.toolDefinitions());
+			body.put("tool_choice", "auto");
+		}
 		return body;
+	}
+
+	private String completeWithTools(final com.fasterxml.jackson.databind.node.ObjectNode body,
+			final String conversationId) throws Exception {
+		if (this.requirementsMcp != null) {
+			final com.fasterxml.jackson.databind.node.ObjectNode system = (com.fasterxml.jackson.databind.node.ObjectNode) body
+					.path("messages").get(0);
+			system.put("content", system.path("content").asText() + " Gesprächs-ID für MCP-Werkzeuge: " + conversationId);
+		}
+		int executedCalls = 0;
+		for (int round = 0; round < MAX_TOOL_ROUNDS; round++) {
+			final HttpResponse<String> response = this.client.send(this.upstreamRequest(body),
+					HttpResponse.BodyHandlers.ofString());
+			if (response.statusCode() != 200)
+				throw new ResponseStatusException(HttpStatus.BAD_GATEWAY);
+			final JsonNode message = this.mapper.readTree(response.body()).at("/choices/0/message");
+			if (message.isMissingNode() || message.isNull())
+				throw new ResponseStatusException(HttpStatus.BAD_GATEWAY);
+			final JsonNode calls = message.path("tool_calls");
+			if (this.requirementsMcp == null || !calls.isArray() || calls.isEmpty()) {
+				final JsonNode content = message.path("content");
+				if (content.isMissingNode() || content.isNull())
+					throw new ResponseStatusException(HttpStatus.BAD_GATEWAY);
+				return content.asText().replaceAll("(?s)<think>.*?</think>", "").trim();
+			}
+			if (executedCalls + calls.size() > MAX_TOOL_CALLS)
+				throw new ResponseStatusException(HttpStatus.BAD_GATEWAY);
+			final ArrayNode messages = (ArrayNode) body.path("messages");
+			messages.add(message.deepCopy());
+			for (final JsonNode call : calls) {
+				final String toolCallId = call.path("id").asText();
+				final JsonNode function = call.path("function");
+				final String toolName = function.path("name").asText();
+				final JsonNode rawArguments = function.path("arguments");
+				final JsonNode arguments = rawArguments.isTextual() ? this.mapper.readTree(rawArguments.asText())
+						: rawArguments;
+				if (!arguments.isObject() || toolCallId.isBlank() || toolName.isBlank())
+					throw new ResponseStatusException(HttpStatus.BAD_GATEWAY);
+				final String result = this.requirementsMcp.call(toolName, arguments);
+				messages.addObject().put("role", "tool").put("tool_call_id", toolCallId).put("content", result);
+				executedCalls++;
+			}
+		}
+		throw new ResponseStatusException(HttpStatus.BAD_GATEWAY);
 	}
 
 	private HttpRequest upstreamRequest(final JsonNode body) throws IOException {
