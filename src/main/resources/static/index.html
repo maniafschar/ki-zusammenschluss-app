@@ -1595,14 +1595,18 @@
 			let audioFrequencies = null;
 			let audioLevel = 0;
 			let audioPitch = 180;
+			const audioBands = [0, 0, 0];
 			let visual = null;
 			let visible = true;
 			let frame = null;
+			let lastFrame = 0;
 			const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
 
 			function draw(t) {
 				frame = null;
 				if (!visible) return;
+				const delta = lastFrame ? Math.min((t - lastFrame) / 1000, 0.1) : 1 / 60;
+				lastFrame = t;
 				if (audioAnalyser && audioSamples) {
 					audioAnalyser.getByteTimeDomainData(audioSamples);
 					let energy = 0;
@@ -1610,11 +1614,20 @@
 						const amplitude = (sample - 128) / 128;
 						energy += amplitude * amplitude;
 					}
-					const measuredLevel = Math.min(1, Math.sqrt(energy / audioSamples.length) * 3);
-					audioLevel += (measuredLevel - audioLevel) * 0.2;
-					if (audioFrequencies && audioLevel > 0.035) {
+					const measuredLevel = Math.min(1, Math.sqrt(energy / audioSamples.length) * 4);
+					const rate = measuredLevel > audioLevel ? 25 : 10;
+					audioLevel += (measuredLevel - audioLevel) * (1 - Math.exp(-delta * rate));
+					if (audioFrequencies) {
 						audioAnalyser.getByteFrequencyData(audioFrequencies);
 						const binHz = audioContext.sampleRate / audioAnalyser.fftSize;
+						[[85, 300], [300, 1200], [1200, 4000]].forEach(([low, high], band) => {
+							const from = Math.max(1, Math.floor(low / binHz));
+							const to = Math.min(audioFrequencies.length, Math.ceil(high / binHz));
+							let sum = 0;
+							for (let i = from; i < to; i++) sum += audioFrequencies[i];
+							const target = audioLevel > 0.02 ? sum / Math.max(1, to - from) / 255 : 0;
+							audioBands[band] += (target - audioBands[band]) * (1 - Math.exp(-delta * (target > audioBands[band] ? 20 : 8)));
+						});
 						const minBin = Math.max(1, Math.floor(85 / binHz));
 						const maxBin = Math.min(audioFrequencies.length - 1, Math.ceil(420 / binHz));
 						let peakBin = minBin;
@@ -1627,18 +1640,21 @@
 						const divisor = lower - 2 * center + upper;
 						const offset = divisor ? Math.max(-0.5, Math.min(0.5, 0.5 * (lower - upper) / divisor)) : 0;
 						const measuredPitch = (peakBin + offset) * binHz;
-						audioPitch += (measuredPitch - audioPitch) * 0.12;
+						if (audioLevel > 0.035 && center > 0) {
+							audioPitch += (measuredPitch - audioPitch) * (1 - Math.exp(-delta * 5));
+						}
 					}
 				} else {
-					audioLevel *= 0.82;
+					audioLevel *= Math.exp(-delta * 10);
+					for (let i = 0; i < audioBands.length; i++) audioBands[i] *= Math.exp(-delta * 8);
 				}
 				if (visual) {
-					visual.draw(t, reducedMotion.matches ? 'idle' : state, reducedMotion.matches, audioLevel, audioPitch);
+					visual.draw(t, reducedMotion.matches ? 'idle' : state, reducedMotion.matches, audioLevel, audioPitch, audioBands);
 				} else if (ctx) {
 					const w = canvas.width, h = canvas.height, bars = 32;
 					ctx.clearRect(0, 0, w, h);
 					const target = reducedMotion.matches ? 0.15 : state === 'speaking' ? audioLevel : state === 'thinking' ? 0.25 : state === 'listening' ? 0.12 : 0.05;
-					level += (target - level) * 0.15;
+					level += (target - level) * (1 - Math.exp(-delta * 12));
 					const fallbackHue = 235 - Math.max(0, Math.min(1, (audioPitch - 85) / 335)) * 205;
 					ctx.fillStyle = `hsl(${fallbackHue} 95% 70%)`;
 					for (let i = 0; i < bars; i++) {
@@ -1663,6 +1679,7 @@
 				else if (frame !== null) {
 					cancelAnimationFrame(frame);
 					frame = null;
+					lastFrame = 0;
 				}
 			});
 			voiceObserver.observe(document.getElementById('home'));
@@ -1676,107 +1693,60 @@
 					const scene = new THREE.Scene();
 					const camera = new THREE.OrthographicCamera(-3, 3, 3, -3, 0.1, 100);
 					camera.position.z = 6;
-					const orb = new THREE.Group();
-					scene.add(orb);
+					const uniforms = {
+						time: { value: 0 },
+						voice: { value: 0 },
+						bands: { value: new THREE.Vector3() },
+						tone: { value: 0.3 },
+						mode: { value: 0 }
+					};
+					const material = new THREE.ShaderMaterial({
+						uniforms,
+						transparent: true,
+						depthWrite: false,
+						vertexShader: `
+							varying vec2 point;
+							void main() {
+								point = uv * 2.0 - 1.0;
+								gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+							}
+						`,
+						fragmentShader: `
+							varying vec2 point;
+							uniform float time, voice, tone, mode;
+							uniform vec3 bands;
 
-					const glowCanvas = document.createElement('canvas');
-					glowCanvas.width = glowCanvas.height = 128;
-					const glowContext = glowCanvas.getContext('2d');
-					const gradient = glowContext.createRadialGradient(64, 64, 0, 64, 64, 64);
-					gradient.addColorStop(0, 'rgba(255,255,255,1)');
-					gradient.addColorStop(.12, 'rgba(160,225,255,.9)');
-					gradient.addColorStop(.4, 'rgba(45,145,255,.25)');
-					gradient.addColorStop(1, 'rgba(0,60,255,0)');
-					glowContext.fillStyle = gradient;
-					glowContext.fillRect(0, 0, 128, 128);
-					const glowTexture = new THREE.CanvasTexture(glowCanvas);
-					const glow = new THREE.Sprite(new THREE.SpriteMaterial({
-						map: glowTexture, color: 0x8bcfff, transparent: true,
-						blending: THREE.AdditiveBlending, depthWrite: false
-					}));
-					glow.scale.set(2.2, 2.2, 1);
-					orb.add(glow);
+							float noise(vec2 p) {
+								return sin(p.x) * sin(p.y);
+							}
 
-					const rings = [];
-					function addRing(radius, segments, gap, color, opacity, speed) {
-						const vertices = [];
-						for (let i = 0; i < segments; i++) {
-							const from = i * Math.PI * 2 / segments;
-							const to = (i + 1 - gap) * Math.PI * 2 / segments;
-							vertices.push(Math.cos(from) * radius, Math.sin(from) * radius, 0,
-								Math.cos(to) * radius, Math.sin(to) * radius, 0);
-						}
-						const geometry = new THREE.BufferGeometry();
-						geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
-						const ring = new THREE.LineSegments(geometry, new THREE.LineBasicMaterial({
-							color, transparent: true, opacity, blending: THREE.AdditiveBlending, depthWrite: false
-						}));
-						orb.add(ring);
-						rings.push({ ring, speed });
-					}
-					addRing(2.08, 180, 0, 0x448dff, .55, .08);
-					addRing(1.98, 80, .38, 0x66eeff, .75, -.18);
-					addRing(1.83, 110, .1, 0x956bff, .65, .22);
-					addRing(1.59, 64, .5, 0x32e5d0, .6, -.28);
-					addRing(1.32, 24, .7, 0xff9ad5, .65, .32);
-					addRing(.72, 80, 0, 0x9fe5ff, .8, .26);
-					addRing(.59, 36, .35, 0xbc8fff, .85, -.4);
-					addRing(.42, 8, .15, 0xbfefff, .8, .38);
-
-					const ticks = [];
-					for (let i = 0; i < 144; i++) {
-						const angle = i * Math.PI * 2 / 144;
-						const innerRadius = i % 12 === 0 ? 1.85 : 1.91;
-						ticks.push(Math.cos(angle) * innerRadius, Math.sin(angle) * innerRadius, 0,
-							Math.cos(angle) * 1.96, Math.sin(angle) * 1.96, 0);
-					}
-					const tickGeometry = new THREE.BufferGeometry();
-					tickGeometry.setAttribute('position', new THREE.Float32BufferAttribute(ticks, 3));
-					const tickRing = new THREE.LineSegments(tickGeometry, new THREE.LineBasicMaterial({
-						color: 0x76beff, transparent: true, opacity: .65,
-						blending: THREE.AdditiveBlending, depthWrite: false
-					}));
-					orb.add(tickRing);
-
-					const positions = [];
-					const colors = [];
-					const particlePaths = [];
-					const palette = [0x64caff, 0x9c7dff, 0x54f0df, 0xff87cb, 0xa6eaff];
-					for (let i = 0; i < 1500; i++) {
-						const angle = Math.random() * Math.PI * 2;
-						const radius = .25 + Math.sqrt(Math.random()) * 1.58;
-						const depth = (Math.random() - .5) * .35;
-						particlePaths.push({ angle, radius, depth, speed: .1 + Math.random() * .25, phase: Math.random() * Math.PI * 2 });
-						positions.push(Math.cos(angle) * radius, Math.sin(angle) * radius, depth);
-						const color = new THREE.Color(palette[Math.floor(Math.random() * palette.length)]);
-						colors.push(color.r, color.g, color.b);
-					}
-					const geometry = new THREE.BufferGeometry();
-					geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-					geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
-					const particles = new THREE.Points(geometry, new THREE.PointsMaterial({
-						map: glowTexture, vertexColors: true, size: 6, sizeAttenuation: false, transparent: true, opacity: .95,
-						blending: THREE.AdditiveBlending, depthWrite: false
-					}));
-					orb.add(particles);
-
-					const sparksGeometry = new THREE.BufferGeometry();
-					const sparkPositions = new Float32Array(24 * 3);
-					sparksGeometry.setAttribute('position', new THREE.BufferAttribute(sparkPositions, 3));
-					const sparks = new THREE.Points(sparksGeometry, new THREE.PointsMaterial({
-						map: glowTexture, color: 0xffffff, size: 13, sizeAttenuation: false,
-						transparent: true, opacity: .9, blending: THREE.AdditiveBlending, depthWrite: false
-					}));
-					orb.add(sparks);
-
-					const core = new THREE.Mesh(
-						new THREE.IcosahedronGeometry(.2, 2),
-						new THREE.MeshBasicMaterial({ color: 0xc3eeff, wireframe: true, transparent: true, opacity: .9 })
-					);
-					orb.add(core);
-					let smoothSignal = 0;
-					let smoothHue = .58;
-					let previousFrame = 0;
+							void main() {
+								float r = length(point);
+								float angle = atan(point.y, point.x);
+								float drift = time * 0.24;
+								float movement = 0.012 + voice * 0.075;
+								float edge = 0.48 + voice * 0.055
+									+ movement * (0.55 * sin(angle * 3.0 + drift)
+									+ 0.3 * sin(angle * 5.0 - drift * 1.3 + bands.y * 2.0)
+									+ 0.15 * sin(angle * 9.0 + drift + bands.z * 3.0));
+								float body = 1.0 - smoothstep(edge - 0.045, edge + 0.045, r);
+								float halo = exp(-max(r - edge, 0.0) * 9.0) * 0.22;
+								float rim = exp(-abs(r - edge) * 35.0) * (0.22 + voice * 0.3);
+								float flow = noise(point * 9.0 + vec2(drift, -drift * 0.7));
+								flow += 0.5 * noise(point.yx * 17.0 + vec2(-drift * 1.4, drift));
+								float veil = 0.5 + 0.5 * sin(r * 19.0 - drift * 2.0 + flow * 1.6 + bands.x * 2.0);
+								vec3 deep = mix(vec3(0.06, 0.19, 0.50), vec3(0.34, 0.12, 0.52), tone);
+								vec3 light = mix(vec3(0.23, 0.80, 0.95), vec3(1.0, 0.42, 0.69), tone);
+								vec3 color = deep * (0.45 + veil * 0.35) + light * (rim + body * (0.15 + veil * 0.2));
+								color += vec3(0.55, 0.85, 1.0) * exp(-r * 5.5) * (0.45 + voice * 0.7);
+								color += light * halo * (0.65 + mode * 0.2);
+								float alpha = clamp(body * 0.85 + halo + rim, 0.0, 1.0);
+								gl_FragColor = vec4(color, alpha);
+							}
+						`
+					});
+					const geometry = new THREE.PlaneGeometry(4.6, 4.6);
+					scene.add(new THREE.Mesh(geometry, material));
 
 					function resize() {
 						const width = webglCanvas.clientWidth;
@@ -1794,50 +1764,12 @@
 					}
 
 					visual = {
-						draw(t, currentState, still, signal, pitch) {
-							const time = still ? 0 : t * 0.001;
-							const delta = previousFrame ? Math.min(.05, (t - previousFrame) * .001) : 1 / 60;
-							previousFrame = t;
-							const smoothing = 1 - Math.exp(-delta * 5);
-							const targetSignal = currentState === 'speaking' ? signal : 0;
-							smoothSignal += (targetSignal - smoothSignal) * smoothing;
-							const pitchRange = Math.max(0, Math.min(1, (pitch - 85) / 335));
-							const targetHue = currentState === 'speaking' ? .68 - pitchRange * .62 : .58;
-							smoothHue += (targetHue - smoothHue) * (1 - Math.exp(-delta * 2.4));
-							const hue = (smoothHue + .012 * Math.sin(time * .35) + 1) % 1;
-							const voice = smoothSignal;
-							const intensity = currentState === 'speaking' ? .07 + voice * .18 : currentState === 'thinking' ? .09 : currentState === 'listening' ? .07 : .04;
-							const pulse = 1 + Math.sin(time * 1.2) * .025 + voice * .18;
-							core.scale.setScalar(pulse);
-							core.rotation.set(time * .18, time * .24, time * .1);
-							core.material.color.setHSL((hue + .06) % 1, .72, .82);
-							glow.scale.setScalar(2.2 * pulse);
-							glow.material.color.setHSL(hue, .95, .72);
-							particles.material.color.setHSL((hue + .12) % 1, .82, 1);
-							sparks.material.color.setHSL((hue + .2) % 1, .9, .82);
-							tickRing.material.color.setHSL((hue + .38) % 1, .82, .68);
-							const positions = geometry.attributes.position;
-							particlePaths.forEach((path, i) => {
-								const angle = path.angle + time * path.speed * (path.radius < 1 ? 1 : -1);
-								const radius = path.radius * (1 + intensity * .25 * Math.sin(time * 1.1 + path.phase) + voice * .07);
-								positions.setXYZ(i, Math.cos(angle) * radius, Math.sin(angle) * radius, path.depth);
-							});
-							positions.needsUpdate = true;
-							for (let i = 0; i < 24; i++) {
-								const angle = i * Math.PI * 2 / 24 + time * (i % 2 ? .5 : -.35);
-								const radius = .8 + (i % 4) * .29 + .05 * Math.sin(time * 1.1 + i * .4) + voice * .06;
-								sparkPositions[i * 3] = Math.cos(angle) * radius;
-								sparkPositions[i * 3 + 1] = Math.sin(angle) * radius;
-								sparkPositions[i * 3 + 2] = .25;
-							}
-							sparksGeometry.attributes.position.needsUpdate = true;
-							sparks.material.opacity = Math.min(1, .62 + .12 * Math.sin(time * 1.2) ** 2 + voice * .12);
-							tickRing.rotation.z = -time * .04;
-							rings.forEach(({ ring, speed }, i) => {
-								ring.rotation.z = time * speed * .55;
-								ring.material.color.setHSL((hue + i * .1) % 1, .78, .68);
-								ring.scale.setScalar(1 + .008 * Math.sin(time * 1.1 + i * .4) + voice * .018);
-							});
+						draw(t, currentState, still, signal, pitch, frequencyBands) {
+							uniforms.time.value = still ? 0 : t * 0.001;
+							uniforms.voice.value = currentState === 'speaking' ? signal : 0;
+							uniforms.bands.value.set(...(currentState === 'speaking' ? frequencyBands : [0, 0, 0]));
+							uniforms.tone.value = currentState === 'speaking' ? Math.max(0, Math.min(1, (pitch - 85) / 335)) : 0.3;
+							uniforms.mode.value = currentState === 'thinking' || currentState === 'listening' ? 1 : 0;
 							renderer.render(scene, camera);
 						}
 					};
@@ -1850,6 +1782,8 @@
 						visual = null;
 						webglCanvas.hidden = true;
 						canvas.hidden = false;
+						geometry.dispose();
+						material.dispose();
 						renderer.dispose();
 						requestDraw();
 					}, { once: true });
@@ -1883,8 +1817,8 @@
 						audioContext ||= new AudioContextType();
 						if (audioContext.state === 'suspended') await audioContext.resume();
 						playbackAnalyser = audioContext.createAnalyser();
-						playbackAnalyser.fftSize = 4096;
-						playbackAnalyser.smoothingTimeConstant = .82;
+						playbackAnalyser.fftSize = 2048;
+						playbackAnalyser.smoothingTimeConstant = .3;
 						source = audioContext.createMediaElementSource(player);
 						source.connect(playbackAnalyser);
 						playbackAnalyser.connect(audioContext.destination);
@@ -1907,12 +1841,12 @@
 						console.warn('Audioanalyse nicht verfügbar:', error);
 					}
 				}
-				state = 'speaking';
 				try {
 					const finished = new Promise((resolve, reject) => {
 						player.addEventListener('ended', resolve, { once: true });
 						player.addEventListener('error', () => reject(new Error('Audio playback failed')), { once: true });
 					});
+					player.addEventListener('playing', () => { state = 'speaking'; }, { once: true });
 					await player.play();
 					await finished;
 				} finally {
@@ -1923,7 +1857,9 @@
 						audioSamples = null;
 						audioFrequencies = null;
 					}
+					if (state === 'speaking') state = 'idle';
 					URL.revokeObjectURL(audioUrl);
+					requestDraw();
 				}
 			}
 
@@ -1931,12 +1867,15 @@
 				text.textContent = welcome;
 				start.hidden = true;
 				mic.hidden = false;
+				mic.disabled = true;
 				privacy.hidden = false;
 				try {
 					await speak(welcome);
 				} catch (e) {
 					text.textContent = welcome + ' Sprachausgabe ist derzeit nicht verfügbar.';
 					state = 'idle';
+				} finally {
+					mic.disabled = !canRecord;
 				}
 			}
 
