@@ -350,6 +350,9 @@ startBooking();
 	let gespraechId = null;
 	let state = 'idle'; // idle | listening | thinking | speaking
 	let recorder = null;
+	let chatTurn = 0;
+	let activeSpeech = null;
+	let choiceReady = false;
 	let level = 0;
 	let audioContext = null;
 	let audioAnalyser = null;
@@ -739,35 +742,49 @@ startBooking();
 		return decodeURIComponent((document.cookie.match(/(?:^|; )XSRF-TOKEN=([^;]*)/) || [])[1] || '');
 	}
 
-	async function speak(reply) {
-		const token = await csrfToken();
-		const res = await fetch('/ai-expert/api/ki/audio/speech', {
-			method: 'POST',
-			credentials: 'same-origin',
-			headers: { 'Content-Type': 'application/json', 'X-XSRF-TOKEN': token },
-			body: JSON.stringify({ input: reply })
-		});
-		if (!res.ok) throw new Error(res.status);
-		const audioUrl = URL.createObjectURL(await res.blob());
-		const player = new Audio(audioUrl);
+	function stopSpeech() {
+		if (!activeSpeech) return;
+		activeSpeech.cancelled = true;
+		activeSpeech.controller.abort();
+		activeSpeech.finish?.();
+		activeSpeech.player?.pause();
+	}
+
+	async function speak(reply, turnId = null) {
+		const playback = { controller: new AbortController(), player: null, finish: null, cancelled: false };
+		activeSpeech = playback;
+		let audioUrl = null;
 		let source = null;
 		let playbackAnalyser = null;
-		const AudioContextType = window.AudioContext || window.webkitAudioContext;
-		if (AudioContextType) {
-			try {
-				audioContext ||= new AudioContextType();
-				if (audioContext.state === 'suspended') await audioContext.resume();
-				playbackAnalyser = audioContext.createAnalyser();
-				playbackAnalyser.fftSize = 2048;
-				playbackAnalyser.smoothingTimeConstant = .3;
-				source = audioContext.createMediaElementSource(player);
-				source.connect(playbackAnalyser);
-				playbackAnalyser.connect(audioContext.destination);
-				audioAnalyser = playbackAnalyser;
-				audioSamples = new Uint8Array(playbackAnalyser.fftSize);
-				audioFrequencies = new Uint8Array(playbackAnalyser.frequencyBinCount);
-			} catch (error) {
-				if (source) {
+		try {
+			const token = await csrfToken();
+			const res = await fetch('/ai-expert/api/ki/audio/speech', {
+				method: 'POST',
+				credentials: 'same-origin',
+				headers: { 'Content-Type': 'application/json', 'X-XSRF-TOKEN': token },
+				body: JSON.stringify({ input: reply }),
+				signal: playback.controller.signal
+			});
+			if (!res.ok) throw new Error(res.status);
+			audioUrl = URL.createObjectURL(await res.blob());
+			const player = new Audio(audioUrl);
+			playback.player = player;
+			const AudioContextType = window.AudioContext || window.webkitAudioContext;
+			if (AudioContextType) {
+				try {
+					audioContext ||= new AudioContextType();
+					if (audioContext.state === 'suspended') await audioContext.resume();
+					playbackAnalyser = audioContext.createAnalyser();
+					playbackAnalyser.fftSize = 2048;
+					playbackAnalyser.smoothingTimeConstant = .3;
+					source = audioContext.createMediaElementSource(player);
+					source.connect(playbackAnalyser);
+					playbackAnalyser.connect(audioContext.destination);
+					audioAnalyser = playbackAnalyser;
+					audioSamples = new Uint8Array(playbackAnalyser.fftSize);
+					audioFrequencies = new Uint8Array(playbackAnalyser.frequencyBinCount);
+				} catch (error) {
+					if (source) {
 					try {
 						source.disconnect();
 						source.connect(audioContext.destination);
@@ -775,22 +792,27 @@ startBooking();
 						console.warn('Audioanalyse nicht verfügbar:', connectError);
 					}
 				}
-				playbackAnalyser?.disconnect();
-				audioAnalyser = null;
-				audioSamples = null;
-				audioFrequencies = null;
-				console.warn('Audioanalyse nicht verfügbar:', error);
+					playbackAnalyser?.disconnect();
+					audioAnalyser = null;
+					audioSamples = null;
+					audioFrequencies = null;
+					console.warn('Audioanalyse nicht verfügbar:', error);
+				}
 			}
-		}
-		try {
 			const finished = new Promise((resolve, reject) => {
+				playback.finish = resolve;
 				player.addEventListener('ended', resolve, { once: true });
 				player.addEventListener('error', () => reject(new Error('Audio playback failed')), { once: true });
 			});
-			player.addEventListener('playing', () => { state = 'speaking'; }, { once: true });
+			player.addEventListener('playing', () => {
+				if (!playback.cancelled && (turnId === null || turnId === chatTurn)) state = 'speaking';
+			}, { once: true });
 			await player.play();
 			await finished;
+		} catch (error) {
+			if (!playback.cancelled && error.name !== 'AbortError') throw error;
 		} finally {
+			playback.finish = null;
 			source?.disconnect();
 			playbackAnalyser?.disconnect();
 			if (audioAnalyser === playbackAnalyser) {
@@ -798,8 +820,9 @@ startBooking();
 				audioSamples = null;
 				audioFrequencies = null;
 			}
-			if (state === 'speaking') state = 'idle';
-			URL.revokeObjectURL(audioUrl);
+			if (activeSpeech === playback) activeSpeech = null;
+			if (state === 'speaking' && (turnId === null || turnId === chatTurn)) state = 'idle';
+			if (audioUrl) URL.revokeObjectURL(audioUrl);
 			requestDraw();
 		}
 	}
@@ -875,10 +898,16 @@ startBooking();
 
 	text.addEventListener('click', (event) => {
 		const button = event.target.closest('[data-chat-choice]');
-		if (button && !button.disabled && state === 'idle') ask(button.dataset.chatChoice);
+		if (button && !button.disabled && choiceReady && state !== 'listening') {
+			choiceReady = false;
+			stopSpeech();
+			ask(button.dataset.chatChoice);
+		}
 	});
 
 	async function ask(question) {
+		const turnId = ++chatTurn;
+		choiceReady = false;
 		state = 'thinking';
 		mic.disabled = true;
 		renderConversation(question, '', { status: 'Die KI denkt nach …' });
@@ -936,17 +965,22 @@ startBooking();
 			if (!reply.trim()) throw new Error('Die KI hat keine Antwort geliefert.');
 			history.push({ role: 'assistant', content: reply.trim() });
 			renderConversation(question, reply.trim(), { choices: true });
+			choiceReady = true;
 			try {
-				await speak(plainMarkdown(reply));
+				await speak(plainMarkdown(reply), turnId);
 			} catch (e) {
+				if (turnId !== chatTurn) return;
 				const speechError = document.createElement('p');
 				speechError.className = 'chat-status';
 				speechError.textContent = 'Die Sprachausgabe ist fehlgeschlagen.';
 				text.querySelector('.chat-assistant')?.append(speechError);
 			}
-			state = 'idle';
-			mic.disabled = !canRecord;
+			if (turnId === chatTurn) {
+				state = 'idle';
+				mic.disabled = !canRecord;
+			}
 		} catch (e) {
+			if (turnId !== chatTurn) return;
 			history.pop();
 			state = 'idle';
 			mic.disabled = !canRecord;
