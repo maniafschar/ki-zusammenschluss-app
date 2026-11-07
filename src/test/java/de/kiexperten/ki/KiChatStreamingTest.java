@@ -92,9 +92,15 @@ class KiChatStreamingTest {
 				}
 			});
 			upstream.createContext("/audio/speech", exchange -> {
-				exchange.getRequestBody().readAllBytes();
-				final byte[] body = { 'I', 'D', '3', 1, 2, 3 };
-				exchange.getResponseHeaders().set("Content-Type", "audio/mpeg");
+				final String request = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
+				if (!request.contains("\"model\":\"stimme\"") || !request.contains("\"voice\":\"1930\"")
+						|| !request.contains("\"response_format\":\"wav\"")) {
+					exchange.sendResponseHeaders(400, -1);
+					exchange.close();
+					return;
+				}
+				final byte[] body = { 'R', 'I', 'F', 'F', 1, 2, 3, 4 };
+				exchange.getResponseHeaders().set("Content-Type", "audio/wav");
 				exchange.sendResponseHeaders(200, body.length);
 				try (var out = exchange.getResponseBody()) {
 					out.write(body);
@@ -259,8 +265,8 @@ class KiChatStreamingTest {
 				.POST(HttpRequest.BodyPublishers.ofString("{\"input\":\"Hallo\"}")).build(),
 				HttpResponse.BodyHandlers.ofByteArray());
 		assertEquals(200, speech.statusCode());
-		assertEquals("audio/mpeg", speech.headers().firstValue("Content-Type").orElseThrow());
-		assertEquals("ID3", new String(speech.body(), 0, 3, StandardCharsets.UTF_8));
+		assertEquals("audio/wav", speech.headers().firstValue("Content-Type").orElseThrow());
+		assertEquals("RIFF", new String(speech.body(), 0, 4, StandardCharsets.UTF_8));
 	}
 
 	@Test
