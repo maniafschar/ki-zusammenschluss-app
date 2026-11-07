@@ -1012,7 +1012,7 @@
 		<div id="main-nav-links" class="nav-links">
 			<a href="#inhouse">in House</a>
 			<a href="#leistungen">Leistungen</a>
-			<a href="#produkte">Produkte</a>
+			<a href="#produkte" hidden>Produkte</a>
 			<a href="#experten">Experten</a>
 			<a href="#ablauf">Ablauf</a>
 			<a href="#kontakt">Kontakt</a>
@@ -1543,12 +1543,15 @@
 
 		async function loadSection(url, sectionId, listId, render) {
 			const section = document.getElementById(sectionId);
+			const menuLink = sectionId === 'produkte' ? document.querySelector('.nav-links a[href="#produkte"]') : null;
 			try {
 				const items = await fetch(url).then((r) => r.json());
 				section.hidden = items.length === 0;
+				if (menuLink) menuLink.hidden = items.length === 0;
 				document.getElementById(listId).innerHTML = items.map(render).join('');
 			} catch (err) {
 				section.hidden = true;
+				if (menuLink) menuLink.hidden = true;
 				console.error(err);
 			}
 		}
