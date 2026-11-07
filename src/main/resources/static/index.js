@@ -336,6 +336,7 @@ startBooking();
 	const text = document.getElementById('voice-text');
 	const start = document.getElementById('welcome-start');
 	const privacy = document.getElementById('voice-privacy');
+	const privacyPopup = document.getElementById('voice-privacy-popup');
 	const canvas = document.getElementById('voice-canvas');
 	const webglCanvas = document.getElementById('voice-webgl');
 	const ctx = canvas.getContext('2d');
@@ -808,7 +809,6 @@ startBooking();
 		start.hidden = true;
 		mic.hidden = false;
 		mic.disabled = true;
-		privacy.hidden = false;
 		try {
 			await speak(welcome);
 		} catch (e) {
@@ -820,6 +820,29 @@ startBooking();
 	}
 
 	start.addEventListener('click', playWelcome, { once: true });
+
+	function closePrivacyPopup() {
+		if (privacyPopup.hidden) return;
+		privacyPopup.hidden = true;
+		privacy.setAttribute('aria-expanded', 'false');
+		privacy.focus();
+	}
+
+	privacy.addEventListener('click', (event) => {
+		event.stopPropagation();
+		privacyPopup.hidden = !privacyPopup.hidden;
+		const expanded = !privacyPopup.hidden;
+		privacy.setAttribute('aria-expanded', String(expanded));
+		if (expanded) privacyPopup.focus();
+	});
+	privacyPopup.addEventListener('click', closePrivacyPopup);
+	document.addEventListener('click', (event) => {
+		if (!privacyPopup.hidden && !privacyPopup.contains(event.target) && event.target !== privacy)
+			closePrivacyPopup();
+	});
+	document.addEventListener('keydown', (event) => {
+		if (event.key === 'Escape') closePrivacyPopup();
+	});
 
 	text.addEventListener('click', (event) => {
 		const button = event.target.closest('[data-chat-choice]');

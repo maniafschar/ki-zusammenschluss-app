@@ -950,6 +950,7 @@ footer a {
 }
 
 .voice.welcome {
+	position: relative;
 	height: 100vh;
 	height: 100dvh;
 	overflow-y: auto;
@@ -1099,9 +1100,42 @@ footer a {
 	font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 
-.voice-privacy {
-	max-width: 640px;
-	margin: 12px auto 0;
+.voice .privacy-toggle {
+	position: absolute;
+	right: max(24px, 6%);
+	bottom: 24px;
+	z-index: 3;
+}
+
+.voice .privacy-toggle:focus-visible {
+	outline: 2px solid #9deaff;
+	outline-offset: 3px;
+}
+
+.voice-privacy-popup {
+	position: absolute;
+	right: max(24px, 6%);
+	bottom: 108px;
+	z-index: 4;
+	width: min(360px, calc(100% - 32px));
+	max-height: min(45vh, 240px);
+	overflow-y: auto;
+	padding: 16px;
+	border: 1px solid rgba(133, 198, 238, .45);
+	border-radius: 8px;
+	background: #102342;
+	box-shadow: 0 12px 32px rgba(0, 0, 0, .35);
 	color: #c6dbef;
-	font-size: .8rem;
+	text-align: left;
+}
+
+.voice-privacy-popup h2 {
+	margin-bottom: 8px;
+	color: #fff;
+	font-size: 1rem;
+}
+
+.voice-privacy-popup p {
+	font-size: .9rem;
+	line-height: 1.5;
 }
