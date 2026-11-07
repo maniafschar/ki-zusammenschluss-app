@@ -341,7 +341,8 @@ public class KiChatController {
 		if (this.requirementsMcp != null) {
 			final com.fasterxml.jackson.databind.node.ObjectNode system = (com.fasterxml.jackson.databind.node.ObjectNode) body
 					.path("messages").get(0);
-			system.put("content", system.path("content").asText() + " Gesprächs-ID für MCP-Werkzeuge: " + conversationId);
+			system.put("content",
+					system.path("content").asText() + " Gesprächs-ID für MCP-Werkzeuge: " + conversationId);
 		}
 		int executedCalls = 0;
 		for (int round = 0; round < MAX_TOOL_ROUNDS; round++) {

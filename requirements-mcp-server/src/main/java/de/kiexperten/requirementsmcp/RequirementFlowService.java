@@ -24,19 +24,26 @@ public class RequirementFlowService {
 					List.of("Viele manuelle Schritte", "Wiederkehrende Kommunikation", "Schwierige Informationssuche",
 							"Fehler oder Verzögerungen", "Sonstiges"),
 					"Ein konkreter heutiger Schmerzpunkt, Prozess oder die offene Frage ist beschrieben."),
-			new RequirementStep("workflow", "Ablauf", "Wie läuft der betroffene Vorgang heute ab und was soll künftig anders sein?",
-					List.of("Eingabe automatisieren", "Entscheidungen vorbereiten", "Entwürfe erzeugen", "Prüfen und freigeben",
+			new RequirementStep("workflow", "Ablauf",
+					"Wie läuft der betroffene Vorgang heute ab und was soll künftig anders sein?",
+					List.of("Eingabe automatisieren", "Entscheidungen vorbereiten", "Entwürfe erzeugen",
+							"Prüfen und freigeben",
 							"Noch nicht festgelegt"),
 					"Mindestens der relevante heutige oder gewünschte Ablauf ist verständlich."),
 			new RequirementStep("systems_data", "Systeme und Daten", "Welche Software und Datenquellen sind beteiligt?",
-					List.of("E-Mail oder Dokumente", "Excel oder Tabellen", "CRM oder ERP", "Interne Datenbank oder API",
+					List.of("E-Mail oder Dokumente", "Excel oder Tabellen", "CRM oder ERP",
+							"Interne Datenbank oder API",
 							"Noch unbekannt"),
 					"Betroffene Systeme oder Daten sind benannt; unbekannte Systeme dürfen ausdrücklich offenbleiben."),
-			new RequirementStep("constraints", "Rahmenbedingungen", "Welche Grenzen oder Vorgaben müssen wir berücksichtigen?",
-					List.of("Datenschutz oder sensible Daten", "Bestehende Systeme", "Budget", "Zeitplan", "Keine bekannt"),
+			new RequirementStep("constraints", "Rahmenbedingungen",
+					"Welche Grenzen oder Vorgaben müssen wir berücksichtigen?",
+					List.of("Datenschutz oder sensible Daten", "Bestehende Systeme", "Budget", "Zeitplan",
+							"Keine bekannt"),
 					"Wichtige Einschränkungen sind benannt oder der Nutzer bestätigt, dass noch keine bekannt sind."),
-			new RequirementStep("acceptance", "Erfolgskriterien", "Woran würden Sie erkennen, dass die Lösung erfolgreich ist?",
-					List.of("Weniger Bearbeitungszeit", "Weniger Fehler", "Bessere Servicequalität", "Höhere Auslastung",
+			new RequirementStep("acceptance", "Erfolgskriterien",
+					"Woran würden Sie erkennen, dass die Lösung erfolgreich ist?",
+					List.of("Weniger Bearbeitungszeit", "Weniger Fehler", "Bessere Servicequalität",
+							"Höhere Auslastung",
 							"Noch zu definieren"),
 					"Mindestens ein beobachtbares Erfolgskriterium oder ausdrücklich noch zu definieren ist festgehalten."));
 
@@ -62,16 +69,20 @@ public class RequirementFlowService {
 		synchronized (progress) {
 			progress.lastUpdated = Instant.now();
 			if (progress.nextStepIndex >= STEPS.size())
-				return Map.of("accepted", false, "completed", true, "reason", "Der Fragenkatalog ist bereits abgeschlossen.");
+				return Map.of("accepted", false, "completed", true, "reason",
+						"Der Fragenkatalog ist bereits abgeschlossen.");
 			final RequirementStep current = STEPS.get(progress.nextStepIndex);
 			if (!current.id().equals(stepId))
-				return Map.of("accepted", false, "completed", false, "reason", "Nur der aktuelle Schritt darf bewertet werden.",
+				return Map.of("accepted", false, "completed", false, "reason",
+						"Nur der aktuelle Schritt darf bewertet werden.",
 						"expectedStepId", current.id());
 			if (answer == null || answer.isBlank())
-				return Map.of("accepted", false, "completed", false, "reason", "Eine leere Antwort kann nicht übernommen werden.");
+				return Map.of("accepted", false, "completed", false, "reason",
+						"Eine leere Antwort kann nicht übernommen werden.");
 			if (!sufficient)
 				return Map.of("accepted", false, "completed", false, "step", current,
-						"clarificationQuestion", clarificationQuestion == null ? "Bitte präzisieren Sie Ihre Antwort." : clarificationQuestion);
+						"clarificationQuestion",
+						clarificationQuestion == null ? "Bitte präzisieren Sie Ihre Antwort." : clarificationQuestion);
 			progress.answers.put(current.id(), answer.trim());
 			progress.nextStepIndex++;
 			if (progress.nextStepIndex == STEPS.size())

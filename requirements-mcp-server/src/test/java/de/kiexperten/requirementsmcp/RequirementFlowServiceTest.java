@@ -16,18 +16,21 @@ class RequirementFlowServiceTest {
 		assertEquals(1, first.get("stepNumber"));
 		assertEquals(7, first.get("totalSteps"));
 
-		final var insufficient = this.flow.recordAnswer(conversationId, "project_goal", "", false, "Was genau soll besser werden?");
+		final var insufficient = this.flow.recordAnswer(conversationId, "project_goal", "", false,
+				"Was genau soll besser werden?");
 		assertFalse((boolean) insufficient.get("accepted"));
 		assertEquals(1, this.flow.nextStep(conversationId).get("stepNumber"));
 
-		for (final String stepId : new String[] { "project_goal", "users", "problem", "workflow", "systems_data", "constraints" }) {
+		for (final String stepId : new String[] { "project_goal", "users", "problem", "workflow", "systems_data",
+				"constraints" }) {
 			final var result = this.flow.recordAnswer(conversationId, stepId, "Konkrete Antwort", true, null);
 			assertTrue((boolean) result.get("accepted"));
 			assertFalse((boolean) result.get("completed"));
 		}
 		assertEquals(7, this.flow.nextStep(conversationId).get("stepNumber"));
 
-		final var completed = this.flow.recordAnswer(conversationId, "acceptance", "Bearbeitungszeit halbieren", true, null);
+		final var completed = this.flow.recordAnswer(conversationId, "acceptance", "Bearbeitungszeit halbieren", true,
+				null);
 		assertTrue((boolean) completed.get("completed"));
 		assertEquals(7, completed.get("answeredSteps"));
 		assertTrue((boolean) this.flow.nextStep(conversationId).get("completed"));
