@@ -2,4 +2,5 @@
 /.vscode
 /data
 /target
+/requirements-mcp-server/target
 application.properties
