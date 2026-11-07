@@ -412,20 +412,53 @@ startBooking();
 		if (visual) {
 			visual.draw(t, reducedMotion.matches ? 'idle' : state, reducedMotion.matches, audioLevel, audioPitch, audioBands);
 		} else if (ctx) {
-			const w = canvas.width, h = canvas.height, bars = 32;
+			const w = canvas.width, h = canvas.height;
 			ctx.clearRect(0, 0, w, h);
-			const target = reducedMotion.matches ? 0.15 : state === 'speaking' ? audioLevel : state === 'thinking' ? 0.25 : state === 'listening' ? 0.12 : 0.05;
+			const target = reducedMotion.matches ? 0 : state === 'speaking' ? audioLevel : 0;
 			level += (target - level) * (1 - Math.exp(-delta * 12));
-			const fallbackHue = 235 - Math.max(0, Math.min(1, (audioPitch - 85) / 335)) * 205;
-			ctx.fillStyle = `hsl(${fallbackHue} 95% 70%)`;
-			for (let i = 0; i < bars; i++) {
-				const wave = Math.sin((reducedMotion.matches ? 0 : t / 220) + i * 0.5) * 0.5 + 0.5;
-				const bh = Math.max(6, h * (0.15 + 0.85 * wave) * level * (1 - Math.abs(i - bars / 2) / bars));
-				const x = (i + 0.5) * (w / bars);
+			const radius = Math.min(w, h) * 0.39;
+			const time = reducedMotion.matches ? 0 : t / 1000;
+			const hue = 195 + Math.max(0, Math.min(1, (audioPitch - 85) / 335)) * 45;
+			ctx.save();
+			ctx.translate(w / 2, h / 2);
+			const glow = ctx.createRadialGradient(0, 0, radius * 0.1, 0, 0, radius * 1.24);
+			glow.addColorStop(0, `hsla(${hue}, 90%, 65%, ${0.22 + level * 0.15})`);
+			glow.addColorStop(0.65, `hsla(${hue}, 90%, 45%, 0.16)`);
+			glow.addColorStop(1, 'transparent');
+			ctx.fillStyle = glow;
+			ctx.beginPath();
+			ctx.arc(0, 0, radius * 1.24, 0, Math.PI * 2);
+			ctx.fill();
+			for (let ring = 0; ring < 3; ring++) {
 				ctx.beginPath();
-				ctx.roundRect(x - 8, (h - bh) / 2, 16, bh, 8);
-				ctx.fill();
+				ctx.strokeStyle = `hsla(${hue + ring * 7}, 90%, ${72 - ring * 8}%, ${0.65 - ring * 0.15})`;
+				ctx.lineWidth = ring === 0 ? 2 : 1;
+				ctx.setLineDash(ring === 1 ? [5, 6] : ring === 2 ? [36, 12] : []);
+				ctx.lineDashOffset = time * (ring === 1 ? -5 : 3);
+				ctx.arc(0, 0, radius * (0.65 + ring * 0.16), 0, Math.PI * 2);
+				ctx.stroke();
 			}
+			ctx.setLineDash([]);
+			for (let i = 0; i < 80; i++) {
+				const angle = i * Math.PI * 2 / 80;
+				const length = i % 5 === 0 ? 9 : 4;
+				ctx.strokeStyle = `hsla(${hue}, 95%, 80%, ${i % 5 === 0 ? 0.7 : 0.3})`;
+				ctx.beginPath();
+				ctx.moveTo(Math.cos(angle) * radius * 0.91, Math.sin(angle) * radius * 0.91);
+				ctx.lineTo(Math.cos(angle) * (radius * 0.91 + length), Math.sin(angle) * (radius * 0.91 + length));
+				ctx.stroke();
+			}
+			ctx.beginPath();
+			ctx.strokeStyle = `hsla(${hue}, 100%, 83%, 0.9)`;
+			ctx.lineWidth = 2;
+			for (let i = 0; i <= 160; i++) {
+				const x = (i / 160 * 2 - 1) * radius * 0.55;
+				const envelope = Math.sin(i / 160 * Math.PI);
+				const y = Math.sin(x * 0.095 - time * 3) * envelope * (3 + level * radius * 0.22);
+				if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+			}
+			ctx.stroke();
+			ctx.restore();
 		}
 		if (!reducedMotion.matches) frame = requestAnimationFrame(draw);
 	}
@@ -452,14 +485,14 @@ startBooking();
 			const renderer = new THREE.WebGLRenderer({ canvas: webglCanvas, alpha: true, antialias: true });
 			renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
 			const scene = new THREE.Scene();
-			const camera = new THREE.OrthographicCamera(-3, 3, 3, -3, 0.1, 100);
-			camera.position.z = 6;
+			const camera = new THREE.Camera();
 			const uniforms = {
 				time: { value: 0 },
 				voice: { value: 0 },
 				bands: { value: new THREE.Vector3() },
 				tone: { value: 0.3 },
-				mode: { value: 0 }
+				mode: { value: 0 },
+				resolution: { value: new THREE.Vector2(1, 1) }
 			};
 			const material = new THREE.ShaderMaterial({
 				uniforms,
@@ -469,44 +502,77 @@ startBooking();
 					varying vec2 point;
 					void main() {
 						point = uv * 2.0 - 1.0;
-						gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+						gl_Position = vec4(position, 1.0);
 					}
 				`,
 				fragmentShader: `
 					varying vec2 point;
 					uniform float time, voice, tone, mode;
 					uniform vec3 bands;
+					uniform vec2 resolution;
 
-					float noise(vec2 p) {
-						return sin(p.x) * sin(p.y);
+					float ring(float r, float radius, float width) {
+						return 1.0 - smoothstep(width, width + 0.006, abs(r - radius));
 					}
 
 					void main() {
-						float r = length(point);
-						float angle = atan(point.y, point.x);
-						float drift = time * 0.24;
-						float movement = 0.012 + voice * 0.075;
-						float edge = 0.48 + voice * 0.055
-							+ movement * (0.55 * sin(angle * 3.0 + drift)
-							+ 0.3 * sin(angle * 5.0 - drift * 1.3 + bands.y * 2.0)
-							+ 0.15 * sin(angle * 9.0 + drift + bands.z * 3.0));
-						float body = 1.0 - smoothstep(edge - 0.045, edge + 0.045, r);
-						float halo = exp(-max(r - edge, 0.0) * 9.0) * 0.22;
-						float rim = exp(-abs(r - edge) * 35.0) * (0.22 + voice * 0.3);
-						float flow = noise(point * 9.0 + vec2(drift, -drift * 0.7));
-						flow += 0.5 * noise(point.yx * 17.0 + vec2(-drift * 1.4, drift));
-						float veil = 0.5 + 0.5 * sin(r * 19.0 - drift * 2.0 + flow * 1.6 + bands.x * 2.0);
-						vec3 deep = mix(vec3(0.06, 0.19, 0.50), vec3(0.34, 0.12, 0.52), tone);
-						vec3 light = mix(vec3(0.23, 0.80, 0.95), vec3(1.0, 0.42, 0.69), tone);
-						vec3 color = deep * (0.45 + veil * 0.35) + light * (rim + body * (0.15 + veil * 0.2));
-						color += vec3(0.55, 0.85, 1.0) * exp(-r * 5.5) * (0.45 + voice * 0.7);
-						color += light * halo * (0.65 + mode * 0.2);
-						float alpha = clamp(body * 0.85 + halo + rim, 0.0, 1.0);
-						gl_FragColor = vec4(color, alpha);
+						vec2 p = point * resolution / min(resolution.x, resolution.y);
+						float r = length(p);
+						float angle = atan(p.y, p.x);
+						float pulse = clamp(voice, 0.0, 1.0);
+						vec3 cyan = mix(vec3(0.18, 0.78, 1.0), vec3(0.50, 0.60, 1.0), tone * 0.65);
+						vec3 violet = vec3(0.43, 0.30, 0.95);
+						vec3 color = vec3(0.0);
+						float alpha = 0.0;
+
+						float body = 1.0 - smoothstep(0.57, 0.61, r);
+						float glow = exp(-r * r * 5.5) * (1.0 - smoothstep(0.76, 0.98, r));
+						float flow = sin(p.x * 15.0 + sin(p.y * 9.0 + time * 0.35) * 2.0 - time * 0.55);
+						flow += sin(p.y * 17.0 - p.x * 5.0 + time * 0.4) * 0.5;
+						float shimmer = 0.5 + 0.5 * sin(r * 23.0 - time * 0.7 + flow + bands.x * 2.0);
+						color += mix(vec3(0.025, 0.09, 0.22), cyan * 0.38, shimmer * 0.5 + pulse * 0.25) * body;
+						color += cyan * glow * (0.25 + pulse * 0.25);
+						alpha += body * 0.7 + glow * 0.3;
+
+						float core = exp(-r * r * 28.0) * (0.30 + pulse * 0.5);
+						color += mix(cyan, vec3(0.83, 0.96, 1.0), 0.45) * core;
+						alpha += core * 0.3;
+
+						float rim = ring(r, 0.61, 0.004);
+						float inner = ring(r, 0.51, 0.002) * (0.4 + 0.6 * step(0.25, fract((angle + time * 0.06) * 3.82)));
+						float outer = ring(r, 0.76, 0.002) * (0.25 + 0.75 * step(0.35, fract((angle - time * 0.08) * 1.91)));
+						float ticks = (1.0 - smoothstep(0.006, 0.035, abs(r - 0.83)))
+							* step(0.91, fract((angle + 3.141593) * 12.73));
+						float markers = ring(r, 0.71, 0.006)
+							* step(0.87, fract((angle - time * 0.04) * 0.955));
+						float instruments = rim * 0.75 + inner * 0.45 + outer * 0.7 + ticks * 0.55 + markers * 0.7;
+						color += cyan * instruments * (0.8 + pulse * 0.35);
+						alpha += instruments * 0.7;
+
+						float waveMask = (1.0 - smoothstep(0.37, 0.49, abs(p.x))) * body;
+						float envelope = max(0.0, 1.0 - abs(p.x) / 0.49);
+						float wave = sin(p.x * 20.0 - time * 2.4) * (0.012 + pulse * 0.085 + bands.y * 0.025) * envelope;
+						float waveLine = (1.0 - smoothstep(0.003, 0.014, abs(p.y - wave))) * waveMask;
+						color += mix(cyan, vec3(0.92, 0.98, 1.0), 0.55) * waveLine;
+						alpha += waveLine * 0.8;
+
+						float span = resolution.x / min(resolution.x, resolution.y);
+						float side = smoothstep(0.93, 1.04, abs(p.x)) * (1.0 - smoothstep(span - 0.12, span - 0.02, abs(p.x)));
+						float rail = exp(-abs(p.y) * 170.0) * side;
+						float sideTicks = (1.0 - smoothstep(0.012, 0.04, abs(p.y)))
+							* step(0.94, fract(abs(p.x) * 14.0)) * side;
+						float meterHeight = (0.04 + 0.045 * (0.5 + 0.5 * sin(abs(p.x) * 13.0 - time * 0.7))
+							+ pulse * 0.12 + bands.y * 0.05) * side;
+						float meters = (1.0 - smoothstep(meterHeight, meterHeight + 0.008, abs(p.y)))
+							* step(0.87, fract(abs(p.x) * 11.0)) * side;
+						color += mix(cyan, violet, tone * 0.3) * (rail * 0.65 + sideTicks * 0.5 + meters * 0.5);
+						alpha += rail * 0.65 + sideTicks * 0.5 + meters * (0.45 + pulse * 0.2);
+						color += violet * glow * (mode * 0.12 + bands.z * 0.18);
+						gl_FragColor = vec4(clamp(color, 0.0, 1.0), clamp(alpha, 0.0, 1.0));
 					}
 				`
 			});
-			const geometry = new THREE.PlaneGeometry(4.6, 4.6);
+			const geometry = new THREE.PlaneGeometry(2, 2);
 			scene.add(new THREE.Mesh(geometry, material));
 
 			function resize() {
@@ -514,13 +580,7 @@ startBooking();
 				const height = webglCanvas.clientHeight;
 				if (!width || !height) return;
 				renderer.setSize(width, height, false);
-				const aspect = width / height;
-				const halfHeight = 2.45 / Math.min(aspect, 1);
-				camera.left = -halfHeight * aspect;
-				camera.right = halfHeight * aspect;
-				camera.top = halfHeight;
-				camera.bottom = -halfHeight;
-				camera.updateProjectionMatrix();
+				uniforms.resolution.value.set(width, height);
 				requestDraw();
 			}
 
@@ -536,10 +596,11 @@ startBooking();
 			};
 			canvas.hidden = true;
 			webglCanvas.hidden = false;
-			window.addEventListener('resize', resize);
+			const resizeObserver = new ResizeObserver(resize);
+			resizeObserver.observe(webglCanvas);
 			webglCanvas.addEventListener('webglcontextlost', () => {
 				console.warn('WebGL-Kontext verloren; die einfache Sprachvisualisierung wird verwendet.');
-				window.removeEventListener('resize', resize);
+				resizeObserver.disconnect();
 				visual = null;
 				webglCanvas.hidden = true;
 				canvas.hidden = false;

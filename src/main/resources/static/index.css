@@ -949,13 +949,12 @@ footer a {
 
 .voice canvas {
 	width: 100%;
-	max-width: 560px;
-	height: clamp(0px, 30vh, 430px);
-	height: clamp(0px, 30dvh, 430px);
+	max-width: 840px;
+	height: clamp(0px, 42vh, 480px);
+	height: clamp(0px, 42dvh, 480px);
 	min-height: 0;
 	display: block;
 	margin: 0 auto 16px;
-	filter: drop-shadow(0 0 16px rgba(49, 143, 255, .3));
 }
 
 .voice [hidden] {
