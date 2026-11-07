@@ -435,11 +435,33 @@
 			transition-delay: calc(.45s + var(--i) * .5s);
 		}
 
-		.spider-benefit:nth-of-type(odd) { grid-column: 1; --tx: calc(50% + 124px); }
-		.spider-benefit:nth-of-type(even) { grid-column: 3; --tx: calc(-50% - 124px); }
-		.spider-benefit:nth-of-type(1), .spider-benefit:nth-of-type(2) { grid-row: 1; --ty: calc(100% + 18px); }
-		.spider-benefit:nth-of-type(3), .spider-benefit:nth-of-type(4) { grid-row: 2; --ty: 0px; }
-		.spider-benefit:nth-of-type(5), .spider-benefit:nth-of-type(6) { grid-row: 3; --ty: calc(-100% - 18px); }
+		.spider-benefit:nth-of-type(odd) {
+			grid-column: 1;
+			--tx: calc(50% + 124px);
+		}
+
+		.spider-benefit:nth-of-type(even) {
+			grid-column: 3;
+			--tx: calc(-50% - 124px);
+		}
+
+		.spider-benefit:nth-of-type(1),
+		.spider-benefit:nth-of-type(2) {
+			grid-row: 1;
+			--ty: calc(100% + 18px);
+		}
+
+		.spider-benefit:nth-of-type(3),
+		.spider-benefit:nth-of-type(4) {
+			grid-row: 2;
+			--ty: 0px;
+		}
+
+		.spider-benefit:nth-of-type(5),
+		.spider-benefit:nth-of-type(6) {
+			grid-row: 3;
+			--ty: calc(-100% - 18px);
+		}
 
 		.spider-icon {
 			flex: 0 0 auto;
@@ -580,11 +602,15 @@
 				min-height: 62px;
 			}
 
-			.spider-lines { display: none; }
+			.spider-lines {
+				display: none;
+			}
 		}
 
 		@media (prefers-reduced-motion: reduce) {
-			.spider *, .spider-panel {
+
+			.spider *,
+			.spider-panel {
 				transition: none !important;
 			}
 		}
@@ -933,11 +959,11 @@
 			height: 72px;
 			border-radius: 50%;
 			border: 0;
-			background: rgba(255, 181, 0, 0.4);
+			background: rgba(184, 134, 11, .3);
 			color: #fff;
 			font-size: 28px;
 			cursor: pointer;
-			box-shadow: 0 0 24px rgba(255, 181, 0, 0.4);
+			box-shadow: 0 0 24px rgba(184, 134, 11, .3);
 			line-height: 0;
 		}
 
@@ -1010,7 +1036,8 @@
 				<path d="M8 5 19 12 8 19Z" />
 			</svg>
 		</button>
-		<p class="voice-text" id="voice-text" aria-live="polite" aria-label="Gesprächsverlauf" tabindex="0">Starte, sobald Du bereit bist.<br />Ich bin es... 😊</p>
+		<p class="voice-text" id="voice-text" aria-live="polite" aria-label="Gesprächsverlauf" tabindex="0">Gerne
+			erzähle ich Dir etwas über uns...</p>
 		<p class="voice-privacy">Der Chat wird zur Weiterentwicklung 7 Tage gespeichert. Audiodaten
 			werden nicht gespeichert. Trotz dass die KI bei uns in House läuft, teile keine vertraulichen Daten.
 		</p>
@@ -1028,9 +1055,11 @@
 						<span class="spider-title">IN HOUSE</span>
 						<span class="spider-action">Vorteile entdecken +</span>
 					</button>
-					<div id="spider-panel" class="spider-panel" aria-label="Vorteile von KI in House und Risiken der Cloud" role="region" inert>
+					<div id="spider-panel" class="spider-panel"
+						aria-label="Vorteile von KI in House und Risiken der Cloud" role="region" inert>
 						<div class="spider-panel-inner">
-							<svg class="spider-lines" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+							<svg class="spider-lines" viewBox="0 0 100 100" preserveAspectRatio="none"
+								aria-hidden="true">
 								<line pathLength="100" style="--i:0" x1="50" y1="50" x2="17" y2="17" />
 								<line pathLength="100" style="--i:1" x1="50" y1="50" x2="83" y2="17" />
 								<line pathLength="100" style="--i:2" x1="50" y1="50" x2="17" y2="50" />
@@ -1040,43 +1069,96 @@
 							</svg>
 							<ul class="spider-benefits">
 								<li class="spider-benefit" style="--i:0">
-									<button class="spider-benefit-toggle" type="button" aria-expanded="false" aria-controls="spider-detail-1"><span class="spider-icon" aria-hidden="true">🔒</span><span>Ihre Daten bleiben bei Ihnen</span></button>
-									<div id="spider-detail-1" class="spider-benefit-details" inert><div class="spider-benefit-details-inner"><div class="spider-benefit-copy">
-										<p>Ihre Dokumente und Kundendaten verlassen Ihr Haus nicht. Vertrauen, das Sie selbst bestimmen.</p>
-									</div></div></div>
+									<button class="spider-benefit-toggle" type="button" aria-expanded="false"
+										aria-controls="spider-detail-1"><span class="spider-icon"
+											aria-hidden="true">🔒</span><span>Ihre Daten bleiben bei
+											Ihnen</span></button>
+									<div id="spider-detail-1" class="spider-benefit-details" inert>
+										<div class="spider-benefit-details-inner">
+											<div class="spider-benefit-copy">
+												<p>Ihre Dokumente und Kundendaten verlassen Ihr Haus nicht. Vertrauen,
+													das Sie selbst bestimmen.</p>
+											</div>
+										</div>
+									</div>
 								</li>
 								<li class="spider-benefit" style="--i:1">
-									<button class="spider-benefit-toggle" type="button" aria-expanded="false" aria-controls="spider-detail-2"><span class="spider-icon" aria-hidden="true">💶</span><span>Planbare Kosten</span></button>
-									<div id="spider-detail-2" class="spider-benefit-details" inert><div class="spider-benefit-details-inner"><div class="spider-benefit-copy">
-										<p>Eine feste Investition statt überraschender Cloud-Rechnungen. Sie wissen von Anfang an, womit Sie rechnen können.</p>
-										<p><strong>Cloud-Risiko: Kosten können explodieren.</strong> Nutzungsabhängige Gebühren steigen mit jeder Anfrage und sind kaum planbar.</p>
-									</div></div></div>
+									<button class="spider-benefit-toggle" type="button" aria-expanded="false"
+										aria-controls="spider-detail-2"><span class="spider-icon"
+											aria-hidden="true">💶</span><span>Planbare Kosten</span></button>
+									<div id="spider-detail-2" class="spider-benefit-details" inert>
+										<div class="spider-benefit-details-inner">
+											<div class="spider-benefit-copy">
+												<p>Eine feste Investition statt überraschender Cloud-Rechnungen. Sie
+													wissen von Anfang an, womit Sie rechnen können.</p>
+												<p><strong>Cloud-Risiko: Kosten können explodieren.</strong>
+													Nutzungsabhängige Gebühren steigen mit jeder Anfrage und sind kaum
+													planbar.</p>
+											</div>
+										</div>
+									</div>
 								</li>
 								<li class="spider-benefit" style="--i:2">
-									<button class="spider-benefit-toggle" type="button" aria-expanded="false" aria-controls="spider-detail-3"><span class="spider-icon" aria-hidden="true">🛡️</span><span>Volle Datenkontrolle</span></button>
-									<div id="spider-detail-3" class="spider-benefit-details" inert><div class="spider-benefit-details-inner"><div class="spider-benefit-copy">
-										<p>Sie bestimmen, wer auf Ihre Daten zugreift und wo sie verarbeitet werden.</p>
-										<p><strong>Cloud-Risiko: Daten können ausgewertet werden.</strong> Ihre Anfragen und Dokumente liegen auf fremden Servern, außerhalb Ihrer Kontrolle.</p>
-									</div></div></div>
+									<button class="spider-benefit-toggle" type="button" aria-expanded="false"
+										aria-controls="spider-detail-3"><span class="spider-icon"
+											aria-hidden="true">🛡️</span><span>Volle Datenkontrolle</span></button>
+									<div id="spider-detail-3" class="spider-benefit-details" inert>
+										<div class="spider-benefit-details-inner">
+											<div class="spider-benefit-copy">
+												<p>Sie bestimmen, wer auf Ihre Daten zugreift und wo sie verarbeitet
+													werden.</p>
+												<p><strong>Cloud-Risiko: Daten können ausgewertet werden.</strong> Ihre
+													Anfragen und Dokumente liegen auf fremden Servern, außerhalb Ihrer
+													Kontrolle.</p>
+											</div>
+										</div>
+									</div>
 								</li>
 								<li class="spider-benefit" style="--i:3">
-									<button class="spider-benefit-toggle" type="button" aria-expanded="false" aria-controls="spider-detail-4"><span class="spider-icon" aria-hidden="true">🔓</span><span>Unabhängig von Cloud-Anbietern</span></button>
-									<div id="spider-detail-4" class="spider-benefit-details" inert><div class="spider-benefit-details-inner"><div class="spider-benefit-copy">
-										<p>Offene Modelle und flexible Bausteine helfen, unabhängig von einzelnen Anbietern zu bleiben.</p>
-										<p><strong>Cloud-Risiko: Abhängigkeit von Anbietern.</strong> Dienste können aus politischen Gründen eingestellt oder verteuert werden.</p>
-									</div></div></div>
+									<button class="spider-benefit-toggle" type="button" aria-expanded="false"
+										aria-controls="spider-detail-4"><span class="spider-icon"
+											aria-hidden="true">🔓</span><span>Unabhängig von
+											Cloud-Anbietern</span></button>
+									<div id="spider-detail-4" class="spider-benefit-details" inert>
+										<div class="spider-benefit-details-inner">
+											<div class="spider-benefit-copy">
+												<p>Offene Modelle und flexible Bausteine helfen, unabhängig von
+													einzelnen Anbietern zu bleiben.</p>
+												<p><strong>Cloud-Risiko: Abhängigkeit von Anbietern.</strong> Dienste
+													können aus politischen Gründen eingestellt oder verteuert werden.
+												</p>
+											</div>
+										</div>
+									</div>
 								</li>
 								<li class="spider-benefit" style="--i:4">
-									<button class="spider-benefit-toggle" type="button" aria-expanded="false" aria-controls="spider-detail-5"><span class="spider-icon" aria-hidden="true">🧩</span><span>Auf Ihre Abläufe zugeschnitten</span></button>
-									<div id="spider-detail-5" class="spider-benefit-details" inert><div class="spider-benefit-details-inner"><div class="spider-benefit-copy">
-										<p>Die Lösung wird an Ihre Prozesse angepasst. Offene Modelle und flexible Bausteine: Neue Entwicklungen lassen sich einfach integrieren.</p>
-									</div></div></div>
+									<button class="spider-benefit-toggle" type="button" aria-expanded="false"
+										aria-controls="spider-detail-5"><span class="spider-icon"
+											aria-hidden="true">🧩</span><span>Auf Ihre Abläufe
+											zugeschnitten</span></button>
+									<div id="spider-detail-5" class="spider-benefit-details" inert>
+										<div class="spider-benefit-details-inner">
+											<div class="spider-benefit-copy">
+												<p>Die Lösung wird an Ihre Prozesse angepasst. Offene Modelle und
+													flexible Bausteine: Neue Entwicklungen lassen sich einfach
+													integrieren.</p>
+											</div>
+										</div>
+									</div>
 								</li>
 								<li class="spider-benefit" style="--i:5">
-									<button class="spider-benefit-toggle" type="button" aria-expanded="false" aria-controls="spider-detail-6"><span class="spider-icon" aria-hidden="true">⚡</span><span>Schnell und jederzeit verfügbar</span></button>
-									<div id="spider-detail-6" class="spider-benefit-details" inert><div class="spider-benefit-details-inner"><div class="spider-benefit-copy">
-										<p>Ihre KI läuft in Ihrer eigenen Infrastruktur und ist nicht von der Verfügbarkeit externer Cloud-Dienste abhängig.</p>
-									</div></div></div>
+									<button class="spider-benefit-toggle" type="button" aria-expanded="false"
+										aria-controls="spider-detail-6"><span class="spider-icon"
+											aria-hidden="true">⚡</span><span>Schnell und jederzeit
+											verfügbar</span></button>
+									<div id="spider-detail-6" class="spider-benefit-details" inert>
+										<div class="spider-benefit-details-inner">
+											<div class="spider-benefit-copy">
+												<p>Ihre KI läuft in Ihrer eigenen Infrastruktur und ist nicht von der
+													Verfügbarkeit externer Cloud-Dienste abhängig.</p>
+											</div>
+										</div>
+									</div>
 								</li>
 							</ul>
 						</div>
