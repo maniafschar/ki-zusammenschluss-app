@@ -30,8 +30,8 @@ public class SecurityConfig {
 		csrfRequestHandler.setCsrfRequestAttributeName(null);
 
 		http.authorizeHttpRequests(auth -> auth
-				.requestMatchers("/", "/index.html", "/api/leistungen", "/api/produkte", "/api/experten",
-						"/api/csrf", "/api/ki/chat", "/api/ki/chat/stream", "/api/ki/audio/transcriptions",
+				.requestMatchers("/", "/index.html", "/index.css", "/index.js", "/api/leistungen", "/api/produkte",
+						"/api/experten", "/api/csrf", "/api/ki/chat", "/api/ki/chat/stream", "/api/ki/audio/transcriptions",
 						"/api/ki/audio/speech", "/api/termine", "/api/termine/bestaetigen", "/api/r/*", "/error")
 				.permitAll()
 				.requestMatchers(HttpMethod.GET, "/api/admin/termine", "/api/admin/interessenten",

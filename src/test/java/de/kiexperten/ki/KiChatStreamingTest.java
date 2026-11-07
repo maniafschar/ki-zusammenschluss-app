@@ -149,6 +149,27 @@ class KiChatStreamingTest {
 	}
 
 	@Test
+	void servesPublicPageAssetsWithoutAuthentication() throws Exception {
+		final HttpClient client = HttpClient.newHttpClient();
+		for (final String path : new String[] { "/", "/index.html", "/index.css", "/index.js" }) {
+			final var response = client.send(HttpRequest.newBuilder(
+					URI.create("http://127.0.0.1:" + this.port + path)).GET().build(),
+					HttpResponse.BodyHandlers.ofString());
+			assertEquals(200, response.statusCode(), path);
+			if (path.equals("/") || path.equals("/index.html")) {
+				assertTrue(response.body().contains("href=\"index.css\""), path);
+				assertTrue(response.body().contains("src=\"index.js\""), path);
+			} else if (path.endsWith(".css")) {
+				assertTrue(response.headers().firstValue("Content-Type").orElse("").startsWith("text/css"));
+				assertTrue(response.body().contains(".spider-benefit"));
+			} else {
+				assertTrue(response.headers().firstValue("Content-Type").orElse("").contains("javascript"));
+				assertTrue(response.body().contains("spiderToggle"));
+			}
+		}
+	}
+
+	@Test
 	void streamsBeforeCompletionAndHidesSplitThinkTags() throws Exception {
 		continueStream = new CountDownLatch(1);
 		try {
