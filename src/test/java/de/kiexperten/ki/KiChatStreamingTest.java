@@ -78,6 +78,28 @@ class KiChatStreamingTest {
 					throw new IllegalStateException(e);
 				}
 			});
+			upstream.createContext("/audio/transcriptions", exchange -> {
+				final String request = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
+				if (!request.contains("name=\"file\"") || !request.contains("sample-audio")) {
+					exchange.sendResponseHeaders(400, -1);
+					exchange.close();
+					return;
+				}
+				final byte[] body = "{\"text\":\"Erkannter Satz\"}".getBytes(StandardCharsets.UTF_8);
+				exchange.sendResponseHeaders(200, body.length);
+				try (var out = exchange.getResponseBody()) {
+					out.write(body);
+				}
+			});
+			upstream.createContext("/audio/speech", exchange -> {
+				exchange.getRequestBody().readAllBytes();
+				final byte[] body = { 'I', 'D', '3', 1, 2, 3 };
+				exchange.getResponseHeaders().set("Content-Type", "audio/mpeg");
+				exchange.sendResponseHeaders(200, body.length);
+				try (var out = exchange.getResponseBody()) {
+					out.write(body);
+				}
+			});
 			upstream.start();
 		} catch (final Exception e) {
 			throw new ExceptionInInitializerError(e);
@@ -212,6 +234,33 @@ class KiChatStreamingTest {
 				.orElseThrow();
 		assertEquals("Antwort.", entry.getAntwort());
 		assertEquals("ABGESCHLOSSEN", entry.getStatus());
+	}
+
+	@Test
+	void proxiesTranscriptionAndSpeechAudio() throws Exception {
+		final String auth = Base64.getEncoder()
+				.encodeToString("admin:local-test-password".getBytes(StandardCharsets.UTF_8));
+		final String boundary = "----voice-test-boundary";
+		final String multipart = "--" + boundary + "\r\n"
+				+ "Content-Disposition: form-data; name=\"audio\"; filename=\"sample.webm\"\r\n"
+				+ "Content-Type: audio/webm\r\n\r\nsample-audio\r\n--" + boundary + "--\r\n";
+		final var transcription = HttpClient.newHttpClient().send(HttpRequest.newBuilder(
+				URI.create("http://127.0.0.1:" + this.port + "/api/ki/audio/transcriptions"))
+				.header("Authorization", "Basic " + auth).header("X-API-Client", "test")
+				.header("Content-Type", "multipart/form-data; boundary=" + boundary)
+				.POST(HttpRequest.BodyPublishers.ofString(multipart)).build(), HttpResponse.BodyHandlers.ofString());
+		assertEquals(200, transcription.statusCode());
+		assertEquals("{\"text\":\"Erkannter Satz\"}", transcription.body());
+
+		final var speech = HttpClient.newHttpClient().send(HttpRequest.newBuilder(
+				URI.create("http://127.0.0.1:" + this.port + "/api/ki/audio/speech"))
+				.header("Authorization", "Basic " + auth).header("X-API-Client", "test")
+				.header("Content-Type", "application/json")
+				.POST(HttpRequest.BodyPublishers.ofString("{\"input\":\"Hallo\"}")).build(),
+				HttpResponse.BodyHandlers.ofByteArray());
+		assertEquals(200, speech.statusCode());
+		assertEquals("audio/mpeg", speech.headers().firstValue("Content-Type").orElseThrow());
+		assertEquals("ID3", new String(speech.body(), 0, 3, StandardCharsets.UTF_8));
 	}
 
 	@Test

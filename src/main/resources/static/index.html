@@ -959,11 +959,11 @@
 			height: 72px;
 			border-radius: 50%;
 			border: 0;
-			background: rgba(184, 134, 11, .3);
+			background: rgba(255, 255, 255, .2);
 			color: #fff;
 			font-size: 28px;
 			cursor: pointer;
-			box-shadow: 0 0 24px rgba(184, 134, 11, .3);
+			box-shadow: 0 0 24px rgba(255, 255, 255, .2);
 			line-height: 0;
 		}
 
@@ -1038,8 +1038,8 @@
 		</button>
 		<p class="voice-text" id="voice-text" aria-live="polite" aria-label="Gesprächsverlauf" tabindex="0">Gerne
 			erzähle ich Dir etwas über uns...</p>
-		<p class="voice-privacy">Der Chat wird zur Weiterentwicklung 7 Tage gespeichert. Audiodaten
-			werden nicht gespeichert. Trotz dass die KI bei uns in House läuft, teile keine vertraulichen Daten.
+		<p class="voice-privacy">Der Chat wird zur Weiterentwicklung 7 Tage gespeichert. Audiodaten werden zur
+			Transkription an unser KI-System übertragen, aber nicht gespeichert. Teile keine vertraulichen Daten.
 		</p>
 	</section>
 
@@ -1574,18 +1574,16 @@
 			const canvas = document.getElementById('voice-canvas');
 			const webglCanvas = document.getElementById('voice-webgl');
 			const ctx = canvas.getContext('2d');
-			const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-			const synth = window.speechSynthesis;
+			const canRecord = Boolean(window.MediaRecorder && navigator.mediaDevices?.getUserMedia);
 			const welcome = 'Willkommen beim KI Experten Team! Wir sind ein unabhängiges Team von top Spezialisten, jeder auf seinem Gebiet. Uns alle vereint die Art, wie wir denken das KI in Unternehmen den größten Profit erbringt. Du kannst mir gerne Fragen stellen oder einfach sagen, dass ich Dir mehr über uns erzählen soll...';
-			if (!SR || !synth) {
+			if (!canRecord) {
 				mic.disabled = true;
-				mic.title = !SR ? 'Ihr Browser unterstützt keine Spracheingabe'
-					: 'Ihr Browser unterstützt keine Sprachausgabe';
+				mic.title = 'Audioaufnahme wird von diesem Browser nicht unterstützt';
 			}
 			const history = [];
 			let gespraechId = null;
 			let state = 'idle'; // idle | listening | thinking | speaking
-			let speechGeneration = 0;
+			let recorder = null;
 			let level = 0;
 			let visual = null;
 			let visible = true;
@@ -1803,32 +1801,45 @@
 					console.warn('Three.js-Animation nicht verfügbar; die einfache Sprachvisualisierung wird verwendet.', err);
 				});
 
-			function speak(reply) {
-				if (!synth) return false;
-				const generation = ++speechGeneration;
-				const u = new SpeechSynthesisUtterance(reply);
-				u.lang = 'de-DE';
-				u.onstart = () => { if (generation === speechGeneration) state = 'speaking'; };
-				u.onend = u.onerror = () => {
-					if (generation !== speechGeneration) return;
-					state = 'idle';
-					mic.disabled = !SR;
-				};
-				synth.cancel();
-				synth.speak(u);
-				return true;
+			async function csrfToken() {
+				await fetch('/ai-expert/api/csrf', { credentials: 'same-origin' });
+				return decodeURIComponent((document.cookie.match(/(?:^|; )XSRF-TOKEN=([^;]*)/) || [])[1] || '');
 			}
 
-			function playWelcome() {
-				if (!synth) {
-					start.hidden = true;
-					text.textContent = 'Ihr Browser unterstützt keine Sprachausgabe. ' + welcome;
-					return;
+			async function speak(reply) {
+				const token = await csrfToken();
+				const res = await fetch('/ai-expert/api/ki/audio/speech', {
+					method: 'POST',
+					credentials: 'same-origin',
+					headers: { 'Content-Type': 'application/json', 'X-XSRF-TOKEN': token },
+					body: JSON.stringify({ input: reply })
+				});
+				if (!res.ok) throw new Error(res.status);
+				const audioUrl = URL.createObjectURL(await res.blob());
+				const player = new Audio(audioUrl);
+				state = 'speaking';
+				try {
+					const finished = new Promise((resolve, reject) => {
+						player.addEventListener('ended', resolve, { once: true });
+						player.addEventListener('error', () => reject(new Error('Audio playback failed')), { once: true });
+					});
+					await player.play();
+					await finished;
+				} finally {
+					URL.revokeObjectURL(audioUrl);
 				}
+			}
+
+			async function playWelcome() {
 				text.textContent = welcome;
 				start.hidden = true;
-				document.getElementById('voice-mic').hidden = false;
-				speak(welcome);
+				mic.hidden = false;
+				try {
+					await speak(welcome);
+				} catch (e) {
+					text.textContent = welcome + ' Sprachausgabe ist derzeit nicht verfügbar.';
+					state = 'idle';
+				}
 			}
 
 			start.addEventListener('click', playWelcome, { once: true });
@@ -1839,72 +1850,20 @@
 				text.innerHTML = '<b>Sie:</b> ' + esc(question) + '<br>Die KI denkt nach …';
 				history.push({ role: 'user', content: question });
 				let reply = '';
-				let unsaid = '';
-				let streaming = true;
-				let speaking = false;
-				let speechFailed = false;
-				const queue = [];
-				let active = true;
 
 				function renderReply() {
 					const follow = text.scrollHeight - text.scrollTop - text.clientHeight <= 2;
-					text.innerHTML = '<b>Sie:</b> ' + esc(question) + '<br><b>KI:</b> ' + esc(reply)
-						+ (speechFailed ? '<br>Die Sprachausgabe ist fehlgeschlagen.' : '');
+					text.innerHTML = '<b>Sie:</b> ' + esc(question) + '<br><b>KI:</b> ' + esc(reply);
 					if (follow) text.scrollTop = text.scrollHeight;
-				}
-
-				function speakNext() {
-					if (!active || speaking || !queue.length) {
-						if (active && !streaming && !speaking && !queue.length) {
-							state = 'idle';
-							mic.disabled = !SR;
-						}
-						return;
-					}
-					speaking = true;
-					const utterance = new SpeechSynthesisUtterance(queue.shift());
-					utterance.lang = 'de-DE';
-					utterance.onstart = () => { if (active) state = 'speaking'; };
-					utterance.onend = () => {
-						if (!active) return;
-						speaking = false;
-						if (streaming && !queue.length) state = 'thinking';
-						speakNext();
-					};
-					utterance.onerror = (event) => {
-						if (!active) return;
-						console.error('Sprachausgabe fehlgeschlagen:', event.error);
-						speaking = false;
-						speechFailed = true;
-						queue.length = 0;
-						renderReply();
-						speakNext();
-					};
-					synth.speak(utterance);
 				}
 
 				function addText(chunk) {
 					reply += chunk;
-					unsaid += chunk;
 					renderReply();
-					if (speechFailed) return;
-					const sentences = unsaid.match(/^([\s\S]*?[.!?]+(?:["»”]?(?:\s+|$)))/);
-					if (sentences) {
-						queue.push(sentences[1].trim());
-						unsaid = unsaid.slice(sentences[1].length);
-						while (true) {
-							const next = unsaid.match(/^([\s\S]*?[.!?]+(?:["»”]?(?:\s+|$)))/);
-							if (!next) break;
-							queue.push(next[1].trim());
-							unsaid = unsaid.slice(next[1].length);
-						}
-						speakNext();
-					}
 				}
 
 				try {
-					await fetch('/ai-expert/api/csrf', { credentials: 'same-origin' });
-					const token = decodeURIComponent((document.cookie.match(/(?:^|; )XSRF-TOKEN=([^;]*)/) || [])[1] || '');
+					const token = await csrfToken();
 					const res = await fetch('/ai-expert/api/ki/chat/stream', {
 						method: 'POST',
 						credentials: 'same-origin',
@@ -1944,41 +1903,83 @@
 					}
 					if (!reply.trim()) throw new Error('Die KI hat keine Antwort geliefert.');
 					history.push({ role: 'assistant', content: reply.trim() });
-					streaming = false;
-					if (!speechFailed && unsaid.trim()) queue.push(unsaid.trim());
-					speakNext();
+					try {
+						await speak(reply.trim());
+					} catch (e) {
+						text.innerHTML += '<br>Die Sprachausgabe ist fehlgeschlagen.';
+					}
+					state = 'idle';
+					mic.disabled = !canRecord;
 				} catch (e) {
-					active = false;
-					synth.cancel();
 					history.pop();
 					state = 'idle';
-					mic.disabled = !SR;
+					mic.disabled = !canRecord;
 					console.error('KI-Antwort fehlgeschlagen:', e);
 					const message = e.message === '429' ? 'Bitte einen Moment warten und erneut versuchen.' : 'Die KI-Antwort konnte nicht vollständig geladen werden.';
 					text.innerHTML = '<b>Sie:</b> ' + esc(question) + (reply ? '<br><b>KI:</b> ' + esc(reply) : '') + '<br>' + esc(message);
 				}
 			}
 
-			mic.addEventListener('click', () => {
-				if (!SR || !synth) return;
-				speechGeneration++;
-				synth.cancel();
-				state = 'idle';
-				const rec = new SR();
-				rec.lang = 'de-DE';
-				rec.interimResults = true;
-				let finalText = '';
-				rec.onstart = () => { state = 'listening'; mic.classList.add('rec'); text.textContent = 'Ich höre zu …'; };
-				rec.onresult = (e) => {
-					finalText = Array.from(e.results).map((r) => r[0].transcript).join(' ');
-					text.innerHTML = '<b>Sie:</b> ' + esc(finalText);
-				};
-				rec.onerror = () => { state = 'idle'; text.textContent = 'Spracheingabe nicht möglich (Mikrofon erlaubt?).'; };
-				rec.onend = () => {
-					mic.classList.remove('rec');
-					if (finalText.trim()) ask(finalText.trim()); else if (state === 'listening') state = 'idle';
-				};
-				rec.start();
+			mic.addEventListener('click', async () => {
+				if (!canRecord) return;
+				if (recorder?.state === 'recording') {
+					recorder.stop();
+					return;
+				}
+				try {
+					const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+					const mimeType = ['audio/webm;codecs=opus', 'audio/mp4', 'audio/ogg;codecs=opus']
+						.find((type) => MediaRecorder.isTypeSupported(type));
+					const currentRecorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
+					const chunks = [];
+					recorder = currentRecorder;
+					currentRecorder.ondataavailable = (event) => { if (event.data.size) chunks.push(event.data); };
+					currentRecorder.onstop = async () => {
+						stream.getTracks().forEach((track) => track.stop());
+						mic.classList.remove('rec');
+						mic.setAttribute('aria-label', 'Sprechen');
+						mic.title = 'Frage aufnehmen';
+						recorder = null;
+						const audio = new Blob(chunks, { type: currentRecorder.mimeType || 'audio/webm' });
+						if (!audio.size) {
+							state = 'idle';
+							text.textContent = 'Keine Sprache aufgenommen.';
+							return;
+						}
+						state = 'thinking';
+						mic.disabled = true;
+						text.textContent = 'Sprache wird erkannt …';
+						try {
+							const token = await csrfToken();
+							const form = new FormData();
+							const extension = audio.type.includes('mp4') ? 'mp4' : audio.type.includes('ogg') ? 'ogg' : 'webm';
+							form.append('audio', audio, 'recording.' + extension);
+							const res = await fetch('/ai-expert/api/ki/audio/transcriptions', {
+								method: 'POST', credentials: 'same-origin',
+								headers: { 'X-XSRF-TOKEN': token }, body: form
+							});
+							if (!res.ok) throw new Error(res.status);
+							const transcription = await res.json();
+							if (!transcription.text?.trim()) throw new Error('Keine Sprache erkannt');
+							await ask(transcription.text.trim());
+						} catch (e) {
+							state = 'idle';
+							mic.disabled = !canRecord;
+							text.textContent = 'Sprache konnte nicht erkannt werden. Bitte erneut versuchen.';
+							console.error('Transkription fehlgeschlagen:', e);
+						}
+					};
+					currentRecorder.start();
+					state = 'listening';
+					mic.classList.add('rec');
+					mic.setAttribute('aria-label', 'Aufnahme beenden');
+					mic.title = 'Aufnahme beenden';
+					text.textContent = 'Ich höre zu. Drücken Sie erneut, um die Aufnahme zu beenden.';
+				} catch (e) {
+					state = 'idle';
+					text.textContent = 'Mikrofonzugriff nicht möglich.';
+					console.error('Mikrofonzugriff fehlgeschlagen:', e);
+				}
 			});
 
 		})();

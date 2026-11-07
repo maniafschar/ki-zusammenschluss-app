@@ -1,6 +1,7 @@
 package de.kiexperten.ki;
 
 import java.io.BufferedReader;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -21,15 +22,18 @@ import javax.net.ssl.SSLContext;
 import javax.net.ssl.TrustManager;
 import javax.net.ssl.X509TrustManager;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody;
 
@@ -57,21 +61,39 @@ public class KiChatController {
 	private final HttpClient client;
 	private final String baseUrl;
 	private final String completionsPath;
+	private final String transcriptionsPath;
+	private final String speechPath;
 	private final String apiKey;
 	private final String model;
+	private final String transcriptionModel;
+	private final String speechModel;
+	private final String speechVoice;
+	private final String speechFormat;
 	private final ChatProtokollService protokolle;
 
 	public KiChatController(
 			final ChatProtokollService protokolle,
 			@Value("${app.ki.base-url:https://100.65.185.69/v1}") final String baseUrl,
 			@Value("${app.ki.completions-path:/chat/completions}") final String completionsPath,
+			@Value("${app.ki.transcriptions-path:/audio/transcriptions}") final String transcriptionsPath,
+			@Value("${app.ki.speech-path:/audio/speech}") final String speechPath,
 			@Value("${app.ki.api-key:}") final String apiKey,
 			@Value("${app.ki.model:swift-1.5-qwen3.8-27b}") final String model,
+			@Value("${app.ki.transcription-model:${app.ki.model:swift-1.5-qwen3.8-27b}}") final String transcriptionModel,
+			@Value("${app.ki.speech-model:${app.ki.model:swift-1.5-qwen3.8-27b}}") final String speechModel,
+			@Value("${app.ki.speech-voice:alloy}") final String speechVoice,
+			@Value("${app.ki.speech-format:mp3}") final String speechFormat,
 			@Value("${app.ki.trust-all-tls:false}") final boolean trustAll) throws Exception {
 		this.baseUrl = baseUrl;
 		this.completionsPath = completionsPath;
+		this.transcriptionsPath = transcriptionsPath;
+		this.speechPath = speechPath;
 		this.apiKey = apiKey;
 		this.model = model;
+		this.transcriptionModel = transcriptionModel;
+		this.speechModel = speechModel;
+		this.speechVoice = speechVoice;
+		this.speechFormat = speechFormat;
 		this.protokolle = protokolle;
 		final HttpClient.Builder builder = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10));
 		if (trustAll) {
@@ -98,10 +120,101 @@ public class KiChatController {
 	public record ChatMessage(@NotBlank @Size(max = 20) String role, @NotBlank @Size(max = 2000) String content) {
 	}
 
-	public record ChatRequest(@NotNull @Size(min = 1, max = 20) List<@NotNull @Valid ChatMessage> messages, UUID gespraechId) {
+	public record ChatRequest(@NotNull @Size(min = 1, max = 20) List<@NotNull @Valid ChatMessage> messages,
+			UUID gespraechId) {
 	}
 
 	public record ChatResponse(String reply) {
+	}
+
+	public record TranscriptionResponse(String text) {
+	}
+
+	public record SpeechRequest(@NotBlank @Size(max = 6000) String input) {
+	}
+
+	@PostMapping(value = "/api/ki/audio/transcriptions", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+	public TranscriptionResponse transcribe(@RequestPart("audio") final MultipartFile audio,
+			final HttpServletRequest http) throws IOException, InterruptedException {
+		if (apiKey.isBlank())
+			throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE);
+		limit(http.getRemoteAddr());
+		if (audio.isEmpty() || audio.getSize() > 20L * 1024 * 1024)
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST);
+		final String boundary = "----KiAudio" + UUID.randomUUID().toString().replace("-", "");
+		final byte[] payload = transcriptionPayload(audio, boundary);
+		final HttpRequest request = HttpRequest.newBuilder(URI.create(baseUrl + transcriptionsPath))
+				.timeout(Duration.ofSeconds(120))
+				.header("Authorization", "Bearer " + apiKey)
+				.header("Content-Type", "multipart/form-data; boundary=" + boundary)
+				.POST(HttpRequest.BodyPublishers.ofByteArray(payload)).build();
+		final HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
+		if (response.statusCode() != 200) {
+			log.warn("KI-Transkription antwortete mit HTTP {}", response.statusCode());
+			throw new ResponseStatusException(HttpStatus.BAD_GATEWAY);
+		}
+		final JsonNode text = mapper.readTree(response.body()).get("text");
+		if (text == null || !text.isTextual() || text.asText().isBlank())
+			throw new ResponseStatusException(HttpStatus.BAD_GATEWAY);
+		return new TranscriptionResponse(text.asText().trim());
+	}
+
+	@PostMapping(value = "/api/ki/audio/speech", produces = { "audio/mpeg", "audio/wav", "audio/ogg" })
+	public ResponseEntity<byte[]> synthesize(@RequestBody @Valid final SpeechRequest request,
+			final HttpServletRequest http) throws IOException, InterruptedException {
+		if (apiKey.isBlank())
+			throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE);
+		limit(http.getRemoteAddr());
+		final var body = mapper.createObjectNode();
+		body.put("model", speechModel);
+		body.put("input", request.input());
+		body.put("voice", speechVoice);
+		body.put("response_format", speechFormat);
+		final HttpRequest upstream = HttpRequest.newBuilder(URI.create(baseUrl + speechPath))
+				.timeout(Duration.ofSeconds(120))
+				.header("Authorization", "Bearer " + apiKey)
+				.header("Content-Type", MediaType.APPLICATION_JSON_VALUE)
+				.POST(HttpRequest.BodyPublishers.ofString(mapper.writeValueAsString(body))).build();
+		final HttpResponse<byte[]> response = client.send(upstream, HttpResponse.BodyHandlers.ofByteArray());
+		if (response.statusCode() != 200 || response.body().length == 0) {
+			log.warn("KI-Sprachausgabe antwortete mit HTTP {}", response.statusCode());
+			throw new ResponseStatusException(HttpStatus.BAD_GATEWAY);
+		}
+		return ResponseEntity.ok().contentType(speechMediaType()).header(HttpHeaders.CACHE_CONTROL, "no-store")
+				.body(response.body());
+	}
+
+	private byte[] transcriptionPayload(final MultipartFile audio, final String boundary) throws IOException {
+		final ByteArrayOutputStream payload = new ByteArrayOutputStream();
+		final String filename = audio.getOriginalFilename() == null ? "recording.webm"
+				: audio.getOriginalFilename().replaceAll("[^A-Za-z0-9._-]", "_");
+		final String contentType = audio.getContentType() == null ? "application/octet-stream" : audio.getContentType();
+		writePart(payload, boundary, "file", filename, contentType, audio.getBytes());
+		writePart(payload, boundary, "model", null, null, transcriptionModel.getBytes(StandardCharsets.UTF_8));
+		writePart(payload, boundary, "language", null, null, "de".getBytes(StandardCharsets.UTF_8));
+		writePart(payload, boundary, "response_format", null, null, "json".getBytes(StandardCharsets.UTF_8));
+		payload.write(("--" + boundary + "--\r\n").getBytes(StandardCharsets.UTF_8));
+		return payload.toByteArray();
+	}
+
+	private void writePart(final ByteArrayOutputStream payload, final String boundary, final String name,
+			final String filename, final String contentType, final byte[] value) throws IOException {
+		payload.write(("--" + boundary + "\r\nContent-Disposition: form-data; name=\"" + name + "\"")
+				.getBytes(StandardCharsets.UTF_8));
+		if (filename != null)
+			payload.write(("; filename=\"" + filename + "\"\r\nContent-Type: " + contentType)
+					.getBytes(StandardCharsets.UTF_8));
+		payload.write("\r\n\r\n".getBytes(StandardCharsets.UTF_8));
+		payload.write(value);
+		payload.write("\r\n".getBytes(StandardCharsets.UTF_8));
+	}
+
+	private MediaType speechMediaType() {
+		return switch (speechFormat.toLowerCase()) {
+			case "wav" -> MediaType.parseMediaType("audio/wav");
+			case "opus", "ogg" -> MediaType.parseMediaType("audio/ogg");
+			default -> MediaType.parseMediaType("audio/mpeg");
+		};
 	}
 
 	@PostMapping("/api/ki/chat")
@@ -111,9 +224,11 @@ public class KiChatController {
 		final ChatProtokoll protokoll = protokolle.beginne(request);
 		try {
 			final HttpResponse<String> res = client.send(upstreamRequest(body), HttpResponse.BodyHandlers.ofString());
-			if (res.statusCode() != 200) throw new ResponseStatusException(HttpStatus.BAD_GATEWAY);
+			if (res.statusCode() != 200)
+				throw new ResponseStatusException(HttpStatus.BAD_GATEWAY);
 			final JsonNode content = mapper.readTree(res.body()).at("/choices/0/message/content");
-			if (content.isMissingNode() || content.isNull()) throw new ResponseStatusException(HttpStatus.BAD_GATEWAY);
+			if (content.isMissingNode() || content.isNull())
+				throw new ResponseStatusException(HttpStatus.BAD_GATEWAY);
 			final String reply = content.asText().replaceAll("(?s)<think>.*?</think>", "").trim();
 			protokolle.abschliessen(protokoll, reply, "ABGESCHLOSSEN");
 			return new ChatResponse(reply);
@@ -201,7 +316,8 @@ public class KiChatController {
 			String line;
 			while ((line = reader.readLine()) != null) {
 				if (line.isEmpty()) {
-					if (data.isEmpty()) continue;
+					if (data.isEmpty())
+						continue;
 					final String payload = data.toString();
 					data.setLength(0);
 					if ("[DONE]".equals(payload)) {
@@ -209,7 +325,8 @@ public class KiChatController {
 						break;
 					}
 					final JsonNode chunk = mapper.readTree(payload);
-					if (chunk.hasNonNull("error")) throw new IOException("KI-Stream meldet einen Fehler");
+					if (chunk.hasNonNull("error"))
+						throw new IOException("KI-Stream meldet einen Fehler");
 					final JsonNode content = chunk.at("/choices/0/delta/content");
 					if (content.isTextual()) {
 						final String visible = filter.accept(content.asText());
@@ -219,11 +336,13 @@ public class KiChatController {
 						}
 					}
 				} else if (line.startsWith("data:")) {
-					if (!data.isEmpty()) data.append('\n');
+					if (!data.isEmpty())
+						data.append('\n');
 					data.append(line.substring(5).stripLeading());
 				}
 			}
-			if (!done) throw new IOException("KI-Stream wurde vorzeitig beendet");
+			if (!done)
+				throw new IOException("KI-Stream wurde vorzeitig beendet");
 			final String rest = filter.finish();
 			if (!rest.isEmpty()) {
 				sendEvent(output, "delta", rest);
@@ -253,15 +372,18 @@ public class KiChatController {
 				final String tag = thinking ? "</think>" : "<think>";
 				final int index = pending.indexOf(tag);
 				if (index >= 0) {
-					if (!thinking) visible.append(pending, 0, index);
+					if (!thinking)
+						visible.append(pending, 0, index);
 					pending.delete(0, index + tag.length());
 					thinking = !thinking;
 					continue;
 				}
 				int keep = Math.min(pending.length(), tag.length() - 1);
-				while (keep > 0 && !tag.startsWith(pending.substring(pending.length() - keep))) keep--;
+				while (keep > 0 && !tag.startsWith(pending.substring(pending.length() - keep)))
+					keep--;
 				final int count = pending.length() - keep;
-				if (!thinking) visible.append(pending, 0, count);
+				if (!thinking)
+					visible.append(pending, 0, count);
 				pending.delete(0, count);
 				break;
 			}
@@ -269,7 +391,8 @@ public class KiChatController {
 		}
 
 		String finish() throws IOException {
-			if (thinking) throw new IOException("Unvollständiger KI-Denkblock");
+			if (thinking)
+				throw new IOException("Unvollständiger KI-Denkblock");
 			return pending.toString();
 		}
 	}

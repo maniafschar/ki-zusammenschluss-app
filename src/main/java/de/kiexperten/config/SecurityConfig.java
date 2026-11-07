@@ -2,8 +2,8 @@ package de.kiexperten.config;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
-import org.springframework.http.HttpMethod;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
@@ -12,10 +12,11 @@ import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
-import de.kiexperten.content.ExperteRepository;
-import de.kiexperten.content.ExpertenRollenService;
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
 import org.springframework.security.web.csrf.CsrfTokenRequestAttributeHandler;
+
+import de.kiexperten.content.ExperteRepository;
+import de.kiexperten.content.ExpertenRollenService;
 
 @Configuration
 @EnableWebSecurity
@@ -30,7 +31,8 @@ public class SecurityConfig {
 
 		http.authorizeHttpRequests(auth -> auth
 				.requestMatchers("/", "/index.html", "/api/leistungen", "/api/produkte", "/api/experten",
-						"/api/csrf", "/api/ki/chat", "/api/ki/chat/stream", "/api/termine", "/api/termine/bestaetigen", "/api/r/*", "/error")
+						"/api/csrf", "/api/ki/chat", "/api/ki/chat/stream", "/api/ki/audio/transcriptions",
+						"/api/ki/audio/speech", "/api/termine", "/api/termine/bestaetigen", "/api/r/*", "/error")
 				.permitAll()
 				.requestMatchers(HttpMethod.GET, "/api/admin/termine", "/api/admin/interessenten",
 						"/api/admin/interessenten/*")
@@ -48,8 +50,10 @@ public class SecurityConfig {
 				.csrf(csrf -> csrf
 						.csrfTokenRepository(CookieCsrfTokenRepository.withHttpOnlyFalse())
 						.csrfTokenRequestHandler(csrfRequestHandler)
-						// Script clients (curl etc.) send this header instead of a CSRF token. Browsers cannot add
-						// custom headers cross-site without a CORS preflight, which this app does not allow.
+						// Script clients (curl etc.) send this header instead of a CSRF token. Browsers
+						// cannot add
+						// custom headers cross-site without a CORS preflight, which this app does not
+						// allow.
 						.ignoringRequestMatchers(request -> request.getHeader("X-API-Client") != null
 								&& request.getHeader("Authorization") != null));
 		return http.build();
