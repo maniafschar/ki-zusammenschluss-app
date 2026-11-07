@@ -823,17 +823,46 @@ startBooking();
 
 	function closePrivacyPopup() {
 		if (privacyPopup.hidden) return;
-		privacyPopup.hidden = true;
+		const wasOpen = privacyPopup.classList.contains('is-open');
+		if (privacyOpenFrame !== null) {
+			cancelAnimationFrame(privacyOpenFrame);
+			privacyOpenFrame = null;
+		}
 		privacy.setAttribute('aria-expanded', 'false');
 		privacy.focus();
+		privacyPopup.classList.remove('is-open');
+		if (reducedMotion.matches || !wasOpen) {
+			privacyPopup.hidden = true;
+			return;
+		}
+		privacyCloseTimer = setTimeout(() => {
+			if (privacy.getAttribute('aria-expanded') === 'false') privacyPopup.hidden = true;
+		}, 220);
 	}
 
 	privacy.addEventListener('click', (event) => {
 		event.stopPropagation();
-		privacyPopup.hidden = !privacyPopup.hidden;
-		const expanded = !privacyPopup.hidden;
-		privacy.setAttribute('aria-expanded', String(expanded));
-		if (expanded) privacyPopup.focus();
+		if (!privacyPopup.hidden) {
+			closePrivacyPopup();
+			return;
+		}
+		clearTimeout(privacyCloseTimer);
+		privacyPopup.hidden = false;
+		privacy.setAttribute('aria-expanded', 'true');
+		privacyOpenFrame = requestAnimationFrame(() => {
+			privacyOpenFrame = null;
+			if (privacy.getAttribute('aria-expanded') === 'true') privacyPopup.classList.add('is-open');
+		});
+		privacyPopup.focus();
+	});
+	let privacyOpenFrame = null;
+	let privacyCloseTimer = null;
+	privacyPopup.addEventListener('transitionend', (event) => {
+		if (event.target === privacyPopup && event.propertyName === 'opacity'
+				&& privacy.getAttribute('aria-expanded') === 'false') {
+			clearTimeout(privacyCloseTimer);
+			privacyPopup.hidden = true;
+		}
 	});
 	privacyPopup.addEventListener('click', closePrivacyPopup);
 	document.addEventListener('click', (event) => {

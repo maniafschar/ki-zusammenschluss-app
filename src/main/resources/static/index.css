@@ -1126,7 +1126,20 @@ footer a {
 	background: #102342;
 	box-shadow: 0 12px 32px rgba(0, 0, 0, .35);
 	color: #c6dbef;
+	opacity: 0;
+	transform: translateY(8px) scale(.98);
+	visibility: hidden;
+	pointer-events: none;
 	text-align: left;
+	transition: opacity .18s ease, transform .18s ease, visibility 0s linear .18s;
+}
+
+.voice-privacy-popup.is-open {
+	opacity: 1;
+	transform: translateY(0) scale(1);
+	visibility: visible;
+	pointer-events: auto;
+	transition: opacity .18s ease, transform .18s ease, visibility 0s;
 }
 
 .voice-privacy-popup h2 {
@@ -1138,4 +1151,11 @@ footer a {
 .voice-privacy-popup p {
 	font-size: .9rem;
 	line-height: 1.5;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.voice-privacy-popup,
+	.voice-privacy-popup.is-open {
+		transition: none;
+	}
 }
