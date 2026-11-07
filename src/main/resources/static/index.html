@@ -1592,7 +1592,9 @@
 			let audioContext = null;
 			let audioAnalyser = null;
 			let audioSamples = null;
+			let audioFrequencies = null;
 			let audioLevel = 0;
+			let audioPitch = 180;
 			let visual = null;
 			let visible = true;
 			let frame = null;
@@ -1608,18 +1610,37 @@
 						const amplitude = (sample - 128) / 128;
 						energy += amplitude * amplitude;
 					}
-					audioLevel = Math.min(1, Math.sqrt(energy / audioSamples.length) * 3);
+					const measuredLevel = Math.min(1, Math.sqrt(energy / audioSamples.length) * 3);
+					audioLevel += (measuredLevel - audioLevel) * 0.2;
+					if (audioFrequencies && audioLevel > 0.035) {
+						audioAnalyser.getByteFrequencyData(audioFrequencies);
+						const binHz = audioContext.sampleRate / audioAnalyser.fftSize;
+						const minBin = Math.max(1, Math.floor(85 / binHz));
+						const maxBin = Math.min(audioFrequencies.length - 1, Math.ceil(420 / binHz));
+						let peakBin = minBin;
+						for (let i = minBin + 1; i <= maxBin; i++) {
+							if (audioFrequencies[i] > audioFrequencies[peakBin]) peakBin = i;
+						}
+						const lower = audioFrequencies[peakBin - 1];
+						const center = audioFrequencies[peakBin];
+						const upper = audioFrequencies[Math.min(peakBin + 1, audioFrequencies.length - 1)];
+						const divisor = lower - 2 * center + upper;
+						const offset = divisor ? Math.max(-0.5, Math.min(0.5, 0.5 * (lower - upper) / divisor)) : 0;
+						const measuredPitch = (peakBin + offset) * binHz;
+						audioPitch += (measuredPitch - audioPitch) * 0.12;
+					}
 				} else {
-					audioLevel *= 0.8;
+					audioLevel *= 0.82;
 				}
 				if (visual) {
-					visual.draw(t, reducedMotion.matches ? 'idle' : state, reducedMotion.matches, audioLevel);
+					visual.draw(t, reducedMotion.matches ? 'idle' : state, reducedMotion.matches, audioLevel, audioPitch);
 				} else if (ctx) {
 					const w = canvas.width, h = canvas.height, bars = 32;
 					ctx.clearRect(0, 0, w, h);
 					const target = reducedMotion.matches ? 0.15 : state === 'speaking' ? audioLevel : state === 'thinking' ? 0.25 : state === 'listening' ? 0.12 : 0.05;
 					level += (target - level) * 0.15;
-					ctx.fillStyle = '#79d4ff';
+					const fallbackHue = 235 - Math.max(0, Math.min(1, (audioPitch - 85) / 335)) * 205;
+					ctx.fillStyle = `hsl(${fallbackHue} 95% 70%)`;
 					for (let i = 0; i < bars; i++) {
 						const wave = Math.sin((reducedMotion.matches ? 0 : t / 220) + i * 0.5) * 0.5 + 0.5;
 						const bh = Math.max(6, h * (0.15 + 0.85 * wave) * level * (1 - Math.abs(i - bars / 2) / bars));
@@ -1753,6 +1774,9 @@
 						new THREE.MeshBasicMaterial({ color: 0xc3eeff, wireframe: true, transparent: true, opacity: .9 })
 					);
 					orb.add(core);
+					let smoothSignal = 0;
+					let smoothHue = .58;
+					let previousFrame = 0;
 
 					function resize() {
 						const width = webglCanvas.clientWidth;
@@ -1770,35 +1794,49 @@
 					}
 
 					visual = {
-						draw(t, currentState, still, signal) {
+						draw(t, currentState, still, signal, pitch) {
 							const time = still ? 0 : t * 0.001;
-							const voice = currentState === 'speaking' ? signal : 0;
-							const intensity = currentState === 'speaking' ? .12 + voice * .3 : currentState === 'thinking' ? .16 : currentState === 'listening' ? .1 : .05;
-							const pulse = 1 + Math.sin(time * 3) * .06 + voice * .38;
+							const delta = previousFrame ? Math.min(.05, (t - previousFrame) * .001) : 1 / 60;
+							previousFrame = t;
+							const smoothing = 1 - Math.exp(-delta * 5);
+							const targetSignal = currentState === 'speaking' ? signal : 0;
+							smoothSignal += (targetSignal - smoothSignal) * smoothing;
+							const pitchRange = Math.max(0, Math.min(1, (pitch - 85) / 335));
+							const targetHue = currentState === 'speaking' ? .68 - pitchRange * .62 : .58;
+							smoothHue += (targetHue - smoothHue) * (1 - Math.exp(-delta * 2.4));
+							const hue = (smoothHue + .012 * Math.sin(time * .35) + 1) % 1;
+							const voice = smoothSignal;
+							const intensity = currentState === 'speaking' ? .07 + voice * .18 : currentState === 'thinking' ? .09 : currentState === 'listening' ? .07 : .04;
+							const pulse = 1 + Math.sin(time * 1.2) * .025 + voice * .18;
 							core.scale.setScalar(pulse);
-							core.rotation.set(time * .35, time * .5, time * .2);
+							core.rotation.set(time * .18, time * .24, time * .1);
+							core.material.color.setHSL((hue + .06) % 1, .72, .82);
 							glow.scale.setScalar(2.2 * pulse);
-							glow.material.color.setHSL(.56 + .09 * Math.sin(time * .5), .95, .75);
+							glow.material.color.setHSL(hue, .95, .72);
+							particles.material.color.setHSL((hue + .12) % 1, .82, 1);
+							sparks.material.color.setHSL((hue + .2) % 1, .9, .82);
+							tickRing.material.color.setHSL((hue + .38) % 1, .82, .68);
 							const positions = geometry.attributes.position;
 							particlePaths.forEach((path, i) => {
 								const angle = path.angle + time * path.speed * (path.radius < 1 ? 1 : -1);
-								const radius = path.radius * (1 + intensity * .35 * Math.sin(time * 2 + path.phase) + voice * .16);
+								const radius = path.radius * (1 + intensity * .25 * Math.sin(time * 1.1 + path.phase) + voice * .07);
 								positions.setXYZ(i, Math.cos(angle) * radius, Math.sin(angle) * radius, path.depth);
 							});
 							positions.needsUpdate = true;
 							for (let i = 0; i < 24; i++) {
 								const angle = i * Math.PI * 2 / 24 + time * (i % 2 ? .5 : -.35);
-								const radius = .8 + (i % 4) * .29 + .1 * Math.sin(time * 2 + i);
+								const radius = .8 + (i % 4) * .29 + .05 * Math.sin(time * 1.1 + i * .4) + voice * .06;
 								sparkPositions[i * 3] = Math.cos(angle) * radius;
 								sparkPositions[i * 3 + 1] = Math.sin(angle) * radius;
 								sparkPositions[i * 3 + 2] = .25;
 							}
 							sparksGeometry.attributes.position.needsUpdate = true;
-							sparks.material.opacity = Math.min(1, .65 + .25 * Math.sin(time * 2) ** 2 + voice * .1);
+							sparks.material.opacity = Math.min(1, .62 + .12 * Math.sin(time * 1.2) ** 2 + voice * .12);
 							tickRing.rotation.z = -time * .04;
 							rings.forEach(({ ring, speed }, i) => {
-								ring.rotation.z = time * speed;
-								ring.scale.setScalar(1 + .015 * Math.sin(time * 2 + i));
+								ring.rotation.z = time * speed * .55;
+								ring.material.color.setHSL((hue + i * .1) % 1, .78, .68);
+								ring.scale.setScalar(1 + .008 * Math.sin(time * 1.1 + i * .4) + voice * .018);
 							});
 							renderer.render(scene, camera);
 						}
@@ -1845,13 +1883,14 @@
 						audioContext ||= new AudioContextType();
 						if (audioContext.state === 'suspended') await audioContext.resume();
 						playbackAnalyser = audioContext.createAnalyser();
-						playbackAnalyser.fftSize = 256;
-						playbackAnalyser.smoothingTimeConstant = .72;
+						playbackAnalyser.fftSize = 4096;
+						playbackAnalyser.smoothingTimeConstant = .82;
 						source = audioContext.createMediaElementSource(player);
 						source.connect(playbackAnalyser);
 						playbackAnalyser.connect(audioContext.destination);
 						audioAnalyser = playbackAnalyser;
 						audioSamples = new Uint8Array(playbackAnalyser.fftSize);
+						audioFrequencies = new Uint8Array(playbackAnalyser.frequencyBinCount);
 					} catch (error) {
 						if (source) {
 							try {
@@ -1864,6 +1903,7 @@
 						playbackAnalyser?.disconnect();
 						audioAnalyser = null;
 						audioSamples = null;
+						audioFrequencies = null;
 						console.warn('Audioanalyse nicht verfügbar:', error);
 					}
 				}
@@ -1881,6 +1921,7 @@
 					if (audioAnalyser === playbackAnalyser) {
 						audioAnalyser = null;
 						audioSamples = null;
+						audioFrequencies = null;
 					}
 					URL.revokeObjectURL(audioUrl);
 				}
