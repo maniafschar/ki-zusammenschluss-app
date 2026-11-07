@@ -785,13 +785,13 @@ startBooking();
 					audioFrequencies = new Uint8Array(playbackAnalyser.frequencyBinCount);
 				} catch (error) {
 					if (source) {
-					try {
-						source.disconnect();
-						source.connect(audioContext.destination);
-					} catch (connectError) {
-						console.warn('Audioanalyse nicht verfügbar:', connectError);
+						try {
+							source.disconnect();
+							source.connect(audioContext.destination);
+						} catch (connectError) {
+							console.warn('Audioanalyse nicht verfügbar:', connectError);
+						}
 					}
-				}
 					playbackAnalyser?.disconnect();
 					audioAnalyser = null;
 					audioSamples = null;
