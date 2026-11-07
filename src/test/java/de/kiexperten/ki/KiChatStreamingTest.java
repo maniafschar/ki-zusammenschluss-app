@@ -35,7 +35,7 @@ import de.kiexperten.Zeit;
 		"spring.datasource.url=jdbc:h2:mem:ki-stream-test",
 		"spring.datasource.username=sa", "spring.datasource.password=",
 		"app.admin.username=admin", "app.admin.password=local-test-password",
-		"app.ki.api-key=local-test-key"
+		"app.ki.api-key=local-test-key", "app.ki.model=test-chat-model"
 })
 class KiChatStreamingTest {
 	private static final HttpServer upstream;
@@ -80,7 +80,8 @@ class KiChatStreamingTest {
 			});
 			upstream.createContext("/audio/transcriptions", exchange -> {
 				final String request = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
-				if (!request.contains("name=\"file\"") || !request.contains("sample-audio")) {
+				if (!request.contains("name=\"file\"") || !request.contains("sample-audio")
+						|| !request.contains("name=\"model\"\r\n\r\nohr-datei\r\n--")) {
 					exchange.sendResponseHeaders(400, -1);
 					exchange.close();
 					return;

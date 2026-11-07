@@ -79,7 +79,7 @@ public class KiChatController {
 			@Value("${app.ki.speech-path:/audio/speech}") final String speechPath,
 			@Value("${app.ki.api-key:}") final String apiKey,
 			@Value("${app.ki.model:swift-1.5-qwen3.8-27b}") final String model,
-			@Value("${app.ki.transcription-model:${app.ki.model:swift-1.5-qwen3.8-27b}}") final String transcriptionModel,
+			@Value("${app.ki.transcription-model:ohr-datei}") final String transcriptionModel,
 			@Value("${app.ki.speech-model:stimme}") final String speechModel,
 			@Value("${app.ki.speech-voice:1930}") final String speechVoice,
 			@Value("${app.ki.speech-format:wav}") final String speechFormat,
