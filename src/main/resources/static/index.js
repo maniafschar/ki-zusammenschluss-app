@@ -859,7 +859,7 @@ startBooking();
 	let privacyCloseTimer = null;
 	privacyPopup.addEventListener('transitionend', (event) => {
 		if (event.target === privacyPopup && event.propertyName === 'opacity'
-				&& privacy.getAttribute('aria-expanded') === 'false') {
+			&& privacy.getAttribute('aria-expanded') === 'false') {
 			clearTimeout(privacyCloseTimer);
 			privacyPopup.hidden = true;
 		}
