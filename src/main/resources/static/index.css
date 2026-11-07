@@ -999,10 +999,81 @@ footer a {
 	color: #c6dbef;
 	overflow-y: auto;
 	overflow-wrap: anywhere;
+	text-align: center;
 }
 
-.voice-text b {
+
+.chat-turn {
+	margin: 0 0 16px;
+	text-align: left;
+}
+
+.chat-turn>strong {
 	color: #fff;
+}
+
+.chat-turn p {
+	margin: 4px 0;
+}
+
+.chat-markdown-list,
+.chat-choice-list {
+	margin: 8px 0 8px 22px;
+	padding: 0;
+}
+
+.chat-markdown-list li,
+.chat-choice-list li {
+	margin: 5px 0;
+	padding-left: 3px;
+}
+
+.chat-choices {
+	margin-top: 8px;
+}
+
+.voice .voice-choice {
+	width: 100%;
+	min-height: 44px;
+	height: auto;
+	padding: 9px 14px;
+	border: 1px solid rgba(133, 198, 238, .45);
+	border-radius: 6px;
+	background: rgba(31, 82, 124, .62);
+	color: #eef7ff;
+	font-size: 1rem;
+	line-height: 1.4;
+	text-align: left;
+	cursor: pointer;
+}
+
+.voice .voice-choice:hover,
+.voice .voice-choice:focus-visible {
+	border-color: #9deaff;
+	background: rgba(39, 104, 151, .82);
+	outline: 2px solid rgba(157, 234, 255, .35);
+	outline-offset: 2px;
+}
+
+.voice .voice-choice:disabled {
+	opacity: .55;
+	cursor: default;
+}
+
+.chat-status {
+	color: #9db8d0;
+	font-size: .9rem;
+}
+
+.chat-assistant a {
+	color: #9deaff;
+}
+
+.chat-assistant code {
+	padding: 1px 4px;
+	border-radius: 3px;
+	background: rgba(255, 255, 255, .12);
+	font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 
 .voice-privacy {

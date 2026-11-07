@@ -362,6 +362,124 @@ startBooking();
 	let frame = null;
 	let lastFrame = 0;
 	const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+	const inlineMarkdown = /(\*\*[^*]+\*\*|__[^_]+__|`[^`]+`|\*[^*]+\*|_[^_]+_|\[[^\]]+\]\(https?:\/\/[^\s)]+\))/g;
+
+	function appendInlineMarkdown(parent, value) {
+		let cursor = 0;
+		for (const match of value.matchAll(inlineMarkdown)) {
+			const token = match[0];
+			const index = match.index;
+			parent.append(document.createTextNode(value.slice(cursor, index)));
+			let element;
+			if (token.startsWith('**') || token.startsWith('__')) {
+				element = document.createElement('strong');
+				element.textContent = token.slice(2, -2);
+			} else if (token.startsWith('`')) {
+				element = document.createElement('code');
+				element.textContent = token.slice(1, -1);
+			} else if (token.startsWith('*') || token.startsWith('_')) {
+				element = document.createElement('em');
+				element.textContent = token.slice(1, -1);
+			} else {
+				const [, label, href] = token.match(/^\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)$/);
+				element = document.createElement('a');
+				element.href = href;
+				element.target = '_blank';
+				element.rel = 'noopener noreferrer';
+				element.textContent = label;
+			}
+			parent.append(element);
+			cursor = index + token.length;
+		}
+		parent.append(document.createTextNode(value.slice(cursor)));
+	}
+
+	function plainMarkdown(markdown) {
+		return String(markdown ?? '').replace(/^\s{0,3}#{1,3}\s+/gm, '')
+			.replace(/^\s*(?:[-+*]|\d+[.)])\s+/gm, '')
+			.replace(/\[([^\]]+)\]\(https?:\/\/[^\s)]+\)/g, '$1')
+			.replace(/\*\*|__|\*|_|`/g, '').trim();
+	}
+
+	function renderMarkdown(parent, markdown, choices = false) {
+		let list = null;
+		let listType = '';
+		let choiceGroup = null;
+		const closeList = () => {
+			list = null;
+			listType = '';
+			choiceGroup = null;
+		};
+		for (const line of String(markdown ?? '').split(/\r?\n/)) {
+			const item = line.match(/^\s*(?:([-+*])\s+|(\d+)[.)]\s+)(.+)$/);
+			if (item) {
+				const type = item[2] ? 'ol' : 'ul';
+				if (!list || listType !== type) {
+					closeList();
+					listType = type;
+					if (choices) {
+						choiceGroup = document.createElement('div');
+						choiceGroup.className = 'chat-choices';
+						parent.append(choiceGroup);
+						list = document.createElement(type);
+						list.className = 'chat-choice-list';
+						choiceGroup.append(list);
+					} else {
+					list = document.createElement(type);
+					list.className = 'chat-markdown-list';
+					parent.append(list);
+				}
+				}
+				const label = item[3].trim();
+				const entry = document.createElement('li');
+				if (choices) {
+					const button = document.createElement('button');
+					button.type = 'button';
+					button.className = 'voice-choice';
+					appendInlineMarkdown(button, label);
+					button.dataset.chatChoice = button.textContent.trim();
+					entry.append(button);
+				} else {
+					appendInlineMarkdown(entry, label);
+				}
+				list.append(entry);
+				continue;
+			}
+			closeList();
+			if (!line.trim()) continue;
+			const heading = line.match(/^#{1,3}\s+(.+)$/);
+			const element = heading ? document.createElement('h3') : document.createElement('p');
+			appendInlineMarkdown(element, heading ? heading[1] : line.trim());
+			parent.append(element);
+		}
+	}
+
+	function renderConversation(question, reply, { choices = false, status = '' } = {}) {
+		const follow = text.scrollHeight - text.scrollTop - text.clientHeight <= 2;
+		text.replaceChildren();
+		const user = document.createElement('div');
+		user.className = 'chat-turn chat-user';
+		const userLabel = document.createElement('strong');
+		userLabel.textContent = 'Sie';
+		const userText = document.createElement('p');
+		userText.textContent = question;
+		user.append(userLabel, userText);
+		text.append(user);
+		const assistant = document.createElement('div');
+		assistant.className = 'chat-turn chat-assistant';
+		const assistantLabel = document.createElement('strong');
+		assistantLabel.textContent = 'KI';
+		assistant.append(assistantLabel);
+		if (reply) renderMarkdown(assistant, reply, choices);
+		if (status) {
+			const detail = document.createElement('p');
+			detail.className = 'chat-status';
+			detail.textContent = status;
+			assistant.append(detail);
+		}
+		text.append(assistant);
+		if (follow) text.scrollTop = text.scrollHeight;
+	}
 
 	function draw(t) {
 		frame = null;
@@ -703,17 +821,20 @@ startBooking();
 
 	start.addEventListener('click', playWelcome, { once: true });
 
+	text.addEventListener('click', (event) => {
+		const button = event.target.closest('[data-chat-choice]');
+		if (button && !button.disabled && state === 'idle') ask(button.dataset.chatChoice);
+	});
+
 	async function ask(question) {
 		state = 'thinking';
 		mic.disabled = true;
-		text.innerHTML = '<b>Sie:</b> ' + esc(question) + '<br>Die KI denkt nach …';
+		renderConversation(question, '', { status: 'Die KI denkt nach …' });
 		history.push({ role: 'user', content: question });
 		let reply = '';
 
 		function renderReply() {
-			const follow = text.scrollHeight - text.scrollTop - text.clientHeight <= 2;
-			text.innerHTML = '<b>Sie:</b> ' + esc(question) + '<br><b>KI:</b> ' + esc(reply);
-			if (follow) text.scrollTop = text.scrollHeight;
+			renderConversation(question, reply);
 		}
 
 		function addText(chunk) {
@@ -762,10 +883,14 @@ startBooking();
 			}
 			if (!reply.trim()) throw new Error('Die KI hat keine Antwort geliefert.');
 			history.push({ role: 'assistant', content: reply.trim() });
+			renderConversation(question, reply.trim(), { choices: true });
 			try {
-				await speak(reply.trim());
+				await speak(plainMarkdown(reply));
 			} catch (e) {
-				text.innerHTML += '<br>Die Sprachausgabe ist fehlgeschlagen.';
+				const speechError = document.createElement('p');
+				speechError.className = 'chat-status';
+				speechError.textContent = 'Die Sprachausgabe ist fehlgeschlagen.';
+				text.querySelector('.chat-assistant')?.append(speechError);
 			}
 			state = 'idle';
 			mic.disabled = !canRecord;
@@ -775,7 +900,7 @@ startBooking();
 			mic.disabled = !canRecord;
 			console.error('KI-Antwort fehlgeschlagen:', e);
 			const message = e.message === '429' ? 'Bitte einen Moment warten und erneut versuchen.' : 'Die KI-Antwort konnte nicht vollständig geladen werden.';
-			text.innerHTML = '<b>Sie:</b> ' + esc(question) + (reply ? '<br><b>KI:</b> ' + esc(reply) : '') + '<br>' + esc(message);
+			renderConversation(question, reply, { status: message });
 		}
 	}
 
