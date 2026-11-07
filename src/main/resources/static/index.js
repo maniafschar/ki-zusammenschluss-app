@@ -406,15 +406,52 @@ startBooking();
 	}
 
 	function renderMarkdown(parent, markdown, choices = false) {
+		const source = String(markdown ?? '');
+		const multiple = choices && /Mehrfachauswahl/i.test(source);
+		const maxMatch = source.match(/max(?:imal)?\.?\s*(\d+)\s*Antworten?/i);
+		const maxSelections = maxMatch ? Number(maxMatch[1]) : 0;
 		let list = null;
 		let listType = '';
 		let choiceGroup = null;
 		const closeList = () => {
+			if (choiceGroup?.dataset.selectionMode === 'multiple'
+				&& !choiceGroup.querySelector('[data-chat-submit-multiple]')) {
+				const submit = document.createElement('button');
+				submit.type = 'button';
+				submit.className = 'chat-multiselect-submit';
+				submit.dataset.chatSubmitMultiple = '';
+				submit.textContent = 'Auswahl übernehmen';
+				submit.disabled = true;
+				choiceGroup.append(submit);
+			}
 			list = null;
 			listType = '';
 			choiceGroup = null;
 		};
-		for (const line of String(markdown ?? '').split(/\r?\n/)) {
+		for (const line of source.split(/\r?\n/)) {
+			const freeText = choices && line.match(/^\s*(?:[-+*]\s+)?(?:\*\s*)?\[?Freitextfeld:\s*(.+?)(?:\])?\*?\s*$/i);
+			if (freeText) {
+				closeList();
+				const form = document.createElement('form');
+				form.className = 'chat-text-entry';
+				form.dataset.chatTextForm = '';
+				const input = document.createElement('input');
+				input.type = 'text';
+				input.name = 'answer';
+				input.maxLength = 2000;
+				input.required = true;
+				input.placeholder = freeText[1].replace(/\*+$/g, '').trim();
+				input.setAttribute('aria-label', 'Ihre Antwort');
+				const submit = document.createElement('button');
+				submit.type = 'submit';
+				submit.className = 'chat-text-submit';
+				submit.setAttribute('aria-label', 'Antwort senden');
+				submit.title = 'Antwort senden';
+				submit.textContent = 'Senden';
+				form.append(input, submit);
+				parent.append(form);
+				continue;
+			}
 			const item = line.match(/^\s*(?:([-+*])\s+|(\d+)[.)]\s+)(.+)$/);
 			if (item) {
 				const type = item[2] ? 'ol' : 'ul';
@@ -424,6 +461,8 @@ startBooking();
 					if (choices) {
 						choiceGroup = document.createElement('div');
 						choiceGroup.className = 'chat-choices';
+						choiceGroup.dataset.selectionMode = multiple ? 'multiple' : 'single';
+						if (multiple) choiceGroup.dataset.maxSelections = String(maxSelections || Number.MAX_SAFE_INTEGER);
 						parent.append(choiceGroup);
 						list = document.createElement(type);
 						list.className = 'chat-choice-list';
@@ -442,6 +481,7 @@ startBooking();
 					button.className = 'voice-choice';
 					appendInlineMarkdown(button, label);
 					button.dataset.chatChoice = button.textContent.trim();
+					if (multiple) button.setAttribute('aria-pressed', 'false');
 					entry.append(button);
 				} else {
 					appendInlineMarkdown(entry, label);
@@ -456,6 +496,7 @@ startBooking();
 			appendInlineMarkdown(element, heading ? heading[1] : line.trim());
 			parent.append(element);
 		}
+		closeList();
 	}
 
 	function renderConversation(question, reply, { choices = false, status = '' } = {}) {
@@ -896,13 +937,42 @@ startBooking();
 		if (event.key === 'Escape') closePrivacyPopup();
 	});
 
+	function submitChatAnswer(answer) {
+		if (!choiceReady || state === 'listening' || !String(answer).trim()) return;
+		choiceReady = false;
+		stopSpeech();
+		ask(String(answer).trim());
+	}
+
 	text.addEventListener('click', (event) => {
 		const button = event.target.closest('[data-chat-choice]');
 		if (button && !button.disabled && choiceReady && state !== 'listening') {
-			choiceReady = false;
-			stopSpeech();
-			ask(button.dataset.chatChoice);
+			const group = button.closest('.chat-choices');
+			if (group?.dataset.selectionMode === 'multiple') {
+				const selected = button.getAttribute('aria-pressed') === 'true';
+				const count = group.querySelectorAll('[data-chat-choice][aria-pressed="true"]').length;
+				if (!selected && count >= Number(group.dataset.maxSelections)) return;
+				button.setAttribute('aria-pressed', String(!selected));
+				group.querySelector('[data-chat-submit-multiple]').disabled = group
+					.querySelectorAll('[data-chat-choice][aria-pressed="true"]').length === 0;
+				return;
+			}
+			submitChatAnswer(button.dataset.chatChoice);
+			return;
 		}
+		const submit = event.target.closest('[data-chat-submit-multiple]');
+		if (submit && !submit.disabled) {
+			const group = submit.closest('.chat-choices');
+			const answers = [...group.querySelectorAll('[data-chat-choice][aria-pressed="true"]')]
+				.map(option => option.dataset.chatChoice);
+			submitChatAnswer(answers.join('\n'));
+		}
+	});
+	text.addEventListener('submit', (event) => {
+		const form = event.target.closest('[data-chat-text-form]');
+		if (!form) return;
+		event.preventDefault();
+		submitChatAnswer(form.elements.answer.value);
 	});
 
 	async function ask(question) {

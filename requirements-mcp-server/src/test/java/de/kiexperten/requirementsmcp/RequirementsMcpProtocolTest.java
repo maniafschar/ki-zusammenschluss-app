@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.util.List;
 import java.util.Map;
 
 import org.junit.jupiter.api.AfterEach;
@@ -52,10 +53,10 @@ class RequirementsMcpProtocolTest {
 
 		final var firstStep = this.call("get_next_requirement_step", Map.of("conversationId", "protocol-test"));
 		assertEquals(1, firstStep.path("stepNumber").asInt());
-		assertEquals(7, firstStep.path("totalSteps").asInt());
+		assertEquals(6, firstStep.path("totalSteps").asInt());
 
 		final var evaluation = this.call("record_requirement_answer", Map.of(
-				"conversationId", "protocol-test", "stepId", "project_goal", "answer", "zu vage",
+				"conversationId", "protocol-test", "stepId", "maturity", "answers", List.of("Keine"),
 				"sufficient", false, "clarificationQuestion", "Welches Ergebnis soll sich verbessern?"));
 		assertFalse(evaluation.path("accepted").asBoolean());
 		assertEquals(1, this.call("get_next_requirement_step", Map.of("conversationId", "protocol-test"))

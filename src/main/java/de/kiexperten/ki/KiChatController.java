@@ -62,13 +62,15 @@ public class KiChatController {
 			+ "Lenke fachfremde Fragen höflich zum aktuellen Punkt zurück. Wenn alle Punkte geklärt sind und Interesse besteht, "
 			+ "lade zu einem Termin am Seitenende ein.";
 
-	private static final String REQUIREMENTS_SYSTEM_PROMPT = "Du bist der deutschsprachige Assistent für die strukturierte Erhebung von Anforderungen an Softwareprojekte. "
-			+ "Nutze für jeden Gesprächsschritt die MCP-Werkzeuge. Rufe zuerst get_next_requirement_step mit der Gesprächs-ID auf. "
-			+ "Wenn der vorherige Assistent bereits eine Frage gestellt hat, bewerte die letzte Nutzeraussage anhand der Akzeptanzkriterien des aktuellen Schritts und rufe record_requirement_answer auf. "
-			+ "Die Einschätzung, ob eine Antwort genügt, triffst du selbst. Bei unklaren oder unvollständigen Antworten darfst du den Schritt nicht abschließen; stelle dann eine konkrete Rückfrage. "
-			+ "Gehe nur in der vom MCP-Server gelieferten Reihenfolge vor und stelle pro Antwort genau eine Multiple-Choice-Frage mit den vom Server gelieferten Optionen. Ergänze bei Bedarf eine Freitextoption. "
-			+ "Der Fragenkatalog umfasst sieben Pflichtschritte und darf erst nach deren Abschluss als fertig gelten. Fasse danach die Anforderungen knapp zusammen und lade zu einem Termin am Ende der Seite ein. "
-			+ "Beantworte keine sachfremden Fragen; führe freundlich zum aktuellen Anforderungsschritt zurück. Halte Antworten kurz.";
+	private static final String REQUIREMENTS_SYSTEM_PROMPT = "Du bist der deutschsprachige Assistent für die KI-Reifegrad-Erhebung eines Unternehmens. "
+			+ "Nutze bei jedem Gesprächsschritt die MCP-Werkzeuge und rufe zuerst get_next_requirement_step mit der Gesprächs-ID auf. "
+			+ "Es gibt genau sechs Pflichtschritte. Beginne jede Frage mit dem unveränderten Titel im Format 'Schritt {stepNumber}: {title}'. Verwende Frage und Antwortoptionen aus dem aktuellen MCP-Schritt unverändert und bleibe in der vorgegebenen Reihenfolge. "
+			+ "Bei selectionMode=single stelle eine Frage mit nummerierten Optionen. Bei selectionMode=multiple zeige den Hinweis 'Mehrfachauswahl möglich (max. N Antworten)' mit dem maxSelections-Wert aus dem MCP-Schritt; der Nutzer kann bis zu diesem Maximum auswählen. "
+			+ "Bei selectionMode=text stelle die gelieferte Frage und erzeuge ein Freitextfeld mit der Zeile 'Freitextfeld: ' gefolgt vom inputPlaceholder. "
+			+ "Wenn bereits eine Frage gestellt wurde, bewerte die letzte Nutzeraussage anhand der Akzeptanzkriterien. Rufe record_requirement_answer auf und übergib die Antwort als answers-Array. Bei Auswahloptionen übergib die exakten Optionstexte einzeln; bei Freitext ein Element. "
+			+ "Du entscheidest selbst, ob die Antwort genügt. Bei unklaren Antworten stelle eine konkrete Rückfrage und schließe den Schritt nicht ab. Der Server prüft Auswahlmaximum und Reihenfolge. "
+			+ "Erkläre die Optionstexte nicht um und erfinde keine Antwortoptionen. Nach dem sechsten Schritt fasse die Antworten knapp zusammen und lade zu einem Termin am Seitenende ein. "
+			+ "Beantworte keine sachfremden Fragen; lenke freundlich zum aktuellen Schritt zurück.";
 	private static final int MAX_TOOL_ROUNDS = 5;
 	private static final int MAX_TOOL_CALLS = 10;
 	private final ObjectMapper mapper = new ObjectMapper();

@@ -1,6 +1,6 @@
 # Requirements MCP Server
 
-The server provides the website's software-requirements questionnaire over MCP Streamable HTTP. It exposes the current step and records the model's sufficiency decision for each answer.
+The server provides a six-step AI-readiness questionnaire over MCP Streamable HTTP. It exposes each question and its answer options, records the model's sufficiency decision, and enforces the multiple-selection limits for steps 3 and 4.
 
 Run the MCP server in one terminal:
 
