@@ -425,10 +425,10 @@ startBooking();
 						list.className = 'chat-choice-list';
 						choiceGroup.append(list);
 					} else {
-					list = document.createElement(type);
-					list.className = 'chat-markdown-list';
-					parent.append(list);
-				}
+						list = document.createElement(type);
+						list.className = 'chat-markdown-list';
+						parent.append(list);
+					}
 				}
 				const label = item[3].trim();
 				const entry = document.createElement('li');

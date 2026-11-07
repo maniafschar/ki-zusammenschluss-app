@@ -385,12 +385,35 @@ h2 {
 	pointer-events: none;
 }
 
-.spider-lines line:nth-of-type(1), .spider-benefit:nth-of-type(1) { --i: 0; }
-.spider-lines line:nth-of-type(2), .spider-benefit:nth-of-type(2) { --i: 1; }
-.spider-lines line:nth-of-type(3), .spider-benefit:nth-of-type(3) { --i: 2; }
-.spider-lines line:nth-of-type(4), .spider-benefit:nth-of-type(4) { --i: 3; }
-.spider-lines line:nth-of-type(5), .spider-benefit:nth-of-type(5) { --i: 4; }
-.spider-lines line:nth-of-type(6), .spider-benefit:nth-of-type(6) { --i: 5; }
+.spider-lines line:nth-of-type(1),
+.spider-benefit:nth-of-type(1) {
+	--i: 0;
+}
+
+.spider-lines line:nth-of-type(2),
+.spider-benefit:nth-of-type(2) {
+	--i: 1;
+}
+
+.spider-lines line:nth-of-type(3),
+.spider-benefit:nth-of-type(3) {
+	--i: 2;
+}
+
+.spider-lines line:nth-of-type(4),
+.spider-benefit:nth-of-type(4) {
+	--i: 3;
+}
+
+.spider-lines line:nth-of-type(5),
+.spider-benefit:nth-of-type(5) {
+	--i: 4;
+}
+
+.spider-lines line:nth-of-type(6),
+.spider-benefit:nth-of-type(6) {
+	--i: 5;
+}
 
 .spider-lines line {
 	stroke: #65d9ff;
