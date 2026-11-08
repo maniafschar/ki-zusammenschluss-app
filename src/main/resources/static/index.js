@@ -352,6 +352,11 @@ startBooking();
 	let chatTurn = 0;
 	let activeSpeech = null;
 	let choiceReady = false;
+	let umfrageAktiv = false;
+	let umfrageSchritt = null;
+	let umfrageMarkdown = '';
+	const OPTION_UMFRAGE = 'Die Umfrage ausfüllen';
+	const ABSCHLUSS_FRAGE = 'Ich habe die Umfrage abgeschlossen. Schlag mir bitte einen Termin vor.';
 	let level = 0;
 	let audioContext = null;
 	let audioAnalyser = null;
@@ -965,9 +970,70 @@ startBooking();
 
 	function submitChatAnswer(answer) {
 		if (!choiceReady || state === 'listening' || !String(answer).trim()) return;
+		const value = String(answer).trim();
 		choiceReady = false;
 		stopSpeech();
-		ask(String(answer).trim());
+		if (umfrageAktiv) {
+			umfrageAntwort(value);
+			return;
+		}
+		if (value === OPTION_UMFRAGE) {
+			startUmfrage();
+			return;
+		}
+		ask(value);
+	}
+
+	async function startUmfrage() {
+		umfrageAktiv = true;
+		renderConversation(OPTION_UMFRAGE, '', { status: 'Die Umfrage lädt …' });
+		try {
+			const res = await fetch(`/ai-expert/api/ki/umfrage/schritt?gespraechId=${encodeURIComponent(gespraechId)}`, {
+				credentials: 'same-origin'
+			});
+			if (!res.ok) throw new Error(res.status);
+			zeigeUmfrageSchritt(OPTION_UMFRAGE, await res.json());
+		} catch (e) {
+			console.error('Umfrage konnte nicht geladen werden:', e);
+			umfrageAktiv = false;
+			renderConversation(OPTION_UMFRAGE, 'Die Umfrage konnte gerade nicht geladen werden. Bitte versuche es erneut.');
+			choiceReady = true;
+		}
+	}
+
+	function zeigeUmfrageSchritt(question, data) {
+		if (data.completed) {
+			umfrageAktiv = false;
+			ask(ABSCHLUSS_FRAGE);
+			return;
+		}
+		umfrageSchritt = data.step;
+		umfrageMarkdown = data.markdown;
+		renderConversation(question, data.markdown, { choices: true });
+		choiceReady = true;
+	}
+
+	async function umfrageAntwort(value) {
+		const step = umfrageSchritt;
+		const answers = step.selectionMode === 'text'
+			? [value]
+			: value.split('\n').map((line) => line.trim()).filter(Boolean);
+		renderConversation(value, '', { status: 'Antwort wird gespeichert …' });
+		try {
+			const token = await csrfToken();
+			const res = await fetch('/ai-expert/api/ki/umfrage/antwort', {
+				method: 'POST',
+				credentials: 'same-origin',
+				headers: { 'Content-Type': 'application/json', 'X-XSRF-TOKEN': token },
+				body: JSON.stringify({ gespraechId, stepId: step.id, answers })
+			});
+			if (!res.ok) throw new Error(res.status);
+			zeigeUmfrageSchritt(value, await res.json());
+		} catch (e) {
+			console.error('Umfrageantwort konnte nicht gespeichert werden:', e);
+			renderConversation(value, umfrageMarkdown, { choices: true, status: 'Bitte prüfe deine Auswahl und versuche es erneut.' });
+			choiceReady = true;
+		}
 	}
 
 	text.addEventListener('click', (event) => {
@@ -1051,7 +1117,7 @@ startBooking();
 			const decoder = new TextDecoder();
 			let buffer = '';
 			let completed = false;
-			let abgeschlossen = false;
+			let zusammenfassung = '';
 			try {
 				while (!completed) {
 					const { value, done } = await reader.read();
@@ -1068,7 +1134,11 @@ startBooking();
 						const payload = JSON.parse(data);
 						if (type === 'delta') addText(payload.text);
 						if (type === 'error') throw new Error(payload.text);
-						if (type === 'done') { completed = true; abgeschlossen = payload.abgeschlossen === true; break; }
+						if (type === 'done') {
+							completed = true;
+							zusammenfassung = typeof payload.zusammenfassung === 'string' ? payload.zusammenfassung.trim() : '';
+							break;
+						}
 					}
 					if (done && !completed) throw new Error('Die KI-Antwort wurde unterbrochen.');
 				}
@@ -1079,8 +1149,8 @@ startBooking();
 			if (!reply.trim()) throw new Error('Die KI hat keine Antwort geliefert.');
 			history.push({ role: 'assistant', content: reply.trim() });
 			renderConversation(question, reply.trim(), { choices: true });
-			choiceReady = !abgeschlossen;
-			if (abgeschlossen) zeigeZusammenfassung(reply.trim());
+			choiceReady = true;
+			if (zusammenfassung) zeigeZusammenfassung(zusammenfassung);
 			try {
 				await speak(plainMarkdown(reply), turnId);
 			} catch (e) {

@@ -112,6 +112,16 @@ public class TerminController {
 		return result;
 	}
 
+	/** Freie Termine für den KI-Assistenten; alle Termine sind Video-Calls. */
+	public List<Slot> freieVideoCallTermine(final int maximal) {
+		return this.slots().stream().filter(Slot::frei).limit(maximal).toList();
+	}
+
+	/** Bucht einen Termin über denselben Weg wie das Buchungsformular (Bestätigungs-Mail inklusive). */
+	public BuchungAntwort buchenFuerKi(final BuchungRequest request) {
+		return this.book(request).getBody();
+	}
+
 	@PostMapping("/api/termine")
 	ResponseEntity<BuchungAntwort> book(@Valid @RequestBody final BuchungRequest request) {
 		final Instant startInstant = request.start();

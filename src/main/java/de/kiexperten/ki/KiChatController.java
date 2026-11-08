@@ -13,10 +13,17 @@ import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.security.cert.X509Certificate;
 import java.time.Duration;
+import java.time.Instant;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.regex.Pattern;
 
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.TrustManager;
@@ -33,6 +40,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
@@ -42,7 +50,9 @@ import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBo
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
-
+import com.fasterxml.jackson.databind.node.JsonNodeFactory;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import de.kiexperten.booking.TerminController;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
@@ -63,26 +73,35 @@ public class KiChatController {
 			+ "Lenke fachfremde Fragen höflich zum aktuellen Punkt zurück. Wenn alle Punkte geklärt sind und Interesse besteht, "
 			+ "lade zu einem Termin am Seitenende ein.";
 
-	private static final String REQUIREMENTS_SYSTEM_PROMPT = "Du bist der deutschsprachige Assistent für die KI-Reifegrad-Erhebung eines Unternehmens. "
+	private static final String REQUIREMENTS_SYSTEM_PROMPT = "Du bist der deutschsprachige Assistent für die KI-Reifegrad-Erhebung eines Unternehmens. Duze den Nutzer. "
 			+ "Nutze bei jedem Gesprächsschritt die MCP-Werkzeuge und rufe zuerst get_next_requirement_step mit der Gesprächs-ID auf. "
 			+ "Es gibt genau sechs Pflichtschritte. Stelle selbst keine Frage und keine Antwortoptionen; der Server hängt den aktuellen Schritt mit Titel, Frage und Optionen aus dem MCP-Server exakt an deine Antwort an. "
 			+ "Gib nur eine kurze Rückmeldung zur letzten Nutzeraussage oder eine konkrete Rückfrage zur Präzisierung. "
 			+ "Wenn bereits eine Frage gestellt wurde, bewerte die letzte Nutzeraussage anhand der Akzeptanzkriterien. Rufe record_requirement_answer auf und übergib die Antwort als answers-Array. Bei Auswahloptionen übergib die exakten Optionstexte einzeln; bei Freitext ein Element. "
 			+ "Du entscheidest selbst, ob die Antwort genügt. Bei unklaren Antworten stelle eine konkrete Rückfrage und schließe den Schritt nicht ab. Der Server prüft Auswahlmaximum und Reihenfolge. "
-			+ "Erkläre die Optionstexte nicht um und erfinde keine Antwortoptionen. Nach dem sechsten Schritt schreibe eine knappe, sachliche Zusammenfassung der Antworten in Stichpunkten ohne Anrede und Grußformel, die der Nutzer als Nachricht an das Team übernehmen kann; verweise danach kurz auf den Terminkalender am Seitenende. "
+			+ "Erkläre die Optionstexte nicht um und erfinde keine Antwortoptionen. "
+			+ "Der Nutzer kann die Umfrage auch ohne dich ausfüllen. Wenn get_next_requirement_step completed=true meldet oder der Nutzer schreibt, dass er die Umfrage abgeschlossen hat, gehe so vor: "
+			+ "1. Rufe speichere_zusammenfassung mit einer knappen, sachlichen Zusammenfassung der Antworten in Stichpunkten ohne Anrede und Grußformel auf. "
+			+ "2. Schlage danach einen Termin vor: Rufe freie_termine auf und biete ausschließlich diese freien Termine an. Es gibt nur Video-Call-Termine; biete keine anderen Terminarten an. "
+			+ "3. Rufe termin_buchen erst auf, nachdem der Nutzer einen Termin ausdrücklich bestätigt hat. Du brauchst dafür Name und E-Mail-Adresse; frage danach, falls sie fehlen. "
+			+ "4. Nach erfolgreicher Buchung sage, dass der Nutzer die Bestätigungs-Mail mit dem Link öffnen muss, um den Termin zu bestätigen. "
 			+ "Beantworte keine sachfremden Fragen; lenke freundlich zum aktuellen Schritt zurück.";
-	private static final String WELCOME_INTRO = "Schön, dass Sie da sind! Ich bin der KI-Assistent des KI Experten Teams: "
-			+ "freiberufliche Spezialisten, unabhängig und mit einer klaren Haltung. KI soll in Ihrem Unternehmen echten Nutzen bringen, "
+	private static final String WELCOME_INTRO = "Schön, dass du da bist! Ich bin der KI-Assistent des KI Experten Teams: "
+			+ "freiberufliche Spezialisten, unabhängig und mit einer klaren Haltung. KI soll in deinem Unternehmen echten Nutzen bringen, "
 			+ "nicht nur gut klingen.\n\n"
-			+ "Dafür brauche ich Ihr ehrliches Bild. Es gibt hier keine falschen Antworten: Wer noch ganz am Anfang steht, "
+			+ "Dafür brauche ich dein ehrliches Bild. Es gibt hier keine falschen Antworten: Wer noch ganz am Anfang steht, "
 			+ "bekommt von uns genauso eine passende Einschätzung wie jemand, der schon mittendrin ist. "
-			+ "Je ehrlicher Ihre Antworten, desto weniger Zeit verlieren wir beide mit Dingen, die nicht zu Ihnen passen.\n\n"
-			+ "Der Einstieg ist eine kurze Frage. Wählen Sie einfach aus, was am ehesten zutrifft, oder antworten Sie in eigenen Worten.";
-	private static final String WELCOME_FALLBACK_QUESTION = "Wie würden Sie den Einsatz von KI in Ihrem Unternehmen heute beschreiben?\n\n"
-			+ "- Noch gar nicht: Wir haben bisher keine KI im Einsatz.\n"
-			+ "- Vereinzelt: Wir probieren KI-Tools aus.\n"
-			+ "- Gezielt: KI wird in einzelnen Prozessen genutzt.\n"
-			+ "- Strategisch: KI ist fester Bestandteil unserer Planung.";
+			+ "Je ehrlicher deine Antworten, desto weniger Zeit verlieren wir beide mit Dingen, die nicht zu dir passen.\n\n"
+			+ "Wie möchtest du starten?\n\n"
+			+ "- Mit mir weiterchatten\n"
+			+ "- Die Umfrage ausfüllen";
+	private static final Set<String> LOKALE_WERKZEUGE = Set.of("speichere_zusammenfassung", "freie_termine",
+			"termin_buchen");
+	private static final int MAX_TERMIN_ANGEBOTE = 8;
+	private static final Pattern E_MAIL = Pattern.compile("[^@\\s]+@[^@\\s]+\\.[^@\\s]+");
+	private static final ZoneId BUCHUNGS_ZONE = ZoneId.of("Europe/Berlin");
+	private static final DateTimeFormatter TERMIN_ANZEIGE = DateTimeFormatter
+			.ofPattern("EEEE, d. MMMM yyyy, HH:mm 'Uhr'", Locale.GERMAN).withZone(BUCHUNGS_ZONE);
 	private static final int MAX_TOOL_ROUNDS = 5;
 	private static final int MAX_TOOL_CALLS = 10;
 	private final ObjectMapper mapper = new ObjectMapper();
@@ -100,10 +119,12 @@ public class KiChatController {
 	private final String speechFormat;
 	private final ChatProtokollService protokolle;
 	private final RequirementsMcpGateway requirementsMcp;
+	private final TerminController termine;
 
 	public KiChatController(
 			final ChatProtokollService protokolle,
 			final ObjectProvider<RequirementsMcpGateway> requirementsMcp,
+			final TerminController termine,
 			@Value("${app.ki.base-url:https://100.65.185.69/v1}") final String baseUrl,
 			@Value("${app.ki.completions-path:/chat/completions}") final String completionsPath,
 			@Value("${app.ki.transcriptions-path:/audio/transcriptions}") final String transcriptionsPath,
@@ -127,6 +148,7 @@ public class KiChatController {
 		this.speechFormat = speechFormat;
 		this.protokolle = protokolle;
 		this.requirementsMcp = requirementsMcp.getIfAvailable();
+		this.termine = termine;
 		final HttpClient.Builder builder = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10));
 		if (trustAll) {
 			// nur für den internen Server mit selbstsigniertem Zertifikat
@@ -162,7 +184,7 @@ public class KiChatController {
 	public record ChatResponse(String reply) {
 	}
 
-	private record KiAntwort(String text, boolean abgeschlossen) {
+	private record KiAntwort(String text, String zusammenfassung) {
 	}
 
 	public record TranscriptionResponse(String text) {
@@ -259,30 +281,56 @@ public class KiChatController {
 	public record WelcomeResponse(String gespraechId, String text) {
 	}
 
+	public record UmfrageAntwort(@NotBlank @Size(max = 64) String gespraechId,
+			@NotBlank @Size(max = 64) String stepId,
+			@NotNull @Size(min = 1, max = 10) List<@NotBlank @Size(max = 500) String> answers) {
+	}
+
 	@GetMapping("/api/ki/welcome")
 	public WelcomeResponse welcome(final HttpServletRequest http) {
 		this.limit(http.getRemoteAddr());
-		final String gespraechId = UUID.randomUUID().toString();
-		return new WelcomeResponse(gespraechId, WELCOME_INTRO + "\n\n" + this.ersteFrage(gespraechId));
+		return new WelcomeResponse(UUID.randomUUID().toString(), WELCOME_INTRO);
 	}
 
-	private String ersteFrage(final String gespraechId) {
-		if (this.requirementsMcp != null) {
-			try {
-				final var arguments = this.mapper.createObjectNode().put("conversationId", gespraechId);
-				final JsonNode result = this.mapper
-						.readTree(this.requirementsMcp.call("get_next_requirement_step", arguments));
-				final JsonNode step = result.path("step");
-				if (!step.path("question").isTextual())
-					throw new IllegalStateException("Anforderungsschritt ohne Frage");
-				return this.schrittAlsMarkdown(result, step);
-			} catch (final IOException | RuntimeException e) {
-				log.warn("Erster Anforderungsschritt konnte nicht geladen werden", e);
-			}
-		}
-		return WELCOME_FALLBACK_QUESTION;
+	/** Aktueller Umfrageschritt ohne KI; die Umfrage läuft direkt über den MCP-Server. */
+	@GetMapping("/api/ki/umfrage/schritt")
+	public ObjectNode umfrageSchritt(@RequestParam final String gespraechId) throws IOException {
+		return this.umfrageZustand(this.gespraechId(gespraechId));
 	}
 
+	@PostMapping("/api/ki/umfrage/antwort")
+	public ObjectNode umfrageAntwort(@RequestBody @Valid final UmfrageAntwort request) throws IOException {
+		final String id = this.gespraechId(request.gespraechId());
+		final ObjectNode arguments = this.mapper.createObjectNode().put("conversationId", id)
+				.put("stepId", request.stepId()).put("sufficient", true);
+		arguments.set("answers", this.mapper.valueToTree(request.answers()));
+		final JsonNode result = this.mapper.readTree(this.mcp().call("record_requirement_answer", arguments));
+		if (!result.path("accepted").asBoolean(false) && !result.path("completed").asBoolean(false))
+			throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
+					result.path("reason").asText("Die Antwort konnte nicht übernommen werden."));
+		return this.umfrageZustand(id);
+	}
+
+	private ObjectNode umfrageZustand(final String id) throws IOException {
+		final var arguments = this.mapper.createObjectNode().put("conversationId", id);
+		final ObjectNode result = (ObjectNode) this.mapper
+				.readTree(this.mcp().call("get_next_requirement_step", arguments));
+		if (!result.path("completed").asBoolean(false))
+			result.put("markdown", this.schrittAlsMarkdown(result, result.path("step")));
+		return result;
+	}
+
+	private RequirementsMcpGateway mcp() {
+		if (this.requirementsMcp == null)
+			throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE);
+		return this.requirementsMcp;
+	}
+
+	private String gespraechId(final String value) {
+		if (value == null || !value.matches("[0-9a-fA-F-]{36}"))
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST);
+		return value;
+	}
 	private String schrittAlsMarkdown(final JsonNode result, final JsonNode step) {
 		final StringBuilder markdown = new StringBuilder();
 		markdown.append("**Schritt ").append(result.path("stepNumber").asInt(1)).append(" von ")
@@ -326,7 +374,8 @@ public class KiChatController {
 					final KiAntwort antwort = this.completeWithTools(toolBody, protokoll.getGespraechId());
 					this.protokolle.abschliessen(protokoll, antwort.text(), "ABGESCHLOSSEN");
 					this.sendEvent(output, "delta", antwort.text());
-					this.sendEvent(output, "done", Map.of("text", "", "abgeschlossen", antwort.abgeschlossen()));
+					this.sendEvent(output, "done", Map.of("text", "", "zusammenfassung",
+							antwort.zusammenfassung() == null ? "" : antwort.zusammenfassung()));
 				} catch (final IOException | InterruptedException | RuntimeException e) {
 					if (e instanceof InterruptedException)
 						Thread.currentThread().interrupt();
@@ -391,15 +440,58 @@ public class KiChatController {
 		body.put("max_tokens", 1500);
 		body.putObject("chat_template_kwargs").put("enable_thinking", true);
 		if (this.requirementsMcp != null) {
-			body.set("tools", this.requirementsMcp.toolDefinitions());
+			final ArrayNode tools = this.requirementsMcp.toolDefinitions().deepCopy();
+			tools.addAll(this.lokaleWerkzeuge());
+			body.set("tools", tools);
 			body.put("tool_choice", "auto");
 		}
 		return body;
 	}
 
+	private ArrayNode lokaleWerkzeuge() {
+		final ArrayNode definitions = this.mapper.createArrayNode();
+
+		final ObjectNode zusammenfassungText = this.mapper.createObjectNode().put("type", "string")
+				.put("description", "Zusammenfassung in Stichpunkten");
+		definitions.add(werkzeug("speichere_zusammenfassung",
+				"Speichert die knappe Zusammenfassung der Umfrage für das Kontaktformular.",
+				this.mapper.createObjectNode().set("text", zusammenfassungText), "text"));
+
+		definitions.add(werkzeug("freie_termine",
+				"Liefert freie Video-Call-Termine. Nur diese Termine dürfen angeboten werden.",
+				this.mapper.createObjectNode()));
+
+		final ObjectNode buchungEigenschaften = this.mapper.createObjectNode();
+		buchungEigenschaften.set("start", this.mapper.createObjectNode().put("type", "string")
+				.put("description", "Startzeit aus freie_termine, ISO-8601 (Feld start)"));
+		buchungEigenschaften.set("name", this.mapper.createObjectNode().put("type", "string"));
+		buchungEigenschaften.set("email", this.mapper.createObjectNode().put("type", "string"));
+		buchungEigenschaften.set("nachricht", this.mapper.createObjectNode().put("type", "string")
+				.put("description", "Optionale kurze Notiz zum Gespräch"));
+		definitions.add(werkzeug("termin_buchen",
+				"Bucht einen freien Video-Call-Termin. Nur nach ausdrücklicher Bestätigung durch den Nutzer aufrufen. "
+						+ "Der Nutzer erhält eine Bestätigungs-Mail und muss den Termin dort bestätigen.",
+				buchungEigenschaften, "start", "name", "email"));
+		return definitions;
+	}
+
+	private ObjectNode werkzeug(final String name, final String beschreibung, final ObjectNode eigenschaften,
+			final String... pflichtfelder) {
+		final ObjectNode parameter = this.mapper.createObjectNode().put("type", "object");
+		parameter.set("properties", eigenschaften);
+		final ArrayNode required = parameter.putArray("required");
+		for (final String feld : pflichtfelder)
+			required.add(feld);
+		final ObjectNode funktion = this.mapper.createObjectNode().put("name", name).put("description", beschreibung);
+		funktion.set("parameters", parameter);
+		final ObjectNode definition = this.mapper.createObjectNode().put("type", "function");
+		definition.set("function", funktion);
+		return definition;
+	}
+
 	private KiAntwort completeWithTools(final com.fasterxml.jackson.databind.node.ObjectNode body,
 			final String conversationId) throws Exception {
-		boolean abgeschlossen = false;
+		String zusammenfassung = "";
 		if (this.requirementsMcp != null) {
 			final com.fasterxml.jackson.databind.node.ObjectNode system = (com.fasterxml.jackson.databind.node.ObjectNode) body
 					.path("messages").get(0);
@@ -422,8 +514,8 @@ public class KiChatController {
 					throw new ResponseStatusException(HttpStatus.BAD_GATEWAY);
 				final String text = content.asText().replaceAll("(?s)<think>.*?</think>", "").trim();
 				if (executedCalls == 0)
-					return new KiAntwort(text, abgeschlossen);
-				return this.mitAktuellemSchritt(text, conversationId, abgeschlossen);
+					return new KiAntwort(text, zusammenfassung);
+				return this.mitAktuellemSchritt(text, conversationId, zusammenfassung);
 			}
 			if (executedCalls + calls.size() > MAX_TOOL_CALLS)
 				throw new ResponseStatusException(HttpStatus.BAD_GATEWAY);
@@ -438,8 +530,14 @@ public class KiChatController {
 						: rawArguments;
 				if (!arguments.isObject() || toolCallId.isBlank() || toolName.isBlank())
 					throw new ResponseStatusException(HttpStatus.BAD_GATEWAY);
-				final String result = this.requirementsMcp.call(toolName, arguments);
-				abgeschlossen |= meldetAbschluss(result);
+				final String result;
+				if (LOKALE_WERKZEUGE.contains(toolName)) {
+					result = this.lokalesWerkzeug(toolName, arguments);
+					if ("speichere_zusammenfassung".equals(toolName))
+						zusammenfassung = arguments.path("text").asText("").trim();
+				} else {
+					result = this.requirementsMcp.call(toolName, arguments);
+				}
 				messages.addObject().put("role", "tool").put("tool_call_id", toolCallId).put("content", result);
 				executedCalls++;
 			}
@@ -447,31 +545,76 @@ public class KiChatController {
 		throw new ResponseStatusException(HttpStatus.BAD_GATEWAY);
 	}
 
-	private KiAntwort mitAktuellemSchritt(final String text, final String conversationId, final boolean abgeschlossen)
+	private KiAntwort mitAktuellemSchritt(final String text, final String conversationId, final String zusammenfassung)
 			throws IOException {
 		try {
 			final var arguments = this.mapper.createObjectNode().put("conversationId", conversationId);
 			final JsonNode result = this.mapper
 					.readTree(this.requirementsMcp.call("get_next_requirement_step", arguments));
 			if (result.path("completed").asBoolean(false))
-				return new KiAntwort(text, true);
+				return new KiAntwort(text, zusammenfassung);
 			final JsonNode step = result.path("step");
 			if (!step.path("question").isTextual())
-				return new KiAntwort(text, abgeschlossen);
+				return new KiAntwort(text, zusammenfassung);
 			final String frage = this.schrittAlsMarkdown(result, step);
-			return new KiAntwort(text.isEmpty() ? frage : text + "\n\n" + frage, abgeschlossen);
+			return new KiAntwort(text.isEmpty() ? frage : text + "\n\n" + frage, zusammenfassung);
 		} catch (final RuntimeException e) {
 			log.warn("Aktueller Anforderungsschritt konnte nicht angehängt werden", e);
-			return new KiAntwort(text, abgeschlossen);
+			return new KiAntwort(text, zusammenfassung);
 		}
 	}
 
-	private boolean meldetAbschluss(final String toolResult) {
+	private String lokalesWerkzeug(final String name, final JsonNode arguments) {
 		try {
-			return this.mapper.readTree(toolResult).path("completed").asBoolean(false);
-		} catch (final IOException | RuntimeException e) {
-			return false;
+			return switch (name) {
+				case "speichere_zusammenfassung" -> this.mapper.createObjectNode().put("gespeichert", true).toString();
+				case "freie_termine" -> this.freieTermine();
+				case "termin_buchen" -> this.terminBuchen(arguments);
+				default -> fehlerAntwort("Unbekanntes Werkzeug");
+			};
+		} catch (final ResponseStatusException e) {
+			log.warn("Lokales Werkzeug {} abgelehnt: {}", name, e.getReason());
+			return fehlerAntwort(e.getReason() == null ? "Aktion nicht möglich" : e.getReason());
+		} catch (final RuntimeException | IOException e) {
+			log.warn("Lokales Werkzeug {} fehlgeschlagen", name, e);
+			return fehlerAntwort("Aktion fehlgeschlagen");
 		}
+	}
+
+	private String freieTermine() throws IOException {
+		final ArrayNode slots = this.mapper.createArrayNode();
+		for (final TerminController.Slot slot : this.termine.freieVideoCallTermine(MAX_TERMIN_ANGEBOTE))
+			slots.addObject().put("start", slot.start().toString())
+					.put("anzeige", TERMIN_ANZEIGE.format(slot.start()));
+		return this.mapper.createObjectNode().put("art", "VideoCall")
+				.put("hinweis", "Nur diese Video-Call-Termine dürfen angeboten werden.")
+				.set("termine", slots).toString();
+	}
+
+	private String terminBuchen(final JsonNode arguments) {
+		final String name = arguments.path("name").asText("").trim();
+		final String email = arguments.path("email").asText("").trim();
+		final String nachricht = arguments.path("nachricht").asText("").trim();
+		if (name.isEmpty() || name.length() > 120)
+			return fehlerAntwort("Bitte einen Namen angeben (max. 120 Zeichen).");
+		if (email.length() > 200 || !E_MAIL.matcher(email).matches())
+			return fehlerAntwort("Bitte eine gültige E-Mail-Adresse angeben.");
+		final Instant start;
+		try {
+			start = Instant.parse(arguments.path("start").asText(""));
+		} catch (final DateTimeParseException e) {
+			return fehlerAntwort("Die Startzeit ist ungültig. Bitte einen Termin aus freie_termine wählen.");
+		}
+		final TerminController.BuchungAntwort antwort = this.termine.buchenFuerKi(new TerminController.BuchungRequest(
+				start, BUCHUNGS_ZONE.getId(), name, email, null, nachricht.isEmpty() ? null : nachricht));
+		return this.mapper.createObjectNode().put("status", "ANGEFRAGT")
+				.put("anzeige", TERMIN_ANZEIGE.format(antwort.start()))
+				.put("hinweis", "Der Termin ist vorgemerkt. Der Nutzer muss ihn über die Bestätigungs-Mail bestätigen.")
+				.toString();
+	}
+
+	private static String fehlerAntwort(final String meldung) {
+		return JsonNodeFactory.instance.objectNode().put("fehler", meldung).toString();
 	}
 
 	private HttpRequest upstreamRequest(final JsonNode body) throws IOException {
