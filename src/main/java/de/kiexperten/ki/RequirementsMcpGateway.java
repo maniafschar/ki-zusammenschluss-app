@@ -24,7 +24,8 @@ public class RequirementsMcpGateway {
 
 	public RequirementsMcpGateway(final List<McpSyncClient> clients, final ObjectMapper mapper) {
 		if (clients.size() != 1)
-			throw new IllegalStateException("Genau ein Requirements-MCP-Server muss konfiguriert sein.");
+			throw new IllegalStateException("Genau ein Requirements-MCP-Server muss konfiguriert sein, gefunden: "
+					+ clients.size() + ". Prüfe APP_REQUIREMENTS_MCP_URL und spring.ai.mcp.client.*");
 		this.client = clients.get(0);
 		this.mapper = mapper;
 	}
