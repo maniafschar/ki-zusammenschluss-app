@@ -341,7 +341,6 @@ startBooking();
 	const webglCanvas = document.getElementById('voice-webgl');
 	const ctx = canvas.getContext('2d');
 	const canRecord = Boolean(window.MediaRecorder && navigator.mediaDevices?.getUserMedia);
-	const welcome = 'Willkommen beim KI Experten Team! Wir sind ein unabhängiges Team von top Spezialisten, jeder auf seinem Gebiet. Uns alle vereint die Art, wie wir denken das KI in Unternehmen den größten Profit erbringt. Du kannst mir gerne Fragen stellen oder einfach sagen, dass ich Dir mehr über uns erzählen soll...';
 	if (!canRecord) {
 		mic.disabled = true;
 		mic.title = 'Audioaufnahme wird von diesem Browser nicht unterstützt';
@@ -868,22 +867,49 @@ startBooking();
 		}
 	}
 
+	function renderWelcome(markdown) {
+		text.replaceChildren();
+		const assistant = document.createElement('div');
+		assistant.className = 'chat-turn chat-assistant';
+		const label = document.createElement('strong');
+		label.textContent = 'KI';
+		assistant.append(label);
+		renderMarkdown(assistant, markdown, true);
+		text.append(assistant);
+	}
+
 	async function playWelcome() {
-		text.textContent = welcome;
+		start.disabled = true;
+		let welcome;
+		try {
+			const res = await fetch('/ai-expert/api/ki/welcome', { credentials: 'same-origin' });
+			if (!res.ok) throw new Error(res.status);
+			({ gespraechId, text: welcome } = await res.json());
+		} catch (e) {
+			console.error('Begrüßung konnte nicht geladen werden:', e);
+			text.textContent = 'Die Begrüßung konnte gerade nicht geladen werden. Bitte versuchen Sie es erneut.';
+			start.disabled = false;
+			return;
+		}
+		history.push({ role: 'assistant', content: welcome });
 		start.hidden = true;
 		mic.hidden = false;
 		mic.disabled = true;
+		renderWelcome(welcome);
+		choiceReady = true;
 		try {
-			await speak(welcome);
+			await speak(plainMarkdown(welcome));
 		} catch (e) {
-			text.textContent = welcome + ' Sprachausgabe ist derzeit nicht verfügbar.';
-			state = 'idle';
+			const speechError = document.createElement('p');
+			speechError.className = 'chat-status';
+			speechError.textContent = 'Die Sprachausgabe ist fehlgeschlagen.';
+			text.querySelector('.chat-assistant')?.append(speechError);
 		} finally {
 			mic.disabled = !canRecord;
 		}
 	}
 
-	start.addEventListener('click', playWelcome, { once: true });
+	start.addEventListener('click', playWelcome);
 
 	function closePrivacyPopup() {
 		if (privacyPopup.hidden) return;

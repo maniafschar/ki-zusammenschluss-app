@@ -125,4 +125,31 @@ class KiChatMcpToolFlowTest {
 		verify(this.requirementsMcp).call(eq("get_next_requirement_step"), invocation.capture());
 		assertTrue(UUID.fromString(invocation.getValue().path("conversationId").asText()) != null);
 	}
+
+	@Test
+	void welcomeContainsFirstRequirementStepFromMcp() throws Exception {
+		when(this.requirementsMcp.call(eq("get_next_requirement_step"), any(JsonNode.class)))
+				.thenReturn("{\"completed\":false,\"stepNumber\":1,\"totalSteps\":6,\"step\":{\"question\":\"Welche Rolle spielt KI?\","
+						+ "\"options\":[\"Keine: nichts.\",\"Strategisch: viel.\"],\"selectionMode\":\"single\"}}");
+		final var response = HttpClient.newHttpClient().send(HttpRequest
+				.newBuilder(URI.create("http://127.0.0.1:" + this.port + "/api/ki/welcome")).GET().build(),
+				HttpResponse.BodyHandlers.ofString());
+
+		assertEquals(200, response.statusCode());
+		final JsonNode body = this.mapper.readTree(response.body());
+		assertTrue(UUID.fromString(body.path("gespraechId").asText()) != null);
+		assertTrue(body.path("text").asText().contains("**Schritt 1 von 6:** Welche Rolle spielt KI?"));
+		assertTrue(body.path("text").asText().contains("\n- Keine: nichts."));
+	}
+
+	@Test
+	void welcomeFallsBackToStaticQuestionWhenMcpFails() throws Exception {
+		final var response = HttpClient.newHttpClient().send(HttpRequest
+				.newBuilder(URI.create("http://127.0.0.1:" + this.port + "/api/ki/welcome")).GET().build(),
+				HttpResponse.BodyHandlers.ofString());
+
+		assertEquals(200, response.statusCode());
+		assertTrue(this.mapper.readTree(response.body()).path("text").asText()
+				.contains("Wie würden Sie den Einsatz von KI in Ihrem Unternehmen heute beschreiben?"));
+	}
 }

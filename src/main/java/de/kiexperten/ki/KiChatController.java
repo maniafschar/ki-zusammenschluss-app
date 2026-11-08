@@ -30,6 +30,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestPart;
@@ -71,6 +72,18 @@ public class KiChatController {
 			+ "Du entscheidest selbst, ob die Antwort genügt. Bei unklaren Antworten stelle eine konkrete Rückfrage und schließe den Schritt nicht ab. Der Server prüft Auswahlmaximum und Reihenfolge. "
 			+ "Erkläre die Optionstexte nicht um und erfinde keine Antwortoptionen. Nach dem sechsten Schritt fasse die Antworten knapp zusammen und lade zu einem Termin am Seitenende ein. "
 			+ "Beantworte keine sachfremden Fragen; lenke freundlich zum aktuellen Schritt zurück.";
+	private static final String WELCOME_INTRO = "Schön, dass Sie da sind! Ich bin der KI-Assistent des KI Experten Teams: "
+			+ "freiberufliche Spezialisten, unabhängig und mit einer klaren Haltung. KI soll in Ihrem Unternehmen echten Nutzen bringen, "
+			+ "nicht nur gut klingen.\n\n"
+			+ "Dafür brauche ich Ihr ehrliches Bild. Es gibt hier keine falschen Antworten: Wer noch ganz am Anfang steht, "
+			+ "bekommt von uns genauso eine passende Einschätzung wie jemand, der schon mittendrin ist. "
+			+ "Je ehrlicher Ihre Antworten, desto weniger Zeit verlieren wir beide mit Dingen, die nicht zu Ihnen passen.\n\n"
+			+ "Der Einstieg ist eine kurze Frage. Wählen Sie einfach aus, was am ehesten zutrifft, oder antworten Sie in eigenen Worten.";
+	private static final String WELCOME_FALLBACK_QUESTION = "Wie würden Sie den Einsatz von KI in Ihrem Unternehmen heute beschreiben?\n\n"
+			+ "- Noch gar nicht: Wir haben bisher keine KI im Einsatz.\n"
+			+ "- Vereinzelt: Wir probieren KI-Tools aus.\n"
+			+ "- Gezielt: KI wird in einzelnen Prozessen genutzt.\n"
+			+ "- Strategisch: KI ist fester Bestandteil unserer Planung.";
 	private static final int MAX_TOOL_ROUNDS = 5;
 	private static final int MAX_TOOL_CALLS = 10;
 	private final ObjectMapper mapper = new ObjectMapper();
@@ -239,6 +252,50 @@ public class KiChatController {
 			case "opus", "ogg" -> MediaType.parseMediaType("audio/ogg");
 			default -> MediaType.parseMediaType("audio/mpeg");
 		};
+	}
+
+	public record WelcomeResponse(String gespraechId, String text) {
+	}
+
+	@GetMapping("/api/ki/welcome")
+	public WelcomeResponse welcome(final HttpServletRequest http) {
+		this.limit(http.getRemoteAddr());
+		final String gespraechId = UUID.randomUUID().toString();
+		return new WelcomeResponse(gespraechId, WELCOME_INTRO + "\n\n" + this.ersteFrage(gespraechId));
+	}
+
+	private String ersteFrage(final String gespraechId) {
+		if (this.requirementsMcp != null) {
+			try {
+				final var arguments = this.mapper.createObjectNode().put("conversationId", gespraechId);
+				final JsonNode result = this.mapper
+						.readTree(this.requirementsMcp.call("get_next_requirement_step", arguments));
+				final JsonNode step = result.path("step");
+				if (!step.path("question").isTextual())
+					throw new IllegalStateException("Anforderungsschritt ohne Frage");
+				return this.schrittAlsMarkdown(result, step);
+			} catch (final IOException | RuntimeException e) {
+				log.warn("Erster Anforderungsschritt konnte nicht geladen werden", e);
+			}
+		}
+		return WELCOME_FALLBACK_QUESTION;
+	}
+
+	private String schrittAlsMarkdown(final JsonNode result, final JsonNode step) {
+		final StringBuilder markdown = new StringBuilder();
+		markdown.append("**Schritt ").append(result.path("stepNumber").asInt(1)).append(" von ")
+				.append(result.path("totalSteps").asInt(1)).append(":** ").append(step.path("question").asText());
+		if ("text".equals(step.path("selectionMode").asText())) {
+			markdown.append("\n\nFreitextfeld: ").append(step.path("inputPlaceholder").asText());
+			return markdown.toString();
+		}
+		markdown.append("\n");
+		for (final JsonNode option : step.path("options"))
+			markdown.append("\n- ").append(option.asText());
+		if ("multiple".equals(step.path("selectionMode").asText()))
+			markdown.append("\n\nMehrfachauswahl möglich (max. ").append(step.path("maxSelections").asInt(1))
+					.append(" Antworten).");
+		return markdown.toString();
 	}
 
 	@PostMapping("/api/ki/chat")
