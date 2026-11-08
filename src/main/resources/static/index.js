@@ -504,7 +504,6 @@ startBooking();
 	}
 
 	function renderConversation(question, reply, { choices = false, status = '' } = {}) {
-		const follow = text.scrollHeight - text.scrollTop - text.clientHeight <= 2;
 		text.replaceChildren();
 		const user = document.createElement('div');
 		user.className = 'chat-turn chat-user';
@@ -527,7 +526,7 @@ startBooking();
 			assistant.append(detail);
 		}
 		text.append(assistant);
-		if (follow) text.scrollTop = text.scrollHeight;
+		text.scrollTo({ top: 0, behavior: reducedMotion.matches ? 'auto' : 'smooth' });
 	}
 
 	function draw(t) {
