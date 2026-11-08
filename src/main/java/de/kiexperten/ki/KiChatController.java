@@ -13,17 +13,11 @@ import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.security.cert.X509Certificate;
 import java.time.Duration;
-import java.time.Instant;
-import java.time.ZoneId;
-import java.time.format.DateTimeFormatter;
-import java.time.format.DateTimeParseException;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.regex.Pattern;
 
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.TrustManager;
@@ -52,7 +46,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import de.kiexperten.booking.TerminController;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
@@ -82,9 +75,7 @@ public class KiChatController {
 			+ "Erkläre die Optionstexte nicht um und erfinde keine Antwortoptionen. "
 			+ "Der Nutzer kann die Umfrage auch ohne dich ausfüllen. Wenn get_next_requirement_step completed=true meldet oder der Nutzer schreibt, dass er die Umfrage abgeschlossen hat, gehe so vor: "
 			+ "1. Rufe speichere_zusammenfassung mit einer knappen, sachlichen Zusammenfassung der Antworten in Stichpunkten ohne Anrede und Grußformel auf. "
-			+ "2. Schlage danach einen Termin vor: Rufe freie_termine auf und biete ausschließlich diese freien Termine an. Es gibt nur Video-Call-Termine; biete keine anderen Terminarten an. "
-			+ "3. Rufe termin_buchen erst auf, nachdem der Nutzer einen Termin ausdrücklich bestätigt hat. Du brauchst dafür Name und E-Mail-Adresse; frage danach, falls sie fehlen. "
-			+ "4. Nach erfolgreicher Buchung sage, dass der Nutzer die Bestätigungs-Mail mit dem Link öffnen muss, um den Termin zu bestätigen. "
+			+ "2. Schlage keine Termine vor und frage nicht nach Terminen, Namen oder E-Mail-Adressen. Bedanke dich kurz für die Antworten. "
 			+ "Beantworte keine sachfremden Fragen; lenke freundlich zum aktuellen Schritt zurück.";
 	private static final String WELCOME_INTRO = "Schön, dass du da bist! Ich bin der KI-Assistent des KI Experten Teams: "
 			+ "freiberufliche Spezialisten, unabhängig und mit einer klaren Haltung. KI soll in deinem Unternehmen echten Nutzen bringen, "
@@ -95,13 +86,7 @@ public class KiChatController {
 			+ "Wie möchtest du starten?\n\n"
 			+ "- Mit mir weiterchatten\n"
 			+ "- Die Umfrage ausfüllen";
-	private static final Set<String> LOKALE_WERKZEUGE = Set.of("speichere_zusammenfassung", "freie_termine",
-			"termin_buchen");
-	private static final int MAX_TERMIN_ANGEBOTE = 8;
-	private static final Pattern E_MAIL = Pattern.compile("[^@\\s]+@[^@\\s]+\\.[^@\\s]+");
-	private static final ZoneId BUCHUNGS_ZONE = ZoneId.of("Europe/Berlin");
-	private static final DateTimeFormatter TERMIN_ANZEIGE = DateTimeFormatter
-			.ofPattern("EEEE, d. MMMM yyyy, HH:mm 'Uhr'", Locale.GERMAN).withZone(BUCHUNGS_ZONE);
+	private static final Set<String> LOKALE_WERKZEUGE = Set.of("speichere_zusammenfassung");
 	private static final int MAX_TOOL_ROUNDS = 5;
 	private static final int MAX_TOOL_CALLS = 10;
 	private final ObjectMapper mapper = new ObjectMapper();
@@ -119,12 +104,10 @@ public class KiChatController {
 	private final String speechFormat;
 	private final ChatProtokollService protokolle;
 	private final RequirementsMcpGateway requirementsMcp;
-	private final TerminController termine;
 
 	public KiChatController(
 			final ChatProtokollService protokolle,
 			final ObjectProvider<RequirementsMcpGateway> requirementsMcp,
-			final TerminController termine,
 			@Value("${app.ki.base-url:https://100.65.185.69/v1}") final String baseUrl,
 			@Value("${app.ki.completions-path:/chat/completions}") final String completionsPath,
 			@Value("${app.ki.transcriptions-path:/audio/transcriptions}") final String transcriptionsPath,
@@ -148,7 +131,6 @@ public class KiChatController {
 		this.speechFormat = speechFormat;
 		this.protokolle = protokolle;
 		this.requirementsMcp = requirementsMcp.getIfAvailable();
-		this.termine = termine;
 		final HttpClient.Builder builder = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10));
 		if (trustAll) {
 			// nur für den internen Server mit selbstsigniertem Zertifikat
@@ -457,21 +439,6 @@ public class KiChatController {
 				"Speichert die knappe Zusammenfassung der Umfrage für das Kontaktformular.",
 				this.mapper.createObjectNode().set("text", zusammenfassungText), "text"));
 
-		definitions.add(werkzeug("freie_termine",
-				"Liefert freie Video-Call-Termine. Nur diese Termine dürfen angeboten werden.",
-				this.mapper.createObjectNode()));
-
-		final ObjectNode buchungEigenschaften = this.mapper.createObjectNode();
-		buchungEigenschaften.set("start", this.mapper.createObjectNode().put("type", "string")
-				.put("description", "Startzeit aus freie_termine, ISO-8601 (Feld start)"));
-		buchungEigenschaften.set("name", this.mapper.createObjectNode().put("type", "string"));
-		buchungEigenschaften.set("email", this.mapper.createObjectNode().put("type", "string"));
-		buchungEigenschaften.set("nachricht", this.mapper.createObjectNode().put("type", "string")
-				.put("description", "Optionale kurze Notiz zum Gespräch"));
-		definitions.add(werkzeug("termin_buchen",
-				"Bucht einen freien Video-Call-Termin. Nur nach ausdrücklicher Bestätigung durch den Nutzer aufrufen. "
-						+ "Der Nutzer erhält eine Bestätigungs-Mail und muss den Termin dort bestätigen.",
-				buchungEigenschaften, "start", "name", "email"));
 		return definitions;
 	}
 
@@ -568,49 +535,15 @@ public class KiChatController {
 		try {
 			return switch (name) {
 				case "speichere_zusammenfassung" -> this.mapper.createObjectNode().put("gespeichert", true).toString();
-				case "freie_termine" -> this.freieTermine();
-				case "termin_buchen" -> this.terminBuchen(arguments);
 				default -> fehlerAntwort("Unbekanntes Werkzeug");
 			};
 		} catch (final ResponseStatusException e) {
 			log.warn("Lokales Werkzeug {} abgelehnt: {}", name, e.getReason());
 			return fehlerAntwort(e.getReason() == null ? "Aktion nicht möglich" : e.getReason());
-		} catch (final RuntimeException | IOException e) {
+		} catch (final RuntimeException e) {
 			log.warn("Lokales Werkzeug {} fehlgeschlagen", name, e);
 			return fehlerAntwort("Aktion fehlgeschlagen");
 		}
-	}
-
-	private String freieTermine() throws IOException {
-		final ArrayNode slots = this.mapper.createArrayNode();
-		for (final TerminController.Slot slot : this.termine.freieVideoCallTermine(MAX_TERMIN_ANGEBOTE))
-			slots.addObject().put("start", slot.start().toString())
-					.put("anzeige", TERMIN_ANZEIGE.format(slot.start()));
-		return this.mapper.createObjectNode().put("art", "VideoCall")
-				.put("hinweis", "Nur diese Video-Call-Termine dürfen angeboten werden.")
-				.set("termine", slots).toString();
-	}
-
-	private String terminBuchen(final JsonNode arguments) {
-		final String name = arguments.path("name").asText("").trim();
-		final String email = arguments.path("email").asText("").trim();
-		final String nachricht = arguments.path("nachricht").asText("").trim();
-		if (name.isEmpty() || name.length() > 120)
-			return fehlerAntwort("Bitte einen Namen angeben (max. 120 Zeichen).");
-		if (email.length() > 200 || !E_MAIL.matcher(email).matches())
-			return fehlerAntwort("Bitte eine gültige E-Mail-Adresse angeben.");
-		final Instant start;
-		try {
-			start = Instant.parse(arguments.path("start").asText(""));
-		} catch (final DateTimeParseException e) {
-			return fehlerAntwort("Die Startzeit ist ungültig. Bitte einen Termin aus freie_termine wählen.");
-		}
-		final TerminController.BuchungAntwort antwort = this.termine.buchenFuerKi(new TerminController.BuchungRequest(
-				start, BUCHUNGS_ZONE.getId(), name, email, null, nachricht.isEmpty() ? null : nachricht));
-		return this.mapper.createObjectNode().put("status", "ANGEFRAGT")
-				.put("anzeige", TERMIN_ANZEIGE.format(antwort.start()))
-				.put("hinweis", "Der Termin ist vorgemerkt. Der Nutzer muss ihn über die Bestätigungs-Mail bestätigen.")
-				.toString();
 	}
 
 	private static String fehlerAntwort(final String meldung) {

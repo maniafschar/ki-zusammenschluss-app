@@ -356,7 +356,7 @@ startBooking();
 	let umfrageSchritt = null;
 	let umfrageMarkdown = '';
 	const OPTION_UMFRAGE = 'Die Umfrage ausfüllen';
-	const ABSCHLUSS_FRAGE = 'Ich habe die Umfrage abgeschlossen. Schlag mir bitte einen Termin vor.';
+	const ABSCHLUSS_FRAGE = 'Ich habe die Umfrage abgeschlossen.';
 	let level = 0;
 	let audioContext = null;
 	let audioAnalyser = null;
@@ -1071,16 +1071,32 @@ startBooking();
 		if (nachricht) nachricht.value = summary.slice(0, 2000);
 		const bereich = text.querySelector('.chat-assistant');
 		if (!bereich) return;
-		const button = document.createElement('button');
-		button.type = 'button';
-		button.className = 'btn';
-		button.textContent = 'Zum Terminkalender';
-		button.addEventListener('click', () => {
+		const aktionen = document.createElement('div');
+		aktionen.className = 'chat-actions';
+		const termin = document.createElement('button');
+		termin.type = 'button';
+		termin.className = 'btn';
+		termin.textContent = 'Termin vereinbaren';
+		termin.addEventListener('click', () => {
 			document.getElementById('kontakt')?.scrollIntoView({
 				behavior: reducedMotion.matches ? 'auto' : 'smooth'
 			});
 		});
-		bereich.append(button);
+		const weiterchatten = document.createElement('button');
+		weiterchatten.type = 'button';
+		weiterchatten.className = 'btn';
+		weiterchatten.textContent = 'Mit mir weiterchatten';
+		weiterchatten.addEventListener('click', () => {
+			aktionen.remove();
+			const danke = document.createElement('p');
+			danke.className = 'chat-status';
+			danke.textContent = 'Danke dir für deine ehrlichen Antworten! '
+				+ 'Wenn du noch eine Frage hast, klicke auf das Mikrofon, um sie zu stellen. '
+				+ 'Wenn du fertig bist, klicke es erneut, um die Frage abzusenden.';
+			bereich.append(danke);
+		});
+		aktionen.append(termin, weiterchatten);
+		bereich.append(aktionen);
 	}
 
 	async function ask(question) {

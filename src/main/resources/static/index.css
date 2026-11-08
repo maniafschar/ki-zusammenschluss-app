@@ -1138,6 +1138,7 @@ footer a {
 	background: rgba(8, 25, 48, .85);
 	color: #eef7ff;
 	font: inherit;
+	margin-left: 4px;
 }
 
 .voice .chat-text-entry input::placeholder {
@@ -1154,6 +1155,13 @@ footer a {
 
 .chat-user p {
 	white-space: pre-line;
+}
+
+.chat-actions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 10px;
+	margin-top: 14px;
 }
 
 .chat-status {

@@ -4,7 +4,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentCaptor.forClass;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.atLeastOnce;
@@ -18,7 +17,6 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
-import java.time.Instant;
 import java.util.Base64;
 import java.util.Map;
 import java.util.UUID;
@@ -36,8 +34,6 @@ import org.springframework.test.context.DynamicPropertySource;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sun.net.httpserver.HttpServer;
-
-import de.kiexperten.booking.TerminController;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties = {
 		"spring.datasource.url=jdbc:h2:mem:ki-mcp-chat-test",
@@ -70,10 +66,7 @@ class KiChatMcpToolFlowTest {
 						return;
 					}
 					final String userText = lastUserText(messages);
-					if (userText.contains("[buchen]")) {
-						response = toolCall("termin_buchen",
-								"{\"start\":\"2030-01-07T08:00:00Z\",\"name\":\"Ada Lovelace\",\"email\":\"ada@example.org\"}");
-					} else if (userText.contains("[zusammenfassung]")) {
+					if (userText.contains("[zusammenfassung]")) {
 						response = toolCall("speichere_zusammenfassung", "{\"text\":\"- Reifegrad: mittel\"}");
 					} else {
 						final String arguments = MAPPER.writeValueAsString(Map.of("conversationId", matcher.group(1)));
@@ -131,9 +124,6 @@ class KiChatMcpToolFlowTest {
 
 	@MockBean
 	RequirementsMcpGateway requirementsMcp;
-
-	@MockBean
-	TerminController termine;
 
 	@Test
 	void executesModelToolCallsAgainstMcpAndReturnsTheFinalAnswer() throws Exception {
@@ -221,23 +211,6 @@ class KiChatMcpToolFlowTest {
 				HttpResponse.BodyHandlers.ofString());
 		assertEquals(200, accepted.statusCode());
 		assertTrue(this.mapper.readTree(accepted.body()).path("completed").asBoolean(false), accepted.body());
-	}
-
-	@Test
-	void chatBooksOnlyTheVideoCallSlotTheCustomerConfirmed() throws Exception {
-		when(this.requirementsMcp.call(eq("get_next_requirement_step"), any(JsonNode.class)))
-				.thenReturn("{\"completed\":true,\"minimumSteps\":6,\"answeredSteps\":6}");
-		when(this.termine.buchenFuerKi(any(TerminController.BuchungRequest.class)))
-				.thenReturn(new TerminController.BuchungAntwort(Instant.parse("2030-01-07T08:00:00Z")));
-		final var response = this.post("/api/ki/chat", "[buchen] Ja, bitte diesen Termin.");
-
-		assertEquals(200, response.statusCode());
-		final var captor = forClass(TerminController.BuchungRequest.class);
-		verify(this.termine).buchenFuerKi(captor.capture());
-		assertEquals(Instant.parse("2030-01-07T08:00:00Z"), captor.getValue().start());
-		assertEquals("Europe/Berlin", captor.getValue().zeitzone());
-		assertEquals("Ada Lovelace", captor.getValue().name());
-		assertEquals("ada@example.org", captor.getValue().email());
 	}
 
 	@Test
