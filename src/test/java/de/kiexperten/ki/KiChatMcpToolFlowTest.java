@@ -1,6 +1,7 @@
 package de.kiexperten.ki;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentCaptor.forClass;
 import static org.mockito.ArgumentMatchers.any;
@@ -8,6 +9,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -17,7 +19,9 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
+import java.time.Instant;
 import java.util.Base64;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.regex.Pattern;
@@ -30,6 +34,10 @@ import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
+
+import de.kiexperten.Zeit;
+import de.kiexperten.booking.BestaetigungsMailService;
+import de.kiexperten.booking.TerminRepository;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -67,7 +75,8 @@ class KiChatMcpToolFlowTest {
 					}
 					final String userText = lastUserText(messages);
 					if (userText.contains("[zusammenfassung]")) {
-						response = toolCall("speichere_zusammenfassung", "{\"text\":\"- Reifegrad: mittel\"}");
+						final String summary = userText.substring(userText.indexOf("[zusammenfassung]") + "[zusammenfassung]".length()).trim();
+						response = toolCall("speichere_zusammenfassung", MAPPER.writeValueAsString(Map.of("text", summary)));
 					} else {
 						final String arguments = MAPPER.writeValueAsString(Map.of("conversationId", matcher.group(1)));
 						response = "{\"choices\":[{\"message\":{\"tool_calls\":[{\"id\":\"call-1\",\"type\":\"function\",\"function\":{\"name\":\"get_next_requirement_step\",\"arguments\":"
@@ -124,6 +133,12 @@ class KiChatMcpToolFlowTest {
 
 	@MockBean
 	RequirementsMcpGateway requirementsMcp;
+
+	@MockBean
+	BestaetigungsMailService mail;
+
+	@Autowired
+	TerminRepository termine;
 
 	@Test
 	void executesModelToolCallsAgainstMcpAndReturnsTheFinalAnswer() throws Exception {
@@ -217,7 +232,7 @@ class KiChatMcpToolFlowTest {
 	void streamUebergibtZusammenfassungAusDemLokalenWerkzeug() throws Exception {
 		when(this.requirementsMcp.call(eq("get_next_requirement_step"), any(JsonNode.class)))
 				.thenReturn("{\"completed\":true,\"minimumSteps\":6,\"answeredSteps\":6}");
-		final var response = this.post("/api/ki/chat/stream", "[zusammenfassung] Bitte fasse zusammen.");
+		final var response = this.post("/api/ki/chat/stream", "[zusammenfassung] - Reifegrad: mittel");
 
 		assertEquals(200, response.statusCode());
 		assertTrue(response.body().contains("event: done\n"), response.body());
@@ -248,6 +263,87 @@ class KiChatMcpToolFlowTest {
 		assertEquals(200, response.statusCode());
 		assertTrue(response.body().contains("event: done\n"), response.body());
 		assertTrue(response.body().contains("\"zusammenfassung\":\"\""), response.body());
+	}
+
+	@Test
+	void umfrageUndTerminbuchungUebernehmenDieUmfrageergebnisseInDasTextfeld() throws Exception {
+		final String step1 = "{\"completed\":false,\"stepNumber\":1,\"totalSteps\":2,\"step\":{\"id\":\"maturity\","
+				+ "\"question\":\"Welche Rolle spielt KI?\",\"options\":[\"Keine: nichts.\",\"Strategisch: viel.\"],\"selectionMode\":\"single\"}}";
+		final String step2 = "{\"completed\":false,\"stepNumber\":2,\"totalSteps\":2,\"step\":{\"id\":\"goal\","
+				+ "\"question\":\"Welches Ziel verfolgt ihr?\",\"selectionMode\":\"text\",\"inputPlaceholder\":\"Dein Ziel in einem Satz\"}}";
+		final String completed = "{\"completed\":true,\"minimumSteps\":2,\"answeredSteps\":2}";
+		when(this.requirementsMcp.call(eq("get_next_requirement_step"), any(JsonNode.class)))
+				.thenReturn(step1, step2, completed);
+		when(this.requirementsMcp.call(eq("record_requirement_answer"), any(JsonNode.class)))
+				.thenReturn("{\"accepted\":true}");
+		final String id = UUID.randomUUID().toString();
+		final Csrf csrf = this.csrf();
+
+		final JsonNode first = this.mapper.readTree(this.get("/api/ki/umfrage/schritt?gespraechId=" + id).body());
+		assertEquals("maturity", first.path("step").path("id").asText());
+		this.postJson("/api/ki/umfrage/antwort", csrf,
+				"{\"gespraechId\":\"" + id + "\",\"stepId\":\"maturity\",\"answers\":[\"Strategisch: viel.\"]}");
+		final var lastAnswer = this.postJson("/api/ki/umfrage/antwort", csrf,
+				"{\"gespraechId\":\"" + id + "\",\"stepId\":\"goal\",\"answers\":[\"Prozesse automatisieren.\"]}");
+		assertEquals(200, lastAnswer.statusCode(), lastAnswer.body());
+		assertTrue(this.mapper.readTree(lastAnswer.body()).path("completed").asBoolean(false), lastAnswer.body());
+
+		final var answers = forClass(JsonNode.class);
+		verify(this.requirementsMcp, times(2)).call(eq("record_requirement_answer"), answers.capture());
+		final List<JsonNode> sent = answers.getAllValues();
+		assertEquals("maturity", sent.get(0).path("stepId").asText());
+		assertEquals("Strategisch: viel.", sent.get(0).path("answers").get(0).asText());
+		assertEquals("goal", sent.get(1).path("stepId").asText());
+		assertEquals("Prozesse automatisieren.", sent.get(1).path("answers").get(0).asText());
+
+		// Die KI fasst die Antworten zusammen; das Frontend übernimmt die Zusammenfassung aus dem done-Event.
+		final String summary = "- Reifegrad: Strategisch: viel.\n- Ziel: Prozesse automatisieren.";
+		final var stream = this.post("/api/ki/chat/stream", "[zusammenfassung] " + summary);
+		assertEquals(200, stream.statusCode());
+		final String zusammenfassung = this.doneEvent(stream.body()).path("zusammenfassung").asText();
+		assertEquals(summary, zusammenfassung);
+
+		final JsonNode slots = this.mapper.readTree(this.get("/api/termine").body());
+		String start = null;
+		for (final JsonNode slot : slots)
+			if (slot.path("frei").asBoolean(false)) {
+				start = slot.path("start").asText();
+				break;
+			}
+		assertNotNull(start);
+		final String booking = this.mapper.createObjectNode().put("start", start).put("zeitzone", "Europe/Berlin")
+				.put("name", "Max Muster").put("email", "max@example.com").put("telefon", "")
+				.put("nachricht", zusammenfassung).toString();
+		final var booked = this.postJson("/api/termine", csrf, booking);
+		assertEquals(201, booked.statusCode(), booked.body());
+
+		final var termin = this.termine.findByAktiverStartZeit(Zeit.utc(Instant.parse(start))).orElseThrow();
+		assertEquals("max@example.com", termin.getEmail());
+		assertEquals(summary, termin.getNachricht());
+		assertTrue(termin.getNachricht().contains("Strategisch: viel."), termin.getNachricht());
+		assertTrue(termin.getNachricht().contains("Prozesse automatisieren."), termin.getNachricht());
+	}
+
+	private HttpResponse<String> get(final String path) throws Exception {
+		return HttpClient.newHttpClient().send(
+				HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + this.port + path)).GET().build(),
+				HttpResponse.BodyHandlers.ofString());
+	}
+
+	private HttpResponse<String> postJson(final String path, final Csrf csrf, final String body) throws Exception {
+		return HttpClient.newHttpClient().send(HttpRequest
+				.newBuilder(URI.create("http://127.0.0.1:" + this.port + path))
+				.header("Content-Type", "application/json")
+				.header("Cookie", csrf.cookie()).header("X-XSRF-TOKEN", csrf.token())
+				.POST(HttpRequest.BodyPublishers.ofString(body)).build(), HttpResponse.BodyHandlers.ofString());
+	}
+
+	private JsonNode doneEvent(final String sse) throws Exception {
+		final int eventStart = sse.indexOf("event: done\n");
+		assertTrue(eventStart >= 0, sse);
+		final int dataStart = sse.indexOf("data:", eventStart) + "data:".length();
+		final int lineEnd = sse.indexOf('\n', dataStart);
+		return this.mapper.readTree(sse.substring(dataStart, lineEnd < 0 ? sse.length() : lineEnd).trim());
 	}
 
 	private record Csrf(String cookie, String token) {
