@@ -963,7 +963,7 @@ footer a {
 		radial-gradient(circle, rgba(91, 177, 255, .16) 1px, transparent 1.5px),
 		linear-gradient(145deg, #071124, #0b1c42 55%, #060e20);
 	background-size: auto, 12px 12px, auto;
-	padding-top: 112px;
+	padding-top: 60px;
 	padding-bottom: 12px;
 }
 
@@ -974,11 +974,9 @@ footer a {
 .voice canvas {
 	width: 100%;
 	max-width: 840px;
-	height: clamp(0px, 42vh, 480px);
-	height: clamp(0px, 42dvh, 480px);
+	height: clamp(0px, 25dvh, 480px);
 	min-height: 0;
 	display: block;
-	margin: 0 auto 16px;
 }
 
 .voice [hidden] {
@@ -1019,7 +1017,7 @@ footer a {
 	max-width: 640px;
 	flex: 1 1 0;
 	min-height: 3em;
-	margin: 16px auto 0;
+	margin: 0 auto;
 	color: #c6dbef;
 	overflow-y: auto;
 	overflow-wrap: anywhere;
