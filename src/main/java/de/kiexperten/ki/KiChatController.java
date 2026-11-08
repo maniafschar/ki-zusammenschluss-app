@@ -70,7 +70,7 @@ public class KiChatController {
 			+ "Bei selectionMode=text stelle die gelieferte Frage und erzeuge ein Freitextfeld mit der Zeile 'Freitextfeld: ' gefolgt vom inputPlaceholder. "
 			+ "Wenn bereits eine Frage gestellt wurde, bewerte die letzte Nutzeraussage anhand der Akzeptanzkriterien. Rufe record_requirement_answer auf und übergib die Antwort als answers-Array. Bei Auswahloptionen übergib die exakten Optionstexte einzeln; bei Freitext ein Element. "
 			+ "Du entscheidest selbst, ob die Antwort genügt. Bei unklaren Antworten stelle eine konkrete Rückfrage und schließe den Schritt nicht ab. Der Server prüft Auswahlmaximum und Reihenfolge. "
-			+ "Erkläre die Optionstexte nicht um und erfinde keine Antwortoptionen. Nach dem sechsten Schritt fasse die Antworten knapp zusammen und lade zu einem Termin am Seitenende ein. "
+			+ "Erkläre die Optionstexte nicht um und erfinde keine Antwortoptionen. Nach dem sechsten Schritt schreibe eine knappe, sachliche Zusammenfassung der Antworten in Stichpunkten ohne Anrede und Grußformel, die der Nutzer als Nachricht an das Team übernehmen kann; verweise danach kurz auf den Terminkalender am Seitenende. "
 			+ "Beantworte keine sachfremden Fragen; lenke freundlich zum aktuellen Schritt zurück.";
 	private static final String WELCOME_INTRO = "Schön, dass Sie da sind! Ich bin der KI-Assistent des KI Experten Teams: "
 			+ "freiberufliche Spezialisten, unabhängig und mit einer klaren Haltung. KI soll in Ihrem Unternehmen echten Nutzen bringen, "
@@ -161,6 +161,9 @@ public class KiChatController {
 	}
 
 	public record ChatResponse(String reply) {
+	}
+
+	private record KiAntwort(String text, boolean abgeschlossen) {
 	}
 
 	public record TranscriptionResponse(String text) {
@@ -304,7 +307,7 @@ public class KiChatController {
 		final ChatProtokoll protokoll = this.protokolle.beginne(request);
 		try {
 			final var body = this.createBody(request, http, false);
-			final String reply = this.completeWithTools(body, protokoll.getGespraechId());
+			final String reply = this.completeWithTools(body, protokoll.getGespraechId()).text();
 			this.protokolle.abschliessen(protokoll, reply, "ABGESCHLOSSEN");
 			return new ChatResponse(reply);
 		} catch (IOException | InterruptedException | RuntimeException e) {
@@ -321,10 +324,10 @@ public class KiChatController {
 			final var toolBody = this.createBody(request, http, false);
 			final StreamingResponseBody toolStream = output -> {
 				try {
-					final String reply = this.completeWithTools(toolBody, protokoll.getGespraechId());
-					this.protokolle.abschliessen(protokoll, reply, "ABGESCHLOSSEN");
-					this.sendEvent(output, "delta", reply);
-					this.sendEvent(output, "done", "");
+					final KiAntwort antwort = this.completeWithTools(toolBody, protokoll.getGespraechId());
+					this.protokolle.abschliessen(protokoll, antwort.text(), "ABGESCHLOSSEN");
+					this.sendEvent(output, "delta", antwort.text());
+					this.sendEvent(output, "done", Map.of("text", "", "abgeschlossen", antwort.abgeschlossen()));
 				} catch (final IOException | InterruptedException | RuntimeException e) {
 					if (e instanceof InterruptedException)
 						Thread.currentThread().interrupt();
@@ -395,8 +398,9 @@ public class KiChatController {
 		return body;
 	}
 
-	private String completeWithTools(final com.fasterxml.jackson.databind.node.ObjectNode body,
+	private KiAntwort completeWithTools(final com.fasterxml.jackson.databind.node.ObjectNode body,
 			final String conversationId) throws Exception {
+		boolean abgeschlossen = false;
 		if (this.requirementsMcp != null) {
 			final com.fasterxml.jackson.databind.node.ObjectNode system = (com.fasterxml.jackson.databind.node.ObjectNode) body
 					.path("messages").get(0);
@@ -417,7 +421,7 @@ public class KiChatController {
 				final JsonNode content = message.path("content");
 				if (content.isMissingNode() || content.isNull())
 					throw new ResponseStatusException(HttpStatus.BAD_GATEWAY);
-				return content.asText().replaceAll("(?s)<think>.*?</think>", "").trim();
+				return new KiAntwort(content.asText().replaceAll("(?s)<think>.*?</think>", "").trim(), abgeschlossen);
 			}
 			if (executedCalls + calls.size() > MAX_TOOL_CALLS)
 				throw new ResponseStatusException(HttpStatus.BAD_GATEWAY);
@@ -433,11 +437,20 @@ public class KiChatController {
 				if (!arguments.isObject() || toolCallId.isBlank() || toolName.isBlank())
 					throw new ResponseStatusException(HttpStatus.BAD_GATEWAY);
 				final String result = this.requirementsMcp.call(toolName, arguments);
+				abgeschlossen |= meldetAbschluss(result);
 				messages.addObject().put("role", "tool").put("tool_call_id", toolCallId).put("content", result);
 				executedCalls++;
 			}
 		}
 		throw new ResponseStatusException(HttpStatus.BAD_GATEWAY);
+	}
+
+	private boolean meldetAbschluss(final String toolResult) {
+		try {
+			return this.mapper.readTree(toolResult).path("completed").asBoolean(false);
+		} catch (final IOException | RuntimeException e) {
+			return false;
+		}
 	}
 
 	private HttpRequest upstreamRequest(final JsonNode body) throws IOException {
@@ -449,7 +462,12 @@ public class KiChatController {
 	}
 
 	private void sendEvent(final OutputStream output, final String event, final String text) throws IOException {
-		final String data = this.mapper.writeValueAsString(Map.of("text", text));
+		this.sendEvent(output, event, Map.<String, Object>of("text", text));
+	}
+
+	private void sendEvent(final OutputStream output, final String event, final Map<String, Object> payload)
+			throws IOException {
+		final String data = this.mapper.writeValueAsString(payload);
 		output.write(("event: " + event + "\ndata: " + data + "\n\n").getBytes(StandardCharsets.UTF_8));
 		output.flush();
 	}

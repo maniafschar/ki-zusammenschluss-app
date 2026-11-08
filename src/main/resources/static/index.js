@@ -1001,6 +1001,23 @@ startBooking();
 		submitChatAnswer(form.elements.answer.value);
 	});
 
+	function zeigeZusammenfassung(summary) {
+		const nachricht = document.getElementById('booking-form')?.elements.nachricht;
+		if (nachricht) nachricht.value = summary.slice(0, 2000);
+		const bereich = text.querySelector('.chat-assistant');
+		if (!bereich) return;
+		const button = document.createElement('button');
+		button.type = 'button';
+		button.className = 'btn';
+		button.textContent = 'Zum Terminkalender';
+		button.addEventListener('click', () => {
+			document.getElementById('kontakt')?.scrollIntoView({
+				behavior: reducedMotion.matches ? 'auto' : 'smooth'
+			});
+		});
+		bereich.append(button);
+	}
+
 	async function ask(question) {
 		const turnId = ++chatTurn;
 		choiceReady = false;
@@ -1034,6 +1051,7 @@ startBooking();
 			const decoder = new TextDecoder();
 			let buffer = '';
 			let completed = false;
+			let abgeschlossen = false;
 			try {
 				while (!completed) {
 					const { value, done } = await reader.read();
@@ -1050,7 +1068,7 @@ startBooking();
 						const payload = JSON.parse(data);
 						if (type === 'delta') addText(payload.text);
 						if (type === 'error') throw new Error(payload.text);
-						if (type === 'done') { completed = true; break; }
+						if (type === 'done') { completed = true; abgeschlossen = payload.abgeschlossen === true; break; }
 					}
 					if (done && !completed) throw new Error('Die KI-Antwort wurde unterbrochen.');
 				}
@@ -1061,7 +1079,8 @@ startBooking();
 			if (!reply.trim()) throw new Error('Die KI hat keine Antwort geliefert.');
 			history.push({ role: 'assistant', content: reply.trim() });
 			renderConversation(question, reply.trim(), { choices: true });
-			choiceReady = true;
+			choiceReady = !abgeschlossen;
+			if (abgeschlossen) zeigeZusammenfassung(reply.trim());
 			try {
 				await speak(plainMarkdown(reply), turnId);
 			} catch (e) {

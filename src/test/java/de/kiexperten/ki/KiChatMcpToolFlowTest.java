@@ -152,4 +152,31 @@ class KiChatMcpToolFlowTest {
 		assertTrue(this.mapper.readTree(response.body()).path("text").asText()
 				.contains("Wie würden Sie den Einsatz von KI in Ihrem Unternehmen heute beschreiben?"));
 	}
+
+	@Test
+	void streamSignalsCompletedRequirementFlowInDoneEvent() throws Exception {
+		final var definitions = this.mapper.createArrayNode();
+		definitions.addObject().put("type", "function").putObject("function").put("name", "get_next_requirement_step");
+		when(this.requirementsMcp.toolDefinitions()).thenReturn(definitions);
+		when(this.requirementsMcp.call(eq("get_next_requirement_step"), any(JsonNode.class)))
+				.thenReturn("{\"completed\":true,\"minimumSteps\":6,\"answeredSteps\":6}");
+		final var messages = this.mapper.createArrayNode();
+		messages.addObject().put("role", "user").put("content", "Alle Fragen beantwortet.");
+		final var chatRequest = this.mapper.createObjectNode();
+		chatRequest.set("messages", messages);
+		final String authorization = Base64.getEncoder()
+				.encodeToString("admin:local-test-password".getBytes(StandardCharsets.UTF_8));
+		final var response = HttpClient.newHttpClient().send(HttpRequest
+				.newBuilder(URI.create("http://127.0.0.1:" + this.port + "/api/ki/chat/stream"))
+				.header("Authorization", "Basic " + authorization)
+				.header("X-API-Client", "test")
+				.header("Content-Type", "application/json")
+				.POST(HttpRequest.BodyPublishers.ofString(this.mapper.writeValueAsString(chatRequest))).build(),
+				HttpResponse.BodyHandlers.ofString());
+
+		assertEquals(200, response.statusCode());
+		assertTrue(response.body().contains("event: done\n"), response.body());
+		assertTrue(response.body().contains("\"abgeschlossen\":true"), response.body());
+	}
 }
+
