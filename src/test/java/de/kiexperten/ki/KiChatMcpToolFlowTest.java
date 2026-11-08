@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentCaptor.forClass;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -122,7 +123,7 @@ class KiChatMcpToolFlowTest {
 		assertEquals(200, response.statusCode());
 		assertTrue(response.body().contains("Schritt 1: Was soll das Projekt erreichen?"));
 		final var invocation = forClass(JsonNode.class);
-		verify(this.requirementsMcp).call(eq("get_next_requirement_step"), invocation.capture());
+		verify(this.requirementsMcp, atLeastOnce()).call(eq("get_next_requirement_step"), invocation.capture());
 		assertTrue(UUID.fromString(invocation.getValue().path("conversationId").asText()) != null);
 	}
 
@@ -140,6 +141,34 @@ class KiChatMcpToolFlowTest {
 		assertTrue(UUID.fromString(body.path("gespraechId").asText()) != null);
 		assertTrue(body.path("text").asText().contains("**Schritt 1 von 6:** Welche Rolle spielt KI?"));
 		assertTrue(body.path("text").asText().contains("\n- Keine: nichts."));
+	}
+
+	@Test
+	void chatAppendsCurrentMcpStepVerbatimAfterToolCalls() throws Exception {
+		final var definitions = this.mapper.createArrayNode();
+		definitions.addObject().put("type", "function").putObject("function").put("name", "get_next_requirement_step");
+		when(this.requirementsMcp.toolDefinitions()).thenReturn(definitions);
+		when(this.requirementsMcp.call(eq("get_next_requirement_step"), any(JsonNode.class)))
+				.thenReturn("{\"completed\":false,\"stepNumber\":2,\"totalSteps\":6,\"step\":{\"question\":\"Welche Rolle spielt KI?\","
+						+ "\"options\":[\"Keine: nichts.\",\"Strategisch: viel.\"],\"selectionMode\":\"single\"}}");
+		final var messages = this.mapper.createArrayNode();
+		messages.addObject().put("role", "user").put("content", "Ich möchte ein Softwareprojekt planen.");
+		final var chatRequest = this.mapper.createObjectNode();
+		chatRequest.set("messages", messages);
+		final String authorization = Base64.getEncoder()
+				.encodeToString("admin:local-test-password".getBytes(StandardCharsets.UTF_8));
+		final var response = HttpClient.newHttpClient().send(HttpRequest
+				.newBuilder(URI.create("http://127.0.0.1:" + this.port + "/api/ki/chat"))
+				.header("Authorization", "Basic " + authorization)
+				.header("X-API-Client", "test")
+				.header("Content-Type", "application/json")
+				.POST(HttpRequest.BodyPublishers.ofString(this.mapper.writeValueAsString(chatRequest))).build(),
+				HttpResponse.BodyHandlers.ofString());
+
+		assertEquals(200, response.statusCode());
+		final String reply = this.mapper.readTree(response.body()).path("reply").asText();
+		assertTrue(reply.contains("**Schritt 2 von 6:** Welche Rolle spielt KI?"), reply);
+		assertTrue(reply.contains("\n- Keine: nichts."), reply);
 	}
 
 	@Test

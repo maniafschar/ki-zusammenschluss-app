@@ -65,9 +65,8 @@ public class KiChatController {
 
 	private static final String REQUIREMENTS_SYSTEM_PROMPT = "Du bist der deutschsprachige Assistent für die KI-Reifegrad-Erhebung eines Unternehmens. "
 			+ "Nutze bei jedem Gesprächsschritt die MCP-Werkzeuge und rufe zuerst get_next_requirement_step mit der Gesprächs-ID auf. "
-			+ "Es gibt genau sechs Pflichtschritte. Beginne jede Frage mit dem unveränderten Titel im Format 'Schritt {stepNumber}: {title}'. Verwende Frage und Antwortoptionen aus dem aktuellen MCP-Schritt unverändert und bleibe in der vorgegebenen Reihenfolge. "
-			+ "Bei selectionMode=single stelle eine Frage mit nummerierten Optionen. Bei selectionMode=multiple zeige den Hinweis 'Mehrfachauswahl möglich (max. N Antworten)' mit dem maxSelections-Wert aus dem MCP-Schritt; der Nutzer kann bis zu diesem Maximum auswählen. "
-			+ "Bei selectionMode=text stelle die gelieferte Frage und erzeuge ein Freitextfeld mit der Zeile 'Freitextfeld: ' gefolgt vom inputPlaceholder. "
+			+ "Es gibt genau sechs Pflichtschritte. Stelle selbst keine Frage und keine Antwortoptionen; der Server hängt den aktuellen Schritt mit Titel, Frage und Optionen aus dem MCP-Server exakt an deine Antwort an. "
+			+ "Gib nur eine kurze Rückmeldung zur letzten Nutzeraussage oder eine konkrete Rückfrage zur Präzisierung. "
 			+ "Wenn bereits eine Frage gestellt wurde, bewerte die letzte Nutzeraussage anhand der Akzeptanzkriterien. Rufe record_requirement_answer auf und übergib die Antwort als answers-Array. Bei Auswahloptionen übergib die exakten Optionstexte einzeln; bei Freitext ein Element. "
 			+ "Du entscheidest selbst, ob die Antwort genügt. Bei unklaren Antworten stelle eine konkrete Rückfrage und schließe den Schritt nicht ab. Der Server prüft Auswahlmaximum und Reihenfolge. "
 			+ "Erkläre die Optionstexte nicht um und erfinde keine Antwortoptionen. Nach dem sechsten Schritt schreibe eine knappe, sachliche Zusammenfassung der Antworten in Stichpunkten ohne Anrede und Grußformel, die der Nutzer als Nachricht an das Team übernehmen kann; verweise danach kurz auf den Terminkalender am Seitenende. "
@@ -421,7 +420,10 @@ public class KiChatController {
 				final JsonNode content = message.path("content");
 				if (content.isMissingNode() || content.isNull())
 					throw new ResponseStatusException(HttpStatus.BAD_GATEWAY);
-				return new KiAntwort(content.asText().replaceAll("(?s)<think>.*?</think>", "").trim(), abgeschlossen);
+				final String text = content.asText().replaceAll("(?s)<think>.*?</think>", "").trim();
+				if (executedCalls == 0)
+					return new KiAntwort(text, abgeschlossen);
+				return this.mitAktuellemSchritt(text, conversationId, abgeschlossen);
 			}
 			if (executedCalls + calls.size() > MAX_TOOL_CALLS)
 				throw new ResponseStatusException(HttpStatus.BAD_GATEWAY);
@@ -443,6 +445,25 @@ public class KiChatController {
 			}
 		}
 		throw new ResponseStatusException(HttpStatus.BAD_GATEWAY);
+	}
+
+	private KiAntwort mitAktuellemSchritt(final String text, final String conversationId, final boolean abgeschlossen)
+			throws IOException {
+		try {
+			final var arguments = this.mapper.createObjectNode().put("conversationId", conversationId);
+			final JsonNode result = this.mapper
+					.readTree(this.requirementsMcp.call("get_next_requirement_step", arguments));
+			if (result.path("completed").asBoolean(false))
+				return new KiAntwort(text, true);
+			final JsonNode step = result.path("step");
+			if (!step.path("question").isTextual())
+				return new KiAntwort(text, abgeschlossen);
+			final String frage = this.schrittAlsMarkdown(result, step);
+			return new KiAntwort(text.isEmpty() ? frage : text + "\n\n" + frage, abgeschlossen);
+		} catch (final RuntimeException e) {
+			log.warn("Aktueller Anforderungsschritt konnte nicht angehängt werden", e);
+			return new KiAntwort(text, abgeschlossen);
+		}
 	}
 
 	private boolean meldetAbschluss(final String toolResult) {
