@@ -821,9 +821,20 @@ startBooking();
 			urls.push(url);
 			return url;
 		};
+		const fetchChunkWithRetry = async (input) => {
+			try {
+				return await fetchChunk(input);
+			} catch (error) {
+				if (playback.controller.signal.aborted || ![429, 502, 503].includes(Number(error.message))) throw error;
+				await new Promise((resolve) => setTimeout(resolve, 1000));
+				return fetchChunk(input);
+			}
+		};
 		const chunks = speechChunks(reply);
+		let previous = Promise.resolve();
 		const loads = chunks.map((chunk) => {
-			const load = fetchChunk(chunk);
+			const load = previous.then(() => fetchChunkWithRetry(chunk));
+			previous = load.catch(() => {});
 			load.catch(() => {});
 			return load;
 		});
