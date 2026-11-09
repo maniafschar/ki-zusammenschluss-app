@@ -60,12 +60,14 @@ class KiChatMcpToolFlowTest {
 	private static final Pattern CONVERSATION_ID = Pattern.compile("Gesprächs-ID für MCP-Werkzeuge: ([0-9a-f-]+)");
 	private static final Pattern ANSWER = Pattern.compile("\\[antwort:([a-z]+)\\]\\s*(.*)", Pattern.DOTALL);
 	private static final HttpServer upstream;
+	private static volatile boolean lastEnableThinking = true;
 
 	static {
 		try {
 			upstream = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
 			upstream.createContext("/chat/completions", exchange -> {
 				final JsonNode request = MAPPER.readTree(exchange.getRequestBody().readAllBytes());
+				lastEnableThinking = request.path("chat_template_kwargs").path("enable_thinking").asBoolean(true);
 				final JsonNode messages = request.path("messages");
 				final boolean hasToolResult = java.util.stream.StreamSupport.stream(messages.spliterator(), false)
 						.anyMatch(message -> "tool".equals(message.path("role").asText()));
@@ -247,10 +249,17 @@ class KiChatMcpToolFlowTest {
 	}
 
 	private HttpResponse<String> chat(final String gespraechId, final String userContent) throws Exception {
+		return chat(gespraechId, userContent, null);
+	}
+
+	private HttpResponse<String> chat(final String gespraechId, final String userContent, final Boolean denken)
+			throws Exception {
 		final var messages = this.mapper.createArrayNode();
 		messages.addObject().put("role", "user").put("content", userContent);
 		final var chatRequest = this.mapper.createObjectNode().put("gespraechId", gespraechId);
 		chatRequest.set("messages", messages);
+		if (denken != null)
+			chatRequest.put("denken", denken);
 		final String authorization = Base64.getEncoder()
 				.encodeToString("admin:local-test-password".getBytes(StandardCharsets.UTF_8));
 		return HttpClient.newHttpClient().send(HttpRequest
@@ -260,6 +269,16 @@ class KiChatMcpToolFlowTest {
 				.header("Content-Type", "application/json")
 				.POST(HttpRequest.BodyPublishers.ofString(this.mapper.writeValueAsString(chatRequest))).build(),
 				HttpResponse.BodyHandlers.ofString());
+	}
+
+	@Test
+	void optionAntwortenSchalteDasDenkenAusUndFreitextBehaeltEsBei() throws Exception {
+		stubUmfrage();
+		chat("00000000-0000-0000-0000-000000000011", "[antwort:single] Beruflich", false);
+		assertFalse(lastEnableThinking);
+
+		chat("00000000-0000-0000-0000-000000000012", "Ich arbeite im Vertrieb.");
+		assertTrue(lastEnableThinking);
 	}
 
 	@Test

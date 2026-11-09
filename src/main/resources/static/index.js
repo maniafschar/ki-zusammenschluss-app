@@ -991,12 +991,12 @@ startBooking();
 		if (event.key === 'Escape') closePrivacyPopup();
 	});
 
-	function submitChatAnswer(answer) {
+	function submitChatAnswer(answer, { denken = true } = {}) {
 		if (!choiceReady || state === 'listening' || !String(answer).trim()) return;
 		const value = String(answer).trim();
 		choiceReady = false;
 		stopSpeech();
-		ask(value);
+		ask(value, { denken });
 	}
 
 	text.addEventListener('click', (event) => {
@@ -1012,7 +1012,7 @@ startBooking();
 					.querySelectorAll('[data-chat-choice][aria-pressed="true"]').length === 0;
 				return;
 			}
-			submitChatAnswer(button.dataset.chatChoice);
+			submitChatAnswer(button.dataset.chatChoice, { denken: false });
 			return;
 		}
 		const submit = event.target.closest('[data-chat-submit-multiple]');
@@ -1020,7 +1020,7 @@ startBooking();
 			const group = submit.closest('.chat-choices');
 			const answers = [...group.querySelectorAll('[data-chat-choice][aria-pressed="true"]')]
 				.map(option => option.dataset.chatChoice);
-			submitChatAnswer(answers.join('\n'));
+			submitChatAnswer(answers.join('\n'), { denken: false });
 		}
 	});
 	text.addEventListener('submit', (event) => {
@@ -1063,7 +1063,7 @@ startBooking();
 		bereich.append(aktionen);
 	}
 
-	async function ask(question) {
+	async function ask(question, { denken = true } = {}) {
 		const turnId = ++chatTurn;
 		choiceReady = false;
 		state = 'thinking';
@@ -1087,7 +1087,7 @@ startBooking();
 				method: 'POST',
 				credentials: 'same-origin',
 				headers: { 'Content-Type': 'application/json', 'X-XSRF-TOKEN': token },
-				body: JSON.stringify({ messages: history.slice(-10), gespraechId })
+				body: JSON.stringify({ messages: history.slice(-10), gespraechId, denken })
 			});
 			if (!res.ok) throw new Error(res.status);
 			gespraechId = res.headers.get('X-Chat-Id') || gespraechId;
