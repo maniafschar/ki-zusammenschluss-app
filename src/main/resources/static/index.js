@@ -1068,12 +1068,18 @@ startBooking();
 
 		try {
 			const token = await csrfToken();
-			const res = await fetch('/ai-expert/api/ki/chat/stream', {
-				method: 'POST',
-				credentials: 'same-origin',
-				headers: { 'Content-Type': 'application/json', 'X-XSRF-TOKEN': token },
-				body: JSON.stringify({ messages: history.slice(-10), gespraechId, denken })
-			});
+			const requestBody = JSON.stringify({ messages: history.slice(-10), gespraechId, denken });
+			let res = null;
+			for (let attempt = 1; attempt <= 20; attempt++) {
+				res = await fetch('/ai-expert/api/ki/chat/stream', {
+					method: 'POST',
+					credentials: 'same-origin',
+					headers: { 'Content-Type': 'application/json', 'X-XSRF-TOKEN': token },
+					body: requestBody
+				});
+				if (res.status !== 429) break;
+				await new Promise((resolve) => setTimeout(resolve, 500));
+			}
 			if (!res.ok) throw new Error(res.status);
 			gespraechId = res.headers.get('X-Chat-Id') || gespraechId;
 			if (!res.body) throw new Error('Streaming wird nicht unterstützt');
