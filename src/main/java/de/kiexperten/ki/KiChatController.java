@@ -16,6 +16,7 @@ import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -72,7 +73,7 @@ public class KiChatController {
 			+ "Gib nur eine kurze Rückmeldung zur letzten Nutzeraussage oder eine konkrete Rückfrage zur Präzisierung. "
 			+ "Wenn bereits eine Frage gestellt wurde, bewerte die letzte Nutzeraussage anhand der Akzeptanzkriterien. Rufe record_requirement_answer auf und übergib die Antwort als answers-Array. Bei Auswahloptionen übergib die exakten Optionstexte einzeln; bei Freitext ein Element. "
 			+ "Du entscheidest selbst, ob die Antwort genügt. Bei unklaren Antworten stelle eine konkrete Rückfrage und schließe den Schritt nicht ab. Der Server prüft Auswahlmaximum und Reihenfolge. "
-			+ "Erkläre die Optionstexte nicht um und erfinde keine Antwortoptionen. "
+			+ "Erkläre die Optionstexte nicht um und erfinde keine Antwortoptionen. Schreibe die nächste Frage nicht ab, auch nicht umformuliert. "
 			+ "Du führst die Umfrage durch. Die erste Frage steht bereits in der Begrüßung; die Antwort des Nutzers darauf bewertest du wie jede andere Antwort. "
 			+ "Wenn get_next_requirement_step completed=true meldet, gehe so vor: "
 			+ "1. Rufe speichere_zusammenfassung mit einer knappen, sachlichen Zusammenfassung der Antworten in Stichpunkten ohne Anrede und Grußformel auf. "
@@ -323,10 +324,10 @@ public class KiChatController {
 			final var toolBody = this.createBody(request, http, false);
 			final StreamingResponseBody toolStream = output -> {
 				try {
-					final KiAntwort antwort = this.completeWithTools(toolBody, protokoll.getGespraechId());
+					final KiAntwort antwort = this.completeWithTools(toolBody, protokoll.getGespraechId(),
+							text -> this.sendEvent(output, "delta", text));
 					this.protokolle.abschliessen(protokoll, antwort.text(), "ABGESCHLOSSEN");
-					this.sendEvent(output, "delta", antwort.text());
-					this.sendEvent(output, "done", Map.of("text", "", "zusammenfassung",
+					this.sendEvent(output, "done", Map.of("text", antwort.text(), "zusammenfassung",
 							antwort.zusammenfassung() == null ? "" : antwort.zusammenfassung()));
 				} catch (final IOException | InterruptedException | RuntimeException e) {
 					if (e instanceof InterruptedException)
@@ -428,7 +429,13 @@ public class KiChatController {
 
 	private KiAntwort completeWithTools(final com.fasterxml.jackson.databind.node.ObjectNode body,
 			final String conversationId) throws Exception {
+		return this.completeWithTools(body, conversationId, null);
+	}
+
+	private KiAntwort completeWithTools(final com.fasterxml.jackson.databind.node.ObjectNode body,
+			final String conversationId, final DeltaSink sink) throws Exception {
 		String zusammenfassung = "";
+		body.put("stream", sink != null);
 		if (this.requirementsMcp != null) {
 			final com.fasterxml.jackson.databind.node.ObjectNode system = (com.fasterxml.jackson.databind.node.ObjectNode) body
 					.path("messages").get(0);
@@ -437,11 +444,7 @@ public class KiChatController {
 		}
 		int executedCalls = 0;
 		for (int round = 0; round < MAX_TOOL_ROUNDS; round++) {
-			final HttpResponse<String> response = this.client.send(this.upstreamRequest(body),
-					HttpResponse.BodyHandlers.ofString());
-			if (response.statusCode() != 200)
-				throw new ResponseStatusException(HttpStatus.BAD_GATEWAY);
-			final JsonNode message = this.mapper.readTree(response.body()).at("/choices/0/message");
+			final JsonNode message = this.modellAntwort(body, sink);
 			if (message.isMissingNode() || message.isNull())
 				throw new ResponseStatusException(HttpStatus.BAD_GATEWAY);
 			final JsonNode calls = message.path("tool_calls");
@@ -494,11 +497,20 @@ public class KiChatController {
 			if (!step.path("question").isTextual())
 				return new KiAntwort(text, zusammenfassung);
 			final String frage = this.schrittAlsMarkdown(result, step);
-			return new KiAntwort(text.isEmpty() ? frage : text + "\n\n" + frage, zusammenfassung);
+			final String vorDerFrage = vorDerFrage(text, step.path("question").asText());
+			return new KiAntwort(vorDerFrage.isEmpty() ? frage : vorDerFrage + "\n\n" + frage, zusammenfassung);
 		} catch (final RuntimeException e) {
 			log.warn("Aktueller Anforderungsschritt konnte nicht angehängt werden", e);
 			return new KiAntwort(text, zusammenfassung);
 		}
+	}
+
+	/** Schneidet eine vom Modell selbst formulierte Frage samt Schrittkopf ab, da der Server den Schritt anhängt. */
+	private static String vorDerFrage(final String text, final String frage) {
+		final int start = frage.isBlank() ? -1 : text.indexOf(frage);
+		if (start < 0)
+			return text;
+		return text.substring(0, start).replaceFirst("\\*{0,2}Schritt \\d+ von \\d+:?\\*{0,2}\\s*$", "").trim();
 	}
 
 	private String lokalesWerkzeug(final String name, final JsonNode arguments) {
@@ -539,10 +551,63 @@ public class KiChatController {
 		output.flush();
 	}
 
-	private void forwardStream(final InputStream input, final OutputStream output, final ChatProtokoll protokoll) {
+	private JsonNode modellAntwort(final ObjectNode body, final DeltaSink sink) throws IOException, InterruptedException {
+		if (sink == null) {
+			final HttpResponse<String> response = this.client.send(this.upstreamRequest(body),
+					HttpResponse.BodyHandlers.ofString());
+			if (response.statusCode() != 200)
+				throw new ResponseStatusException(HttpStatus.BAD_GATEWAY);
+			return this.mapper.readTree(response.body()).at("/choices/0/message");
+		}
+		final HttpResponse<InputStream> response = this.client.send(this.upstreamRequest(body),
+				HttpResponse.BodyHandlers.ofInputStream());
+		if (response.statusCode() != 200) {
+			response.body().close();
+			throw new ResponseStatusException(HttpStatus.BAD_GATEWAY);
+		}
 		final ThinkFilter filter = new ThinkFilter();
-		final StringBuilder antwort = new StringBuilder();
-		boolean done = false;
+		final StringBuilder roh = new StringBuilder();
+		final TreeMap<Integer, ObjectNode> aufrufe = new TreeMap<>();
+		this.leseSse(response.body(), chunk -> {
+			final JsonNode delta = chunk.at("/choices/0/delta");
+			if (delta.path("content").isTextual()) {
+				final String text = delta.path("content").asText();
+				roh.append(text);
+				final String sichtbar = filter.accept(text);
+				if (!sichtbar.isEmpty())
+					sink.sende(sichtbar);
+			}
+			for (final JsonNode teil : delta.path("tool_calls")) {
+				final ObjectNode aufruf = aufrufe.computeIfAbsent(teil.path("index").asInt(aufrufe.size()),
+						i -> this.mapper.createObjectNode());
+				if (teil.hasNonNull("id"))
+					aufruf.put("id", teil.get("id").asText());
+				aufruf.put("type", "function");
+				final ObjectNode funktion = aufruf.has("function") ? (ObjectNode) aufruf.get("function")
+						: aufruf.putObject("function");
+				final JsonNode name = teil.path("function").path("name");
+				if (name.isTextual())
+					funktion.put("name", name.asText());
+				final JsonNode argumente = teil.path("function").path("arguments");
+				if (argumente.isTextual())
+					funktion.put("arguments", funktion.path("arguments").asText("") + argumente.asText());
+			}
+		});
+		final String rest = filter.finish();
+		if (!rest.isEmpty())
+			sink.sende(rest);
+		final ObjectNode nachricht = this.mapper.createObjectNode().put("role", "assistant").put("content",
+				roh.toString());
+		if (!aufrufe.isEmpty()) {
+			final ArrayNode liste = nachricht.putArray("tool_calls");
+			for (final ObjectNode aufruf : aufrufe.values())
+				liste.add(aufruf);
+		}
+		return nachricht;
+	}
+
+	/** Liest einen SSE-Strom bis [DONE] und reicht jeden JSON-Chunk an den Handler weiter. */
+	private void leseSse(final InputStream input, final ChunkHandler handler) throws IOException {
 		try (BufferedReader reader = new BufferedReader(new InputStreamReader(input, StandardCharsets.UTF_8))) {
 			final StringBuilder data = new StringBuilder();
 			String line;
@@ -552,29 +617,36 @@ public class KiChatController {
 						continue;
 					final String payload = data.toString();
 					data.setLength(0);
-					if ("[DONE]".equals(payload)) {
-						done = true;
-						break;
-					}
+					if ("[DONE]".equals(payload))
+						return;
 					final JsonNode chunk = this.mapper.readTree(payload);
 					if (chunk.hasNonNull("error"))
 						throw new IOException("KI-Stream meldet einen Fehler");
-					final JsonNode content = chunk.at("/choices/0/delta/content");
-					if (content.isTextual()) {
-						final String visible = filter.accept(content.asText());
-						if (!visible.isEmpty()) {
-							this.sendEvent(output, "delta", visible);
-							antwort.append(visible);
-						}
-					}
+					handler.verarbeite(chunk);
 				} else if (line.startsWith("data:")) {
 					if (!data.isEmpty())
 						data.append('\n');
 					data.append(line.substring(5).stripLeading());
 				}
 			}
-			if (!done)
-				throw new IOException("KI-Stream wurde vorzeitig beendet");
+		}
+		throw new IOException("KI-Stream wurde vorzeitig beendet");
+	}
+
+	private void forwardStream(final InputStream input, final OutputStream output, final ChatProtokoll protokoll) {
+		final ThinkFilter filter = new ThinkFilter();
+		final StringBuilder antwort = new StringBuilder();
+		try {
+			this.leseSse(input, chunk -> {
+				final JsonNode content = chunk.at("/choices/0/delta/content");
+				if (content.isTextual()) {
+					final String visible = filter.accept(content.asText());
+					if (!visible.isEmpty()) {
+						this.sendEvent(output, "delta", visible);
+						antwort.append(visible);
+					}
+				}
+			});
 			final String rest = filter.finish();
 			if (!rest.isEmpty()) {
 				this.sendEvent(output, "delta", rest);
@@ -591,6 +663,16 @@ public class KiChatController {
 				log.debug("KI-Stream konnte nicht an den Client gesendet werden", writeError);
 			}
 		}
+	}
+
+	@FunctionalInterface
+	private interface DeltaSink {
+		void sende(String text) throws IOException;
+	}
+
+	@FunctionalInterface
+	private interface ChunkHandler {
+		void verarbeite(JsonNode chunk) throws IOException;
 	}
 
 	private static final class ThinkFilter {

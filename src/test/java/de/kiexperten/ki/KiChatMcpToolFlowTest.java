@@ -14,6 +14,7 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -29,6 +30,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Pattern;
 
 import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -36,6 +38,7 @@ import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import de.kiexperten.Zeit;
 import de.kiexperten.booking.BestaetigungsMailService;
@@ -68,7 +71,10 @@ class KiChatMcpToolFlowTest {
 						.anyMatch(message -> "tool".equals(message.path("role").asText()));
 				final String response;
 				if (hasToolResult) {
-					response = "{\"choices\":[{\"message\":{\"content\":\"Schritt 1: Was soll das Projekt erreichen?\"}}]}";
+					final String text = lastUserText(messages).contains("[frage-im-text]")
+							? "Danke, notiert. Welches Ziel verfolgt ihr?"
+							: "Schritt 1: Was soll das Projekt erreichen?";
+					response = "{\"choices\":[{\"message\":{\"content\":\"" + text + "\"}}]}";
 				} else {
 					final var matcher = CONVERSATION_ID.matcher(messages.get(0).path("content").asText());
 					if (!matcher.find() || !request.path("tools").isArray()) {
@@ -91,8 +97,10 @@ class KiChatMcpToolFlowTest {
 								+ MAPPER.writeValueAsString(arguments) + "}}]}}]}";
 					}
 				}
-				final byte[] body = response.getBytes(StandardCharsets.UTF_8);
-				exchange.getResponseHeaders().set("Content-Type", "application/json");
+				final byte[] body = (request.path("stream").asBoolean(false) ? toSse(response) : response)
+						.getBytes(StandardCharsets.UTF_8);
+				exchange.getResponseHeaders().set("Content-Type",
+						request.path("stream").asBoolean(false) ? "text/event-stream" : "application/json");
 				exchange.sendResponseHeaders(200, body.length);
 				try (var output = exchange.getResponseBody()) {
 					output.write(body);
@@ -102,6 +110,34 @@ class KiChatMcpToolFlowTest {
 		} catch (final Exception e) {
 			throw new ExceptionInInitializerError(e);
 		}
+	}
+
+	/** Zerlegt eine Nicht-Stream-Antwort in SSE-Chunks; Text und Tool-Argumente werden absichtlich geteilt. */
+	private static String toSse(final String json) throws IOException {
+		final JsonNode message = MAPPER.readTree(json).at("/choices/0/message");
+		final StringBuilder sse = new StringBuilder();
+		final String content = message.path("content").asText("");
+		for (int start = 0; start < content.length(); start += 12) {
+			final String part = content.substring(start, Math.min(content.length(), start + 12));
+			sse.append("data: ").append(MAPPER.writeValueAsString(Map.of("choices",
+					List.of(Map.of("delta", Map.of("content", part)))))).append("\n\n");
+		}
+		int index = 0;
+		for (final JsonNode call : message.path("tool_calls")) {
+			final String name = call.path("function").path("name").asText();
+			final String arguments = call.path("function").path("arguments").asText();
+			final int half = arguments.length() / 2;
+			sse.append("data: ").append(MAPPER.writeValueAsString(Map.of("choices", List.of(Map.of("delta",
+					Map.of("tool_calls", List.of(Map.of("index", index, "id", call.path("id").asText(), "type",
+							"function", "function", Map.of("name", name, "arguments", arguments.substring(0, half))))))))))
+					.append("\n\n");
+			sse.append("data: ").append(MAPPER.writeValueAsString(Map.of("choices", List.of(Map.of("delta",
+					Map.of("tool_calls", List.of(Map.of("index", index, "function",
+							Map.of("arguments", arguments.substring(half))))))))))
+					.append("\n\n");
+			index++;
+		}
+		return sse.append("data: [DONE]\n\n").toString();
 	}
 
 	private static String lastUserText(final JsonNode messages) {
@@ -147,6 +183,15 @@ class KiChatMcpToolFlowTest {
 
 	@Autowired
 	TerminRepository termine;
+
+	@Autowired
+	KiChatController controller;
+
+	/** Die Tests teilen sich einen Kontext; das Minuten-Limit pro IP darf nicht zwischen Tests greifen. */
+	@BeforeEach
+	void rateLimitZuruecksetzen() {
+		((Map<?, ?>) ReflectionTestUtils.getField(this.controller, "hits")).clear();
+	}
 
 	@Test
 	void executesModelToolCallsAgainstMcpAndReturnsTheFinalAnswer() throws Exception {
@@ -266,6 +311,46 @@ class KiChatMcpToolFlowTest {
 		assertEquals(200, response.statusCode());
 		assertTrue(response.body().contains("event: done\n"), response.body());
 		assertTrue(response.body().contains("\"zusammenfassung\":\"\""), response.body());
+	}
+
+	@Test
+	void frageDesModellsWirdNichtDoppeltAngezeigt() throws Exception {
+		this.beantwortet.set(0);
+		stubUmfrage();
+		final String id = this.mapper.readTree(this.get("/api/ki/welcome").body()).path("gespraechId").asText();
+
+		final String body = this.chat(id, "[frage-im-text] [antwort:maturity] Strategisch: viel.").body();
+		final String text = doneText(body);
+
+		assertEquals(0, countOccurrences(text, "Welche Rolle spielt KI?"), text);
+		assertEquals(1, countOccurrences(text, "Welches Ziel verfolgt ihr?"), text);
+	}
+
+	@Test
+	void streamLiefertDeltasUndKanonischenEndtextImDoneEvent() throws Exception {
+		this.beantwortet.set(0);
+		stubUmfrage();
+		final String id = this.mapper.readTree(this.get("/api/ki/welcome").body()).path("gespraechId").asText();
+
+		final String body = this.chat(id, "[frage-im-text] [antwort:maturity] Strategisch: viel.").body();
+
+		assertTrue(countOccurrences(body, "event: delta\n") >= 2, body);
+		assertTrue(doneText(body).contains("**Schritt 2 von 2:** Welches Ziel verfolgt ihr?"), body);
+	}
+
+	private String doneText(final String sse) throws IOException {
+		final String prefix = "event: done\ndata: ";
+		final int start = sse.indexOf(prefix);
+		assertTrue(start >= 0, sse);
+		final int end = sse.indexOf('\n', start + prefix.length());
+		return this.mapper.readTree(sse.substring(start + prefix.length(), end)).path("text").asText();
+	}
+
+	private static int countOccurrences(final String text, final String part) {
+		int count = 0;
+		for (int index = text.indexOf(part); index >= 0; index = text.indexOf(part, index + part.length()))
+			count++;
+		return count;
 	}
 
 	@Test

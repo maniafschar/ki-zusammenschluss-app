@@ -1087,6 +1087,7 @@ startBooking();
 						if (type === 'done') {
 							completed = true;
 							zusammenfassung = typeof payload.zusammenfassung === 'string' ? payload.zusammenfassung.trim() : '';
+							if (typeof payload.text === 'string' && payload.text.trim()) reply = payload.text.trim();
 							break;
 						}
 					}
