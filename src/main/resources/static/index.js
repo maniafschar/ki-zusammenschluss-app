@@ -1010,7 +1010,7 @@ startBooking();
 		aktionen.className = 'chat-actions';
 		const termin = document.createElement('button');
 		termin.type = 'button';
-		termin.className = 'btn';
+		termin.className = 'btn-text';
 		termin.textContent = 'Termin vereinbaren';
 		termin.addEventListener('click', () => {
 			document.getElementById('kontakt')?.scrollIntoView({
@@ -1019,7 +1019,7 @@ startBooking();
 		});
 		const weiterchatten = document.createElement('button');
 		weiterchatten.type = 'button';
-		weiterchatten.className = 'btn';
+		weiterchatten.className = 'btn-text';
 		weiterchatten.textContent = 'Mit mir weiterchatten';
 		weiterchatten.addEventListener('click', () => {
 			aktionen.remove();
