@@ -790,17 +790,6 @@ startBooking();
 	}
 
 	/** Teilt die Antwort in Sprechabschnitte; kurze Sätze werden zusammengefasst, damit nicht zu viele Anfragen entstehen. */
-	function speechChunks(reply) {
-		const sentences = reply.split(/(?<=[.!?:…])\s+|\n+/).map((s) => s.trim()).filter(Boolean);
-		const chunks = [];
-		for (const sentence of sentences) {
-			const last = chunks[chunks.length - 1];
-			if (last !== undefined && last.length < 120) chunks[chunks.length - 1] = `${last} ${sentence}`;
-			else chunks.push(sentence);
-		}
-		return chunks;
-	}
-
 	async function speak(reply, turnId = null) {
 		const playback = { controller: new AbortController(), player: null, finish: null, cancelled: false };
 		activeSpeech = playback;
@@ -821,23 +810,8 @@ startBooking();
 			urls.push(url);
 			return url;
 		};
-		const fetchChunkWithRetry = async (input) => {
-			try {
-				return await fetchChunk(input);
-			} catch (error) {
-				if (playback.controller.signal.aborted || ![429, 502, 503].includes(Number(error.message))) throw error;
-				await new Promise((resolve) => setTimeout(resolve, 1000));
-				return fetchChunk(input);
-			}
-		};
-		const chunks = speechChunks(reply);
-		let previous = Promise.resolve();
-		const loads = chunks.map((chunk) => {
-			const load = previous.then(() => fetchChunkWithRetry(chunk));
-			previous = load.catch(() => {});
-			load.catch(() => {});
-			return load;
-		});
+		const loads = [fetchChunk(reply)];
+		loads[0].catch(() => {});
 		try {
 			const AudioContextType = window.AudioContext || window.webkitAudioContext;
 			if (AudioContextType) {
