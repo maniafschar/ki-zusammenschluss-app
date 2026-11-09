@@ -789,25 +789,45 @@ startBooking();
 		activeSpeech.player?.pause();
 	}
 
+	/** Teilt die Antwort in Sprechabschnitte; kurze Sätze werden zusammengefasst, damit nicht zu viele Anfragen entstehen. */
+	function speechChunks(reply) {
+		const sentences = reply.split(/(?<=[.!?:…])\s+|\n+/).map((s) => s.trim()).filter(Boolean);
+		const chunks = [];
+		for (const sentence of sentences) {
+			const last = chunks[chunks.length - 1];
+			if (last !== undefined && last.length < 120) chunks[chunks.length - 1] = `${last} ${sentence}`;
+			else chunks.push(sentence);
+		}
+		return chunks;
+	}
+
 	async function speak(reply, turnId = null) {
 		const playback = { controller: new AbortController(), player: null, finish: null, cancelled: false };
 		activeSpeech = playback;
-		let audioUrl = null;
+		const urls = [];
 		let source = null;
 		let playbackAnalyser = null;
-		try {
+		const fetchChunk = async (input) => {
 			const token = await csrfToken();
 			const res = await fetch('/ai-expert/api/ki/audio/speech', {
 				method: 'POST',
 				credentials: 'same-origin',
 				headers: { 'Content-Type': 'application/json', 'X-XSRF-TOKEN': token },
-				body: JSON.stringify({ input: reply }),
+				body: JSON.stringify({ input }),
 				signal: playback.controller.signal
 			});
 			if (!res.ok) throw new Error(res.status);
-			audioUrl = URL.createObjectURL(await res.blob());
-			const player = new Audio(audioUrl);
-			playback.player = player;
+			const url = URL.createObjectURL(await res.blob());
+			urls.push(url);
+			return url;
+		};
+		const chunks = speechChunks(reply);
+		const loads = chunks.map((chunk) => {
+			const load = fetchChunk(chunk);
+			load.catch(() => {});
+			return load;
+		});
+		try {
 			const AudioContextType = window.AudioContext || window.webkitAudioContext;
 			if (AudioContextType) {
 				try {
@@ -816,38 +836,47 @@ startBooking();
 					playbackAnalyser = audioContext.createAnalyser();
 					playbackAnalyser.fftSize = 2048;
 					playbackAnalyser.smoothingTimeConstant = .3;
-					source = audioContext.createMediaElementSource(player);
-					source.connect(playbackAnalyser);
 					playbackAnalyser.connect(audioContext.destination);
 					audioAnalyser = playbackAnalyser;
 					audioSamples = new Uint8Array(playbackAnalyser.fftSize);
 					audioFrequencies = new Uint8Array(playbackAnalyser.frequencyBinCount);
 				} catch (error) {
-					if (source) {
-						try {
-							source.disconnect();
-							source.connect(audioContext.destination);
-						} catch (connectError) {
-							console.warn('Audioanalyse nicht verfügbar:', connectError);
-						}
-					}
 					playbackAnalyser?.disconnect();
+					playbackAnalyser = null;
 					audioAnalyser = null;
 					audioSamples = null;
 					audioFrequencies = null;
 					console.warn('Audioanalyse nicht verfügbar:', error);
 				}
 			}
-			const finished = new Promise((resolve, reject) => {
-				playback.finish = resolve;
-				player.addEventListener('ended', resolve, { once: true });
-				player.addEventListener('error', () => reject(new Error('Audio playback failed')), { once: true });
-			});
-			player.addEventListener('playing', () => {
-				if (!playback.cancelled && (turnId === null || turnId === chatTurn)) state = 'speaking';
-			}, { once: true });
-			await player.play();
-			await finished;
+			for (let index = 0; index < loads.length && !playback.cancelled; index++) {
+				const audioUrl = await loads[index];
+				if (playback.cancelled) break;
+				const player = new Audio(audioUrl);
+				playback.player = player;
+				if (playbackAnalyser) {
+					try {
+						source = audioContext.createMediaElementSource(player);
+						source.connect(playbackAnalyser);
+					} catch (error) {
+						source = null;
+						console.warn('Audioanalyse nicht verfügbar:', error);
+					}
+				}
+				const finished = new Promise((resolve, reject) => {
+					playback.finish = resolve;
+					player.addEventListener('ended', resolve, { once: true });
+					player.addEventListener('error', () => reject(new Error('Audio playback failed')), { once: true });
+				});
+				player.addEventListener('playing', () => {
+					if (!playback.cancelled && (turnId === null || turnId === chatTurn)) state = 'speaking';
+				}, { once: true });
+				await player.play();
+				await finished;
+				playback.finish = null;
+				source?.disconnect();
+				source = null;
+			}
 		} catch (error) {
 			if (!playback.cancelled && error.name !== 'AbortError') throw error;
 		} finally {
@@ -861,7 +890,7 @@ startBooking();
 			}
 			if (activeSpeech === playback) activeSpeech = null;
 			if (state === 'speaking' && (turnId === null || turnId === chatTurn)) state = 'idle';
-			if (audioUrl) URL.revokeObjectURL(audioUrl);
+			urls.forEach((url) => URL.revokeObjectURL(url));
 			requestDraw();
 		}
 	}
