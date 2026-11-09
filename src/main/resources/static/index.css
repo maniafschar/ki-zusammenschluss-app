@@ -1045,10 +1045,15 @@ footer a {
 	margin: 4px 0;
 }
 
-.chat-markdown-list,
-.chat-choice-list {
+.chat-markdown-list {
 	margin: 8px 0 8px 22px;
 	padding: 0;
+}
+
+.chat-choice-list {
+	margin: 8px 0;
+	padding: 0;
+	list-style: none;
 }
 
 .chat-markdown-list li,
