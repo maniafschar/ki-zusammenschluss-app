@@ -157,7 +157,7 @@ public class KiChatController {
 	}
 
 	public record ChatRequest(@NotNull @Size(min = 1, max = 20) List<@NotNull @Valid ChatMessage> messages,
-			UUID gespraechId, Boolean denken) {
+			UUID gespraechId) {
 	}
 
 	public record ChatResponse(String reply) {
@@ -391,7 +391,7 @@ public class KiChatController {
 		body.set("messages", messages);
 		body.put("stream", stream);
 		body.put("max_tokens", 1500);
-		body.putObject("chat_template_kwargs").put("enable_thinking", !Boolean.FALSE.equals(request.denken()));
+		body.putObject("chat_template_kwargs").put("enable_thinking", true);
 		if (this.requirementsMcp != null) {
 			final ArrayNode tools = this.requirementsMcp.toolDefinitions().deepCopy();
 			tools.addAll(this.lokaleWerkzeuge());

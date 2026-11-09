@@ -976,12 +976,12 @@ startBooking();
 		if (event.key === 'Escape') closePrivacyPopup();
 	});
 
-	function submitChatAnswer(answer, { denken = true } = {}) {
+	function submitChatAnswer(answer) {
 		if (!choiceReady || state === 'listening' || !String(answer).trim()) return;
 		const value = String(answer).trim();
 		choiceReady = false;
 		stopSpeech();
-		ask(value, { denken });
+		ask(value);
 	}
 
 	text.addEventListener('click', (event) => {
@@ -997,7 +997,7 @@ startBooking();
 					.querySelectorAll('[data-chat-choice][aria-pressed="true"]').length === 0;
 				return;
 			}
-			submitChatAnswer(button.dataset.chatChoice, { denken: false });
+			submitChatAnswer(button.dataset.chatChoice);
 			return;
 		}
 		const submit = event.target.closest('[data-chat-submit-multiple]');
@@ -1005,7 +1005,7 @@ startBooking();
 			const group = submit.closest('.chat-choices');
 			const answers = [...group.querySelectorAll('[data-chat-choice][aria-pressed="true"]')]
 				.map(option => option.dataset.chatChoice);
-			submitChatAnswer(answers.join('\n'), { denken: false });
+			submitChatAnswer(answers.join('\n'));
 		}
 	});
 	text.addEventListener('submit', (event) => {
@@ -1048,7 +1048,7 @@ startBooking();
 		bereich.append(aktionen);
 	}
 
-	async function ask(question, { denken = true } = {}) {
+	async function ask(question) {
 		const turnId = ++chatTurn;
 		choiceReady = false;
 		state = 'thinking';
@@ -1068,7 +1068,7 @@ startBooking();
 
 		try {
 			const token = await csrfToken();
-			const requestBody = JSON.stringify({ messages: history.slice(-10), gespraechId, denken });
+			const requestBody = JSON.stringify({ messages: history.slice(-10), gespraechId });
 			let res = null;
 			for (let attempt = 1; attempt <= 20; attempt++) {
 				res = await fetch('/ai-expert/api/ki/chat/stream', {
