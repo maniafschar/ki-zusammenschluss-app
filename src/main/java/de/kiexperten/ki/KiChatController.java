@@ -73,19 +73,15 @@ public class KiChatController {
 			+ "Wenn bereits eine Frage gestellt wurde, bewerte die letzte Nutzeraussage anhand der Akzeptanzkriterien. Rufe record_requirement_answer auf und übergib die Antwort als answers-Array. Bei Auswahloptionen übergib die exakten Optionstexte einzeln; bei Freitext ein Element. "
 			+ "Du entscheidest selbst, ob die Antwort genügt. Bei unklaren Antworten stelle eine konkrete Rückfrage und schließe den Schritt nicht ab. Der Server prüft Auswahlmaximum und Reihenfolge. "
 			+ "Erkläre die Optionstexte nicht um und erfinde keine Antwortoptionen. "
-			+ "Der Nutzer kann die Umfrage auch ohne dich ausfüllen. Wenn get_next_requirement_step completed=true meldet oder der Nutzer schreibt, dass er die Umfrage abgeschlossen hat, gehe so vor: "
+			+ "Du führst die Umfrage durch. Die erste Frage steht bereits in der Begrüßung; die Antwort des Nutzers darauf bewertest du wie jede andere Antwort. "
+			+ "Wenn get_next_requirement_step completed=true meldet, gehe so vor: "
 			+ "1. Rufe speichere_zusammenfassung mit einer knappen, sachlichen Zusammenfassung der Antworten in Stichpunkten ohne Anrede und Grußformel auf. "
 			+ "2. Schlage keine Termine vor und frage nicht nach Terminen, Namen oder E-Mail-Adressen. Bedanke dich kurz für die Antworten. "
 			+ "Beantworte keine sachfremden Fragen; lenke freundlich zum aktuellen Schritt zurück.";
-	private static final String WELCOME_INTRO = "Schön, dass du da bist! Ich bin der KI-Assistent des KI Experten Teams: "
-			+ "freiberufliche Spezialisten, unabhängig und mit einer klaren Haltung. KI soll in deinem Unternehmen echten Nutzen bringen, "
-			+ "nicht nur gut klingen.\n\n"
-			+ "Dafür brauche ich dein ehrliches Bild. Es gibt hier keine falschen Antworten: Wer noch ganz am Anfang steht, "
-			+ "bekommt von uns genauso eine passende Einschätzung wie jemand, der schon mittendrin ist. "
-			+ "Je ehrlicher deine Antworten, desto weniger Zeit verlieren wir beide mit Dingen, die nicht zu dir passen.\n\n"
-			+ "Wie möchtest du starten?\n\n"
-			+ "- Mit mir weiterchatten\n"
-			+ "- Die Umfrage ausfüllen";
+	private static final String WELCOME_INTRO = "Schön, dass du da bist! Ich bin der KI-Assistent der KI Experten. "
+			+ "In sechs kurzen Fragen finden wir gemeinsam heraus, wo dein Unternehmen bei KI steht. "
+			+ "Sei ehrlich, es gibt keine falschen Antworten.\n\n"
+			+ "Los geht's mit der ersten Frage:";
 	private static final Set<String> LOKALE_WERKZEUGE = Set.of("speichere_zusammenfassung");
 	private static final int MAX_TOOL_ROUNDS = 5;
 	private static final int MAX_TOOL_CALLS = 10;
@@ -263,34 +259,13 @@ public class KiChatController {
 	public record WelcomeResponse(String gespraechId, String text) {
 	}
 
-	public record UmfrageAntwort(@NotBlank @Size(max = 64) String gespraechId,
-			@NotBlank @Size(max = 64) String stepId,
-			@NotNull @Size(min = 1, max = 10) List<@NotBlank @Size(max = 500) String> answers) {
-	}
-
+	/** Begrüßung mit der ersten Umfragefrage aus dem MCP-Server; ab hier führt die KI die Umfrage im Chat. */
 	@GetMapping("/api/ki/welcome")
-	public WelcomeResponse welcome(final HttpServletRequest http) {
+	public WelcomeResponse welcome(final HttpServletRequest http) throws IOException {
 		this.limit(http.getRemoteAddr());
-		return new WelcomeResponse(UUID.randomUUID().toString(), WELCOME_INTRO);
-	}
-
-	/** Aktueller Umfrageschritt ohne KI; die Umfrage läuft direkt über den MCP-Server. */
-	@GetMapping("/api/ki/umfrage/schritt")
-	public ObjectNode umfrageSchritt(@RequestParam final String gespraechId) throws IOException {
-		return this.umfrageZustand(this.gespraechId(gespraechId));
-	}
-
-	@PostMapping("/api/ki/umfrage/antwort")
-	public ObjectNode umfrageAntwort(@RequestBody @Valid final UmfrageAntwort request) throws IOException {
-		final String id = this.gespraechId(request.gespraechId());
-		final ObjectNode arguments = this.mapper.createObjectNode().put("conversationId", id)
-				.put("stepId", request.stepId()).put("sufficient", true);
-		arguments.set("answers", this.mapper.valueToTree(request.answers()));
-		final JsonNode result = this.mapper.readTree(this.mcp().call("record_requirement_answer", arguments));
-		if (!result.path("accepted").asBoolean(false) && !result.path("completed").asBoolean(false))
-			throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
-					result.path("reason").asText("Die Antwort konnte nicht übernommen werden."));
-		return this.umfrageZustand(id);
+		final String id = UUID.randomUUID().toString();
+		final String frage = this.umfrageZustand(id).path("markdown").asText("");
+		return new WelcomeResponse(id, WELCOME_INTRO + "\n\n" + frage);
 	}
 
 	private ObjectNode umfrageZustand(final String id) throws IOException {
@@ -308,11 +283,6 @@ public class KiChatController {
 		return this.requirementsMcp;
 	}
 
-	private String gespraechId(final String value) {
-		if (value == null || !value.matches("[0-9a-fA-F-]{36}"))
-			throw new ResponseStatusException(HttpStatus.BAD_REQUEST);
-		return value;
-	}
 	private String schrittAlsMarkdown(final JsonNode result, final JsonNode step) {
 		final StringBuilder markdown = new StringBuilder();
 		markdown.append("**Schritt ").append(result.path("stepNumber").asInt(1)).append(" von ")

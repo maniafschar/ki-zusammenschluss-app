@@ -352,11 +352,6 @@ startBooking();
 	let chatTurn = 0;
 	let activeSpeech = null;
 	let choiceReady = false;
-	let umfrageAktiv = false;
-	let umfrageSchritt = null;
-	let umfrageMarkdown = '';
-	const OPTION_UMFRAGE = 'Die Umfrage ausfüllen';
-	const ABSCHLUSS_FRAGE = 'Ich habe die Umfrage abgeschlossen.';
 	let level = 0;
 	let audioContext = null;
 	let audioAnalyser = null;
@@ -972,67 +967,7 @@ startBooking();
 		const value = String(answer).trim();
 		choiceReady = false;
 		stopSpeech();
-		if (umfrageAktiv) {
-			umfrageAntwort(value);
-			return;
-		}
-		if (value === OPTION_UMFRAGE) {
-			startUmfrage();
-			return;
-		}
 		ask(value);
-	}
-
-	async function startUmfrage() {
-		umfrageAktiv = true;
-		renderConversation(OPTION_UMFRAGE, '', { status: 'Die Umfrage lädt …' });
-		try {
-			const res = await fetch(`/ai-expert/api/ki/umfrage/schritt?gespraechId=${encodeURIComponent(gespraechId)}`, {
-				credentials: 'same-origin'
-			});
-			if (!res.ok) throw new Error(res.status);
-			zeigeUmfrageSchritt(OPTION_UMFRAGE, await res.json());
-		} catch (e) {
-			console.error('Umfrage konnte nicht geladen werden:', e);
-			umfrageAktiv = false;
-			renderConversation(OPTION_UMFRAGE, 'Die Umfrage konnte gerade nicht geladen werden. Bitte versuche es erneut.');
-			choiceReady = true;
-		}
-	}
-
-	function zeigeUmfrageSchritt(question, data) {
-		if (data.completed) {
-			umfrageAktiv = false;
-			ask(ABSCHLUSS_FRAGE);
-			return;
-		}
-		umfrageSchritt = data.step;
-		umfrageMarkdown = data.markdown;
-		renderConversation(question, data.markdown, { choices: true });
-		choiceReady = true;
-	}
-
-	async function umfrageAntwort(value) {
-		const step = umfrageSchritt;
-		const answers = step.selectionMode === 'text'
-			? [value]
-			: value.split('\n').map((line) => line.trim()).filter(Boolean);
-		renderConversation(value, '', { status: 'Antwort wird gespeichert …' });
-		try {
-			const token = await csrfToken();
-			const res = await fetch('/ai-expert/api/ki/umfrage/antwort', {
-				method: 'POST',
-				credentials: 'same-origin',
-				headers: { 'Content-Type': 'application/json', 'X-XSRF-TOKEN': token },
-				body: JSON.stringify({ gespraechId, stepId: step.id, answers })
-			});
-			if (!res.ok) throw new Error(res.status);
-			zeigeUmfrageSchritt(value, await res.json());
-		} catch (e) {
-			console.error('Umfrageantwort konnte nicht gespeichert werden:', e);
-			renderConversation(value, umfrageMarkdown, { choices: true, status: 'Bitte prüfe deine Auswahl und versuche es erneut.' });
-			choiceReady = true;
-		}
 	}
 
 	text.addEventListener('click', (event) => {

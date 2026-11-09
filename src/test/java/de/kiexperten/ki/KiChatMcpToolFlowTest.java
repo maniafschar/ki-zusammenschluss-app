@@ -1,6 +1,7 @@
 package de.kiexperten.ki;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentCaptor.forClass;
@@ -24,6 +25,7 @@ import java.util.Base64;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Pattern;
 
 import org.junit.jupiter.api.AfterAll;
@@ -53,6 +55,7 @@ import com.sun.net.httpserver.HttpServer;
 class KiChatMcpToolFlowTest {
 	private static final ObjectMapper MAPPER = new ObjectMapper();
 	private static final Pattern CONVERSATION_ID = Pattern.compile("Gesprächs-ID für MCP-Werkzeuge: ([0-9a-f-]+)");
+	private static final Pattern ANSWER = Pattern.compile("\\[antwort:([a-z]+)\\]\\s*(.*)", Pattern.DOTALL);
 	private static final HttpServer upstream;
 
 	static {
@@ -74,9 +77,14 @@ class KiChatMcpToolFlowTest {
 						return;
 					}
 					final String userText = lastUserText(messages);
+					final var answer = ANSWER.matcher(userText);
 					if (userText.contains("[zusammenfassung]")) {
 						final String summary = userText.substring(userText.indexOf("[zusammenfassung]") + "[zusammenfassung]".length()).trim();
 						response = toolCall("speichere_zusammenfassung", MAPPER.writeValueAsString(Map.of("text", summary)));
+					} else if (answer.find()) {
+						final String arguments = MAPPER.writeValueAsString(Map.of("conversationId", matcher.group(1),
+								"stepId", answer.group(1), "sufficient", true, "answers", List.of(answer.group(2).trim())));
+						response = toolCall("record_requirement_answer", arguments);
 					} else {
 						final String arguments = MAPPER.writeValueAsString(Map.of("conversationId", matcher.group(1)));
 						response = "{\"choices\":[{\"message\":{\"tool_calls\":[{\"id\":\"call-1\",\"type\":\"function\",\"function\":{\"name\":\"get_next_requirement_step\",\"arguments\":"
@@ -168,64 +176,59 @@ class KiChatMcpToolFlowTest {
 		assertTrue(UUID.fromString(invocation.getValue().path("conversationId").asText()) != null);
 	}
 
-	@Test
-	void welcomeOffersChatAndSurveyOptionsWithoutCallingMcp() throws Exception {
-		final var response = HttpClient.newHttpClient().send(HttpRequest
-				.newBuilder(URI.create("http://127.0.0.1:" + this.port + "/api/ki/welcome")).GET().build(),
+	private final AtomicInteger beantwortet = new AtomicInteger();
+
+	private static final String SCHRITT_ROLLE = "{\"completed\":false,\"stepNumber\":1,\"totalSteps\":2,\"step\":{\"id\":\"maturity\","
+			+ "\"question\":\"Welche Rolle spielt KI?\",\"options\":[\"Keine: nichts.\",\"Strategisch: viel.\"],\"selectionMode\":\"single\"}}";
+	private static final String SCHRITT_ZIEL = "{\"completed\":false,\"stepNumber\":2,\"totalSteps\":2,\"step\":{\"id\":\"goal\","
+			+ "\"question\":\"Welches Ziel verfolgt ihr?\",\"selectionMode\":\"text\",\"inputPlaceholder\":\"Dein Ziel in einem Satz\"}}";
+	private static final String FERTIG = "{\"completed\":true,\"minimumSteps\":2,\"answeredSteps\":2}";
+
+	/** Stateful MCP-Stub: liefert den nächsten offenen Schritt, nachdem Antworten gespeichert wurden. */
+	private void stubUmfrage() throws Exception {
+		when(this.requirementsMcp.toolDefinitions()).thenReturn(this.mapper.createArrayNode()
+				.add(this.mapper.createObjectNode().put("type", "function")
+						.set("function", this.mapper.createObjectNode().put("name", "get_next_requirement_step")))
+				.add(this.mapper.createObjectNode().put("type", "function")
+						.set("function", this.mapper.createObjectNode().put("name", "record_requirement_answer"))));
+		when(this.requirementsMcp.call(eq("get_next_requirement_step"), any(JsonNode.class)))
+				.thenAnswer(invocation -> this.beantwortet.get() == 0 ? SCHRITT_ROLLE
+						: this.beantwortet.get() == 1 ? SCHRITT_ZIEL : FERTIG);
+		when(this.requirementsMcp.call(eq("record_requirement_answer"), any(JsonNode.class)))
+				.thenAnswer(invocation -> {
+					this.beantwortet.incrementAndGet();
+					return "{\"accepted\":true}";
+				});
+	}
+
+	private HttpResponse<String> chat(final String gespraechId, final String userContent) throws Exception {
+		final var messages = this.mapper.createArrayNode();
+		messages.addObject().put("role", "user").put("content", userContent);
+		final var chatRequest = this.mapper.createObjectNode().put("gespraechId", gespraechId);
+		chatRequest.set("messages", messages);
+		final String authorization = Base64.getEncoder()
+				.encodeToString("admin:local-test-password".getBytes(StandardCharsets.UTF_8));
+		return HttpClient.newHttpClient().send(HttpRequest
+				.newBuilder(URI.create("http://127.0.0.1:" + this.port + "/api/ki/chat/stream"))
+				.header("Authorization", "Basic " + authorization)
+				.header("X-API-Client", "test")
+				.header("Content-Type", "application/json")
+				.POST(HttpRequest.BodyPublishers.ofString(this.mapper.writeValueAsString(chatRequest))).build(),
 				HttpResponse.BodyHandlers.ofString());
+	}
+
+	@Test
+	void welcomeNenntKurzenIntroUndStelltDieErsteFrageOhneKiAufruf() throws Exception {
+		stubUmfrage();
+		final var response = this.get("/api/ki/welcome");
 
 		assertEquals(200, response.statusCode());
 		final JsonNode body = this.mapper.readTree(response.body());
 		assertTrue(UUID.fromString(body.path("gespraechId").asText()) != null);
 		final String text = body.path("text").asText();
-		assertTrue(text.contains("- Mit mir weiterchatten"), text);
-		assertTrue(text.contains("- Die Umfrage ausfüllen"), text);
-		verify(this.requirementsMcp, never()).call(anyString(), any(JsonNode.class));
-	}
-
-	@Test
-	void umfrageSchrittLiefertMarkdownOhneKi() throws Exception {
-		when(this.requirementsMcp.call(eq("get_next_requirement_step"), any(JsonNode.class)))
-				.thenReturn("{\"completed\":false,\"stepNumber\":1,\"totalSteps\":6,\"step\":{\"id\":\"maturity\",\"question\":\"Welche Rolle spielt KI?\","
-						+ "\"options\":[\"Keine: nichts.\",\"Strategisch: viel.\"],\"selectionMode\":\"single\"}}");
-		final var response = HttpClient.newHttpClient().send(HttpRequest
-				.newBuilder(URI.create("http://127.0.0.1:" + this.port + "/api/ki/umfrage/schritt?gespraechId="
-						+ UUID.randomUUID()))
-				.GET().build(), HttpResponse.BodyHandlers.ofString());
-
-		assertEquals(200, response.statusCode());
-		final JsonNode body = this.mapper.readTree(response.body());
-		assertEquals("maturity", body.path("step").path("id").asText());
-		assertTrue(body.path("markdown").asText().contains("**Schritt 1 von 6:** Welche Rolle spielt KI?"));
+		assertTrue(text.contains("**Schritt 1 von 2:** Welche Rolle spielt KI?"), text);
+		assertFalse(text.contains("Die Umfrage ausfüllen"), text);
 		verify(this.requirementsMcp, never()).call(eq("record_requirement_answer"), any(JsonNode.class));
-	}
-
-	@Test
-	void umfrageAntwortLehntUngueltigeAbUndLiefertNaechstenSchritt() throws Exception {
-		final String id = UUID.randomUUID().toString();
-		final Csrf csrf = this.csrf();
-		final String body = "{\"gespraechId\":\"" + id + "\",\"stepId\":\"maturity\",\"answers\":[\"Unbekannt\"]}";
-		when(this.requirementsMcp.call(eq("record_requirement_answer"), any(JsonNode.class)))
-				.thenReturn("{\"accepted\":false,\"reason\":\"Bitte eine Option wählen.\"}");
-		final var rejected = HttpClient.newHttpClient().send(HttpRequest
-				.newBuilder(URI.create("http://127.0.0.1:" + this.port + "/api/ki/umfrage/antwort"))
-				.header("Content-Type", "application/json")
-				.header("Cookie", csrf.cookie()).header("X-XSRF-TOKEN", csrf.token())
-				.POST(HttpRequest.BodyPublishers.ofString(body)).build(), HttpResponse.BodyHandlers.ofString());
-		assertEquals(422, rejected.statusCode());
-
-		when(this.requirementsMcp.call(eq("record_requirement_answer"), any(JsonNode.class)))
-				.thenReturn("{\"accepted\":true}");
-		when(this.requirementsMcp.call(eq("get_next_requirement_step"), any(JsonNode.class)))
-				.thenReturn("{\"completed\":true,\"minimumSteps\":6,\"answeredSteps\":6}");
-		final var accepted = HttpClient.newHttpClient().send(HttpRequest
-				.newBuilder(URI.create("http://127.0.0.1:" + this.port + "/api/ki/umfrage/antwort"))
-				.header("Content-Type", "application/json")
-				.header("Cookie", csrf.cookie()).header("X-XSRF-TOKEN", csrf.token())
-				.POST(HttpRequest.BodyPublishers.ofString(body.replace("Unbekannt", "Keine: nichts."))).build(),
-				HttpResponse.BodyHandlers.ofString());
-		assertEquals(200, accepted.statusCode());
-		assertTrue(this.mapper.readTree(accepted.body()).path("completed").asBoolean(false), accepted.body());
 	}
 
 	@Test
@@ -267,26 +270,14 @@ class KiChatMcpToolFlowTest {
 
 	@Test
 	void umfrageUndTerminbuchungUebernehmenDieUmfrageergebnisseInDasTextfeld() throws Exception {
-		final String step1 = "{\"completed\":false,\"stepNumber\":1,\"totalSteps\":2,\"step\":{\"id\":\"maturity\","
-				+ "\"question\":\"Welche Rolle spielt KI?\",\"options\":[\"Keine: nichts.\",\"Strategisch: viel.\"],\"selectionMode\":\"single\"}}";
-		final String step2 = "{\"completed\":false,\"stepNumber\":2,\"totalSteps\":2,\"step\":{\"id\":\"goal\","
-				+ "\"question\":\"Welches Ziel verfolgt ihr?\",\"selectionMode\":\"text\",\"inputPlaceholder\":\"Dein Ziel in einem Satz\"}}";
-		final String completed = "{\"completed\":true,\"minimumSteps\":2,\"answeredSteps\":2}";
-		when(this.requirementsMcp.call(eq("get_next_requirement_step"), any(JsonNode.class)))
-				.thenReturn(step1, step2, completed);
-		when(this.requirementsMcp.call(eq("record_requirement_answer"), any(JsonNode.class)))
-				.thenReturn("{\"accepted\":true}");
-		final String id = UUID.randomUUID().toString();
+		this.beantwortet.set(0);
+		stubUmfrage();
+		final String id = this.mapper.readTree(this.get("/api/ki/welcome").body()).path("gespraechId").asText();
 		final Csrf csrf = this.csrf();
 
-		final JsonNode first = this.mapper.readTree(this.get("/api/ki/umfrage/schritt?gespraechId=" + id).body());
-		assertEquals("maturity", first.path("step").path("id").asText());
-		this.postJson("/api/ki/umfrage/antwort", csrf,
-				"{\"gespraechId\":\"" + id + "\",\"stepId\":\"maturity\",\"answers\":[\"Strategisch: viel.\"]}");
-		final var lastAnswer = this.postJson("/api/ki/umfrage/antwort", csrf,
-				"{\"gespraechId\":\"" + id + "\",\"stepId\":\"goal\",\"answers\":[\"Prozesse automatisieren.\"]}");
-		assertEquals(200, lastAnswer.statusCode(), lastAnswer.body());
-		assertTrue(this.mapper.readTree(lastAnswer.body()).path("completed").asBoolean(false), lastAnswer.body());
+		assertEquals(200, this.chat(id, "[antwort:maturity] Strategisch: viel.").statusCode());
+		assertEquals(200, this.chat(id, "[antwort:goal] Prozesse automatisieren.").statusCode());
+		assertEquals(2, this.beantwortet.get());
 
 		final var answers = forClass(JsonNode.class);
 		verify(this.requirementsMcp, times(2)).call(eq("record_requirement_answer"), answers.capture());
@@ -295,10 +286,11 @@ class KiChatMcpToolFlowTest {
 		assertEquals("Strategisch: viel.", sent.get(0).path("answers").get(0).asText());
 		assertEquals("goal", sent.get(1).path("stepId").asText());
 		assertEquals("Prozesse automatisieren.", sent.get(1).path("answers").get(0).asText());
+		assertEquals(id, sent.get(0).path("conversationId").asText());
 
 		// Die KI fasst die Antworten zusammen; das Frontend übernimmt die Zusammenfassung aus dem done-Event.
 		final String summary = "- Reifegrad: Strategisch: viel.\n- Ziel: Prozesse automatisieren.";
-		final var stream = this.post("/api/ki/chat/stream", "[zusammenfassung] " + summary);
+		final var stream = this.chat(id, "[zusammenfassung] " + summary);
 		assertEquals(200, stream.statusCode());
 		final String zusammenfassung = this.doneEvent(stream.body()).path("zusammenfassung").asText();
 		assertEquals(summary, zusammenfassung);
