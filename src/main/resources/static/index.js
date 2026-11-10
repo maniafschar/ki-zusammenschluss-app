@@ -1065,11 +1065,14 @@ startBooking();
 		submitChatAnswer(form.elements.answer.value);
 	});
 
+	let aktionenAngezeigt = false;
+
 	function zeigeZusammenfassung(summary) {
 		const nachricht = document.getElementById('booking-form')?.elements.nachricht;
 		if (nachricht) nachricht.value = summary;
 		const bereich = text.querySelector('.chat-assistant');
-		if (!bereich) return;
+		if (!bereich || aktionenAngezeigt) return;
+		aktionenAngezeigt = true;
 		const aktionen = document.createElement('div');
 		aktionen.className = 'chat-actions';
 		const termin = document.createElement('button');
@@ -1077,6 +1080,7 @@ startBooking();
 		termin.className = 'btn-text';
 		termin.textContent = 'Termin vereinbaren';
 		termin.addEventListener('click', () => {
+			termin.remove();
 			document.getElementById('kontakt')?.scrollIntoView({
 				behavior: reducedMotion.matches ? 'auto' : 'smooth'
 			});
