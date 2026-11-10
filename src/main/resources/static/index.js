@@ -906,8 +906,6 @@ startBooking();
 		}
 		history.push({ role: 'assistant', content: welcome });
 		start.hidden = true;
-		mic.hidden = false;
-		mic.disabled = true;
 		renderWelcome(welcome);
 		choiceReady = true;
 		try {
@@ -1036,6 +1034,7 @@ startBooking();
 		weiterchatten.className = 'btn-text';
 		weiterchatten.textContent = 'Mit mir weiterchatten';
 		weiterchatten.addEventListener('click', () => {
+			document.getElementById('voice-mic').hidden = false;
 			aktionen.remove();
 			const danke = document.createElement('p');
 			danke.className = 'chat-status';
@@ -1052,7 +1051,6 @@ startBooking();
 		const turnId = ++chatTurn;
 		choiceReady = false;
 		state = 'thinking';
-		mic.disabled = true;
 		renderConversation(question, '', { status: 'Die KI denkt nach …' });
 		history.push({ role: 'user', content: question });
 		let reply = '';
