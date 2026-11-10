@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.List;
+import java.util.Map;
 
 import org.junit.jupiter.api.Test;
 
@@ -41,6 +42,16 @@ class RequirementFlowServiceTest {
 				List.of("Rechnungen automatisch zuordnen und prüfen"), true, null);
 		assertTrue((boolean) completed.get("completed"));
 		assertEquals(6, completed.get("answeredSteps"));
+		final List<?> answerDetails = (List<?>) completed.get("answerDetails");
+		final Map<?, ?> firstAnswer = (Map<?, ?>) answerDetails.get(0);
+		assertEquals("Welche Rolle spielt Künstliche Intelligenz (KI) aktuell in Ihrem Unternehmen?",
+				firstAnswer.get("question"));
+		assertEquals(List.of("Keine: Wir nutzen bisher keine KI-Tools und haben es kurzfristig auch nicht geplant."),
+				firstAnswer.get("answers"));
+		final Map<?, ?> lastAnswer = (Map<?, ?>) answerDetails.get(5);
+		assertEquals("Beschreiben Sie kurz einen Prozess oder eine tägliche Aufgabe in Ihrem Unternehmen, die Sie am liebsten an eine KI auslagern oder damit beschleunigen würden:",
+				lastAnswer.get("question"));
+		assertEquals(List.of("Rechnungen automatisch zuordnen und prüfen"), lastAnswer.get("answers"));
 		assertTrue((boolean) this.flow.nextStep(conversationId).get("completed"));
 	}
 
@@ -49,6 +60,26 @@ class RequirementFlowServiceTest {
 		final var result = this.flow.recordAnswer("conversation-2", "timeline", List.of("Antwort"), true, null);
 		assertFalse((boolean) result.get("accepted"));
 		assertEquals("maturity", result.get("expectedStepId"));
+	}
+
+	@Test
+	void preservesTextAnswerExactly() {
+		final String answer = "  Bitte genau so übernehmen. \n";
+		this.answer("conversation-verbatim", "maturity", List.of(
+				"Keine: Wir nutzen bisher keine KI-Tools und haben es kurzfristig auch nicht geplant."));
+		this.answer("conversation-verbatim", "timeline", List.of(
+				"Sofort: Wir suchen aktuell aktiv nach passenden Lösungen (innerhalb der nächsten 3 Monate)."));
+		this.answer("conversation-verbatim", "areas", List.of(
+				"Verwaltung & Backoffice: Automatisierung von Dokumentenverarbeitung, Rechnungen oder HR-Prozessen."));
+		this.answer("conversation-verbatim", "infrastructure", List.of(
+				"Datenschutz & Compliance: Absolute Datensouveränität (Daten dürfen das Unternehmen nicht verlassen)."));
+		this.answer("conversation-verbatim", "barrier",
+				List.of("Budget: Die Befürchtung, dass maßgeschneiderte Lösungen für KMU zu teuer sind."));
+
+		final var completed = this.flow.recordAnswer("conversation-verbatim", "use_case", List.of(answer), true, null);
+		final List<?> answerDetails = (List<?>) completed.get("answerDetails");
+		final Map<?, ?> lastAnswer = (Map<?, ?>) answerDetails.get(5);
+		assertEquals(List.of(answer), lastAnswer.get("answers"));
 	}
 
 	@Test
