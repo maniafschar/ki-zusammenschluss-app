@@ -552,6 +552,28 @@ h2 {
 	padding-bottom: 1rem;
 }
 
+.spider-benefit-copy ul {
+	list-style: none;
+	margin: 0;
+	padding: 0 0 1rem;
+}
+
+.spider-benefit-copy li {
+	position: relative;
+	padding-left: 1.1rem;
+}
+
+.spider-benefit-copy li+li {
+	padding-top: .35rem;
+}
+
+.spider-benefit-copy li::before {
+	content: "›";
+	position: absolute;
+	left: 0;
+	color: #a7eaff;
+}
+
 .spider-benefit-copy strong {
 	color: #a7eaff;
 }
