@@ -1038,8 +1038,8 @@ startBooking();
 			aktionen.remove();
 			const danke = document.createElement('p');
 			danke.className = 'chat-status';
-			danke.textContent = 'Danke Dir für Deine ehrlichen Antworten! '
-				+ 'Wenn Du noch eine Frage hast, klicke auf das Mikrofon, um sie zu stellen. '
+			danke.textContent = 'Mit diesen Hintergrundwissen kann ich nun gezielt auf Deine Fragen antworten. '
+				+ 'Klicke hierzu auf das Mikrofon, um sie zu stellen. '
 				+ 'Wenn Du fertig bist, klicke es erneut, um die Frage abzusenden.';
 			bereich.append(danke);
 		});
