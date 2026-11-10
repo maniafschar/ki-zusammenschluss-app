@@ -1280,18 +1280,26 @@ footer a {
 }
 
 @keyframes thinking-pulse {
-	50% { filter: hue-rotate(25deg) brightness(1.25); transform: scale(1.08); }
+	50% {
+		filter: hue-rotate(25deg) brightness(1.25);
+		transform: scale(1.08);
+	}
 }
 
 @keyframes thinking-orbit {
-	to { transform: rotate(325deg) scaleX(1.35); }
+	to {
+		transform: rotate(325deg) scaleX(1.35);
+	}
 }
 
 @keyframes thinking-dots {
-	to { background-position: .8rem 50%; }
+	to {
+		background-position: .8rem 50%;
+	}
 }
 
 @media (prefers-reduced-motion: reduce) {
+
 	.thinking-orb,
 	.thinking-orb::before,
 	.thinking-orb::after,
