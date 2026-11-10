@@ -1,18 +1,18 @@
 package de.kiexperten.booking;
 
+import java.security.SecureRandom;
 import java.time.DayOfWeek;
-import java.time.LocalDate;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
-import java.security.SecureRandom;
-import java.util.Base64;
 import java.util.Set;
 
 import org.springframework.dao.DataIntegrityViolationException;
@@ -53,7 +53,8 @@ public class TerminController {
 			@NotBlank @Size(max = 120) String name,
 			@NotBlank @Email @Size(max = 200) String email,
 			@Pattern(regexp = "^$|^[0-9+()/\\-. ]{5,40}$") String telefon,
-			@Size(max = 2000) String nachricht) {
+			@Size(max = 2000) String nachricht,
+			@Size(max = 36) String gespraechId) {
 	}
 
 	public record BuchungAntwort(Instant start) {
@@ -88,7 +89,8 @@ public class TerminController {
 	List<Slot> slots() {
 		final LocalDateTime now = Zeit.nowUtc();
 		final Instant nowInstant = Zeit.instant(now);
-		// Opening hours are Berlin business hours; only the stored/transferred values are UTC.
+		// Opening hours are Berlin business hours; only the stored/transferred values
+		// are UTC.
 		final LocalDate firstDay = LocalDate.now(ZONE);
 		final LocalDate lastDay = firstDay.plusDays(DAYS_AHEAD);
 		final Set<Instant> booked = new HashSet<>();
@@ -135,6 +137,8 @@ public class TerminController {
 		termin.setEmail(request.email().trim());
 		termin.setTelefon(request.telefon() == null || request.telefon().isBlank() ? null : request.telefon().trim());
 		termin.setNachricht(request.nachricht() == null ? null : request.nachricht().trim());
+		termin.setGespraechId(request.gespraechId() == null || request.gespraechId().isBlank() ? null
+				: request.gespraechId().trim());
 		termin.setGebuchtAm(now);
 		termin.setStatus("ANGEFRAGT");
 		termin.setBestaetigungsToken(newToken());
@@ -171,13 +175,15 @@ public class TerminController {
 				result = "bestaetigt";
 			}
 		}
-		return ResponseEntity.status(HttpStatus.SEE_OTHER).header("Location", "/?termin=" + result + "#kontakt").build();
+		return ResponseEntity.status(HttpStatus.SEE_OTHER).header("Location", "/?termin=" + result + "#kontakt")
+				.build();
 	}
 
 	@GetMapping("/api/admin/termine")
 	List<TerminAnsicht> all() {
 		return this.termine.findAllByDeletedAtIsNullOrderByStartZeitAsc().stream()
-				.map(t -> new TerminAnsicht(t.getId(), Zeit.instant(t.getStartZeit()), t.getName(), t.getEmail(), t.getTelefon(),
+				.map(t -> new TerminAnsicht(t.getId(), Zeit.instant(t.getStartZeit()), t.getName(), t.getEmail(),
+						t.getTelefon(),
 						t.getNachricht(), isExpired(t, Zeit.nowUtc()) ? "ABGELAUFEN" : t.getStatus()))
 				.toList();
 	}

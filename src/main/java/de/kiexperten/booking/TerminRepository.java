@@ -16,4 +16,6 @@ public interface TerminRepository extends JpaRepository<Termin, Long> {
 	Optional<Termin> findByAktiverStartZeit(LocalDateTime startZeit);
 
 	Optional<Termin> findByBestaetigungsToken(String token);
+
+	List<Termin> findByGespraechIdAndStatus(String gespraechId, String status);
 }

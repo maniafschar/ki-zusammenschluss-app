@@ -260,7 +260,8 @@ function startBooking() {
 					name: bookingForm.elements.name.value,
 					email: bookingForm.elements.email.value,
 					telefon: bookingForm.elements.telefon.value,
-					nachricht: bookingForm.elements.nachricht.value
+					nachricht: bookingForm.elements.nachricht.value,
+					gespraechId: bookingForm.dataset.gespraechId || null
 				})
 			});
 			if (res.status === 409) {
@@ -1068,8 +1069,10 @@ startBooking();
 	let aktionenAngezeigt = false;
 
 	function zeigeZusammenfassung(summary) {
-		const nachricht = document.getElementById('booking-form')?.elements.nachricht;
+		const bookingForm = document.getElementById('booking-form');
+		const nachricht = bookingForm?.elements.nachricht;
 		if (nachricht) nachricht.value = summary;
+		if (bookingForm) bookingForm.dataset.gespraechId = gespraechId || '';
 		const bereich = text.querySelector('.chat-assistant');
 		if (!bereich || aktionenAngezeigt) return;
 		aktionenAngezeigt = true;

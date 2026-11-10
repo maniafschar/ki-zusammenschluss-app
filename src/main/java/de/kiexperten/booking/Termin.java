@@ -17,7 +17,9 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
-/** A booked 30 minute slot; cancelled bookings remain recoverable in the trash. */
+/**
+ * A booked 30 minute slot; cancelled bookings remain recoverable in the trash.
+ */
 @Entity
 @SQLRestriction("deleted_at is null")
 @Table
@@ -58,9 +60,13 @@ public class Termin extends Auditable {
 	@Column(length = 64)
 	private String bestaetigungsToken;
 
+	// Chat conversation in which the booking was made (null for direct bookings).
+	@Column(length = 36)
+	private String gespraechId;
+
 	@PrePersist
 	@PreUpdate
 	private void synchronisiereAktivenStart() {
-		this.aktiverStartZeit = getDeletedAt() == null ? this.startZeit : null;
+		this.aktiverStartZeit = this.getDeletedAt() == null ? this.startZeit : null;
 	}
 }
