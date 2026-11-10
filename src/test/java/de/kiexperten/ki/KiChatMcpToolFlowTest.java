@@ -72,9 +72,11 @@ class KiChatMcpToolFlowTest {
 						.anyMatch(message -> "tool".equals(message.path("role").asText()));
 				final String response;
 				if (hasToolResult) {
-					final String text = lastUserText(messages).contains("[frage-im-text]")
-							? "Danke, notiert. Welches Ziel verfolgt ihr?"
-							: "Schritt 1: Was soll das Projekt erreichen?";
+					final String text = lastUserText(messages).contains("[abschluss]")
+							? "Die KI hat die Antwort umgeschrieben."
+							: lastUserText(messages).contains("[frage-im-text]")
+									? "Danke, notiert. Welches Ziel verfolgt ihr?"
+									: "Schritt 1: Was soll das Projekt erreichen?";
 					response = "{\"choices\":[{\"message\":{\"content\":\"" + text + "\"}}]}";
 				} else {
 					final var matcher = CONVERSATION_ID.matcher(messages.get(0).path("content").asText());
@@ -85,9 +87,14 @@ class KiChatMcpToolFlowTest {
 					}
 					final String userText = lastUserText(messages);
 					final var answer = ANSWER.matcher(userText);
-					if (userText.contains("[zusammenfassung]")) {
+					if (userText.contains("[abschluss]")) {
+						final String arguments = MAPPER.writeValueAsString(Map.of("conversationId", matcher.group(1),
+								"stepId", "use_case", "sufficient", true, "answers",
+								List.of("Diesen Satz bitte genau übernehmen!")));
+						response = toolCall("record_requirement_answer", arguments);
+					} else if (userText.contains("[zusammenfassung]")) {
 						final String summary = userText.substring(userText.indexOf("[zusammenfassung]") + "[zusammenfassung]".length()).trim();
-						response = toolCall("speichere_zusammenfassung", MAPPER.writeValueAsString(Map.of("text", summary)));
+						response = "{\"choices\":[{\"message\":{\"content\":\"" + summary + "\"}}]}";
 					} else if (answer.find()) {
 						final String arguments = MAPPER.writeValueAsString(Map.of("conversationId", matcher.group(1),
 								"stepId", answer.group(1), "sufficient", true, "answers", List.of(answer.group(2).trim())));
@@ -288,14 +295,37 @@ class KiChatMcpToolFlowTest {
 	}
 
 	@Test
-	void streamUebergibtZusammenfassungAusDemLokalenWerkzeug() throws Exception {
+	void streamUebernimmtKeineVonDerKiGenerierteZusammenfassung() throws Exception {
 		when(this.requirementsMcp.call(eq("get_next_requirement_step"), any(JsonNode.class)))
 				.thenReturn("{\"completed\":true,\"minimumSteps\":6,\"answeredSteps\":6}");
 		final var response = this.post("/api/ki/chat/stream", "[zusammenfassung] - Reifegrad: mittel");
 
 		assertEquals(200, response.statusCode());
 		assertTrue(response.body().contains("event: done\n"), response.body());
-		assertTrue(response.body().contains("\"zusammenfassung\":\"- Reifegrad: mittel\""), response.body());
+		assertTrue(response.body().contains("\"zusammenfassung\":\"\""), response.body());
+	}
+
+	@Test
+	void streamBautZusammenfassungAusOriginalfragenUndAntwortenStattAusKiText() throws Exception {
+		this.beantwortet.set(0);
+		stubUmfrage();
+		when(this.requirementsMcp.call(eq("get_next_requirement_step"), any(JsonNode.class)))
+				.thenReturn("{\"completed\":false,\"step\":{\"id\":\"use_case\","
+						+ "\"question\":\"Welche Frage wurde gestellt?\",\"selectionMode\":\"text\"}}");
+		when(this.requirementsMcp.call(eq("record_requirement_answer"), any(JsonNode.class))).thenAnswer(invocation -> {
+			final JsonNode args = invocation.getArgument(1);
+			final String answer = args.path("answers").get(0).asText();
+			return this.mapper.writeValueAsString(Map.of("accepted", true, "completed", true, "answerDetails",
+					List.of(Map.of("question", "Welche Frage wurde gestellt?", "answers", List.of(answer)))));
+		});
+
+		final var response = this.chat(UUID.randomUUID().toString(), "[abschluss]");
+
+		assertEquals(200, response.statusCode());
+		assertEquals("- Welche Frage wurde gestellt?\n  Antwort: [abschluss]",
+				this.doneEvent(response.body()).path("zusammenfassung").asText());
+		verify(this.requirementsMcp).call(eq("record_requirement_answer"),
+				argThat(args -> args.path("answers").get(0).asText().equals("[abschluss]")));
 	}
 
 	@Test
@@ -429,12 +459,16 @@ class KiChatMcpToolFlowTest {
 		assertEquals("maturity", sent.get(0).path("stepId").asText());
 		assertEquals("Strategisch: viel.", sent.get(0).path("answers").get(0).asText());
 		assertEquals("goal", sent.get(1).path("stepId").asText());
-		assertEquals("Prozesse automatisieren.", sent.get(1).path("answers").get(0).asText());
+		assertEquals("[antwort:goal] Prozesse automatisieren.", sent.get(1).path("answers").get(0).asText());
 		assertEquals(id, sent.get(0).path("conversationId").asText());
 
-		// Die KI fasst die Antworten zusammen; das Frontend übernimmt die Zusammenfassung aus dem done-Event.
-		final String summary = "- Reifegrad: Strategisch: viel.\n- Ziel: Prozesse automatisieren.";
-		final var stream = this.chat(id, "[zusammenfassung] " + summary);
+		when(this.requirementsMcp.call(eq("record_requirement_answer"), any(JsonNode.class))).thenReturn(
+				"{\"accepted\":true,\"completed\":true,\"answerDetails\":["
+						+ "{\"question\":\"Welche Rolle spielt KI?\",\"answers\":[\"Strategisch: viel.\"]},"
+						+ "{\"question\":\"Welches Ziel verfolgt ihr?\",\"answers\":[\"[antwort:goal] Prozesse automatisieren.\"]}]}");
+		final String summary = "- Welche Rolle spielt KI?\n  Antwort: Strategisch: viel."
+				+ "\n\n- Welches Ziel verfolgt ihr?\n  Antwort: [antwort:goal] Prozesse automatisieren.";
+		final var stream = this.chat(id, "[abschluss]");
 		assertEquals(200, stream.statusCode());
 		final String zusammenfassung = this.doneEvent(stream.body()).path("zusammenfassung").asText();
 		assertEquals(summary, zusammenfassung);

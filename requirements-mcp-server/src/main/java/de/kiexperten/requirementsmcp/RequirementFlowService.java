@@ -62,8 +62,7 @@ public class RequirementFlowService {
 		synchronized (progress) {
 			progress.lastUpdated = Instant.now();
 			if (progress.nextStepIndex == STEPS.size())
-				return Map.of("completed", true, "minimumSteps", MINIMUM_STEPS, "answeredSteps",
-						progress.answers.size(), "answers", Map.copyOf(progress.answers));
+				return this.completion(progress);
 			return Map.of("completed", false, "stepNumber", progress.nextStepIndex + 1, "totalSteps", STEPS.size(),
 					"step", STEPS.get(progress.nextStepIndex));
 		}
@@ -85,7 +84,7 @@ public class RequirementFlowService {
 						"Nur der aktuelle Schritt darf bewertet werden.",
 						"expectedStepId", current.id());
 			final List<String> cleanAnswers = answers == null ? List.of()
-					: answers.stream().filter(answer -> answer != null && !answer.isBlank()).map(String::trim).toList();
+					: answers.stream().filter(answer -> answer != null && !answer.isBlank()).toList();
 			if (cleanAnswers.isEmpty())
 				return Map.of("accepted", false, "completed", false, "reason",
 						"Eine leere Antwort kann nicht übernommen werden.");
@@ -107,12 +106,24 @@ public class RequirementFlowService {
 						clarificationQuestion == null ? "Bitte präzisieren Sie Ihre Antwort." : clarificationQuestion);
 			progress.answers.put(current.id(), cleanAnswers);
 			progress.nextStepIndex++;
-			if (progress.nextStepIndex == STEPS.size())
-				return Map.of("accepted", true, "completed", true, "minimumSteps", MINIMUM_STEPS, "answeredSteps",
-						progress.answers.size(), "answers", Map.copyOf(progress.answers));
+			if (progress.nextStepIndex == STEPS.size()) {
+				final var completion = new LinkedHashMap<>(this.completion(progress));
+				completion.put("accepted", true);
+				return completion;
+			}
 			return Map.of("accepted", true, "completed", false, "answeredSteps", progress.answers.size(),
 					"nextStep", STEPS.get(progress.nextStepIndex));
 		}
+	}
+
+	private Map<String, Object> completion(final Progress progress) {
+		final List<Map<String, Object>> answerDetails = STEPS.stream()
+				.filter(step -> progress.answers.containsKey(step.id()))
+				.map(step -> Map.<String, Object>of("question", step.question(), "answers",
+						progress.answers.get(step.id())))
+				.toList();
+		return Map.of("completed", true, "minimumSteps", MINIMUM_STEPS, "answeredSteps", progress.answers.size(),
+				"answers", Map.copyOf(progress.answers), "answerDetails", answerDetails);
 	}
 
 	@Scheduled(fixedDelay = 3_600_000)

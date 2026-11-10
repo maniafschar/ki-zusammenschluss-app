@@ -1017,7 +1017,7 @@ startBooking();
 
 	function zeigeZusammenfassung(summary) {
 		const nachricht = document.getElementById('booking-form')?.elements.nachricht;
-		if (nachricht) nachricht.value = summary.slice(0, 2000);
+		if (nachricht) nachricht.value = summary;
 		const bereich = text.querySelector('.chat-assistant');
 		if (!bereich) return;
 		const aktionen = document.createElement('div');
@@ -1110,7 +1110,7 @@ startBooking();
 						if (type === 'error') throw new Error(payload.text);
 						if (type === 'done') {
 							completed = true;
-							zusammenfassung = typeof payload.zusammenfassung === 'string' ? payload.zusammenfassung.trim() : '';
+							zusammenfassung = typeof payload.zusammenfassung === 'string' ? payload.zusammenfassung : '';
 							if (typeof payload.text === 'string' && payload.text.trim()) reply = payload.text.trim();
 							break;
 						}

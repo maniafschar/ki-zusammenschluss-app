@@ -46,7 +46,6 @@ import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBo
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
-import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
@@ -73,16 +72,15 @@ public class KiChatController {
 			+ "Nutze bei jedem Gesprächsschritt die MCP-Werkzeuge und rufe zuerst get_next_requirement_step mit der Gesprächs-ID auf. "
 			+ "Es gibt genau sechs Pflichtschritte. Stelle selbst keine Frage und keine Antwortoptionen; der Server hängt den aktuellen Schritt mit Titel, Frage und Optionen aus dem MCP-Server exakt an deine Antwort an. "
 			+ "Gib nur eine kurze Rückmeldung zur letzten Nutzeraussage oder eine konkrete Rückfrage zur Präzisierung. "
-			+ "Wenn bereits eine Frage gestellt wurde, bewerte die letzte Nutzeraussage anhand der Akzeptanzkriterien. Rufe record_requirement_answer auf und übergib die Antwort als answers-Array. Bei Auswahloptionen übergib die exakten Optionstexte einzeln; bei Freitext ein Element. "
+			+ "Wenn bereits eine Frage gestellt wurde, bewerte die letzte Nutzeraussage anhand der Akzeptanzkriterien. Rufe record_requirement_answer auf und übergib die Antwort als answers-Array. Bei Auswahloptionen übergib die exakten Optionstexte einzeln; bei Freitext muss die letzte Nutzeraussage unverändert als einziges Element übergeben werden. "
 			+ "Du entscheidest selbst, ob die Antwort genügt. Bei unklaren Antworten stelle eine konkrete Rückfrage und schließe den Schritt nicht ab. Der Server prüft Auswahlmaximum und Reihenfolge. "
 			+ "Erkläre die Optionstexte nicht um und erfinde keine Antwortoptionen. Schreibe die nächste Frage nicht ab, auch nicht umformuliert. "
 			+ "Du führst die Umfrage durch. Die erste Frage steht bereits in der Begrüßung; die Antwort des Nutzers darauf bewertest du wie jede andere Antwort. "
 			+ "Wenn get_next_requirement_step completed=true meldet, gehe so vor: "
-			+ "1. Rufe speichere_zusammenfassung mit einer knappen, sachlichen Zusammenfassung der Antworten in Stichpunkten ohne Anrede und Grußformel auf. "
+			+ "1. Erstelle und speichere keine Zusammenfassung. Der Server stellt die Fragen und Antworten unverändert zusammen. "
 			+ "2. Schlage keine Termine vor und frage nicht nach Terminen, Namen oder E-Mail-Adressen. Bedanke dich kurz für die Antworten. "
 			+ "Beantworte keine sachfremden Fragen; lenke freundlich zum aktuellen Schritt zurück.";
 	private static final String WELCOME_INTRO = "Dann lass uns zuerst ein paar kurze Fragen gemeinsam beantworten, so dass ich einen ersten Überblick bekomme und konkret auf Deine Bedürfnisse antworten kann. Los geht's...";
-	private static final Set<String> LOKALE_WERKZEUGE = Set.of("speichere_zusammenfassung");
 	private static final int MAX_TOOL_ROUNDS = 5;
 	private static final int MAX_TOOL_CALLS = 10;
 	private final ObjectMapper mapper = new ObjectMapper();
@@ -405,38 +403,10 @@ public class KiChatController {
 		body.put("max_tokens", 1500);
 		body.putObject("chat_template_kwargs").put("enable_thinking", true);
 		if (this.requirementsMcp != null) {
-			final ArrayNode tools = this.requirementsMcp.toolDefinitions().deepCopy();
-			tools.addAll(this.lokaleWerkzeuge());
-			body.set("tools", tools);
+			body.set("tools", this.requirementsMcp.toolDefinitions());
 			body.put("tool_choice", "auto");
 		}
 		return body;
-	}
-
-	private ArrayNode lokaleWerkzeuge() {
-		final ArrayNode definitions = this.mapper.createArrayNode();
-
-		final ObjectNode zusammenfassungText = this.mapper.createObjectNode().put("type", "string")
-				.put("description", "Zusammenfassung in Stichpunkten");
-		definitions.add(werkzeug("speichere_zusammenfassung",
-				"Speichert die knappe Zusammenfassung der Umfrage für das Kontaktformular.",
-				this.mapper.createObjectNode().set("text", zusammenfassungText), "text"));
-
-		return definitions;
-	}
-
-	private ObjectNode werkzeug(final String name, final String beschreibung, final ObjectNode eigenschaften,
-			final String... pflichtfelder) {
-		final ObjectNode parameter = this.mapper.createObjectNode().put("type", "object");
-		parameter.set("properties", eigenschaften);
-		final ArrayNode required = parameter.putArray("required");
-		for (final String feld : pflichtfelder)
-			required.add(feld);
-		final ObjectNode funktion = this.mapper.createObjectNode().put("name", name).put("description", beschreibung);
-		funktion.set("parameters", parameter);
-		final ObjectNode definition = this.mapper.createObjectNode().put("type", "function");
-		definition.set("function", funktion);
-		return definition;
 	}
 
 	private KiAntwort completeWithTools(final com.fasterxml.jackson.databind.node.ObjectNode body,
@@ -453,6 +423,15 @@ public class KiChatController {
 					.path("messages").get(0);
 			system.put("content",
 					system.path("content").asText() + " Gesprächs-ID für MCP-Werkzeuge: " + conversationId);
+		}
+		JsonNode aktuellerSchritt = this.mapper.getNodeFactory().nullNode();
+		if (this.requirementsMcp != null) {
+			final JsonNode status = this.mapper.readTree(this.requirementsMcp.call("get_next_requirement_step",
+					this.mapper.createObjectNode().put("conversationId", conversationId)));
+			if (status.path("completed").asBoolean(false))
+				zusammenfassung = this.zusammenfassungAus(status);
+			else
+				aktuellerSchritt = status.path("step");
 		}
 		int executedCalls = 0;
 		for (int round = 0; round < MAX_TOOL_ROUNDS; round++) {
@@ -482,19 +461,53 @@ public class KiChatController {
 						: rawArguments;
 				if (!arguments.isObject() || toolCallId.isBlank() || toolName.isBlank())
 					throw new ResponseStatusException(HttpStatus.BAD_GATEWAY);
+				if ("record_requirement_answer".equals(toolName)
+						&& "text".equals(aktuellerSchritt.path("selectionMode").asText()))
+					((ObjectNode) arguments).set("answers",
+							this.mapper.createArrayNode().add(this.letzteNutzernachricht(messages)));
 				final String result;
-				if (LOKALE_WERKZEUGE.contains(toolName)) {
-					result = this.lokalesWerkzeug(toolName, arguments);
-					if ("speichere_zusammenfassung".equals(toolName))
-						zusammenfassung = arguments.path("text").asText("").trim();
-				} else {
-					result = this.requirementsMcp.call(toolName, arguments);
+				result = this.requirementsMcp.call(toolName, arguments);
+				if ("get_next_requirement_step".equals(toolName) || "record_requirement_answer".equals(toolName)) {
+					final JsonNode status = this.mapper.readTree(result);
+					if (status.path("completed").asBoolean(false))
+						zusammenfassung = this.zusammenfassungAus(status);
+					else if ("get_next_requirement_step".equals(toolName))
+						aktuellerSchritt = status.path("step");
 				}
 				messages.addObject().put("role", "tool").put("tool_call_id", toolCallId).put("content", result);
 				executedCalls++;
 			}
 		}
 		throw new ResponseStatusException(HttpStatus.BAD_GATEWAY);
+	}
+
+	private String letzteNutzernachricht(final ArrayNode messages) {
+		String letzte = "";
+		for (final JsonNode message : messages)
+			if ("user".equals(message.path("role").asText()))
+				letzte = message.path("content").asText();
+		return letzte;
+	}
+
+	private String zusammenfassungAus(final JsonNode status) {
+		final JsonNode answerDetails = status.path("answerDetails");
+		if (!answerDetails.isArray() || answerDetails.isEmpty())
+			return "";
+		final StringBuilder summary = new StringBuilder();
+		for (final JsonNode detail : answerDetails) {
+			if (!detail.path("question").isTextual() || !detail.path("answers").isArray())
+				continue;
+			if (!summary.isEmpty())
+				summary.append("\n\n");
+			summary.append("- ").append(detail.path("question").asText()).append("\n  Antwort: ");
+			final List<String> answers = new java.util.ArrayList<>();
+			detail.path("answers").forEach(answer -> {
+				if (answer.isTextual())
+					answers.add(answer.asText());
+			});
+			summary.append(String.join("; ", answers));
+		}
+		return summary.toString();
 	}
 
 	/**
@@ -567,25 +580,6 @@ public class KiChatController {
 		if (start < 0)
 			return text;
 		return text.substring(0, start).replaceFirst("\\*{0,2}Schritt \\d+ von \\d+:?\\*{0,2}\\s*$", "").trim();
-	}
-
-	private String lokalesWerkzeug(final String name, final JsonNode arguments) {
-		try {
-			return switch (name) {
-				case "speichere_zusammenfassung" -> this.mapper.createObjectNode().put("gespeichert", true).toString();
-				default -> fehlerAntwort("Unbekanntes Werkzeug");
-			};
-		} catch (final ResponseStatusException e) {
-			log.warn("Lokales Werkzeug {} abgelehnt: {}", name, e.getReason());
-			return fehlerAntwort(e.getReason() == null ? "Aktion nicht möglich" : e.getReason());
-		} catch (final RuntimeException e) {
-			log.warn("Lokales Werkzeug {} fehlgeschlagen", name, e);
-			return fehlerAntwort("Aktion fehlgeschlagen");
-		}
-	}
-
-	private static String fehlerAntwort(final String meldung) {
-		return JsonNodeFactory.instance.objectNode().put("fehler", meldung).toString();
 	}
 
 	private HttpRequest upstreamRequest(final JsonNode body) throws IOException {
