@@ -32,6 +32,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -57,7 +58,8 @@ import jakarta.validation.constraints.Size;
 @RestController
 public class KiChatController {
 
-	private static final int MAX_PER_MINUTE = 10;
+	private static final double BUCKET_SIZE = 30;
+	private static final double REFILL_PER_MS = BUCKET_SIZE / 60_000;
 	private static final Logger log = LoggerFactory.getLogger(KiChatController.class);
 	private static final String LEGACY_SYSTEM_PROMPT = "Du bist der deutschsprachige Assistent des freiberuflichen KI-Experten-Teams für KMU. "
 			+ "Antworte freundlich und knapp (höchstens 3 Sätze). Führe das Gespräch als Multiple-Choice-Dialog: "
@@ -87,7 +89,7 @@ public class KiChatController {
 	private static final int MAX_TOOL_ROUNDS = 5;
 	private static final int MAX_TOOL_CALLS = 10;
 	private final ObjectMapper mapper = new ObjectMapper();
-	private final Map<String, long[]> hits = new ConcurrentHashMap<>();
+	private final Map<String, Bucket> hits = new ConcurrentHashMap<>();
 	private final HttpClient client;
 	private final String baseUrl;
 	private final String completionsPath;
@@ -769,14 +771,45 @@ public class KiChatController {
 	}
 
 	private void limit(final String ip) {
-		final long now = System.currentTimeMillis();
-		final long[] h = this.hits.compute(ip, (k, v) -> {
-			if (v == null || now - v[0] > 60_000)
-				return new long[] { now, 1 };
-			v[1]++;
-			return v;
-		});
-		if (h[1] > MAX_PER_MINUTE)
-			throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS);
+		final long wartezeitMs = this.hits.computeIfAbsent(ip, k -> new Bucket(System.currentTimeMillis()))
+				.nimm(System.currentTimeMillis());
+		if (wartezeitMs > 0)
+			throw new RateLimitedException((wartezeitMs + 999) / 1000);
+	}
+
+	@ExceptionHandler(RateLimitedException.class)
+	public ResponseEntity<Void> zuVieleAnfragen(final RateLimitedException e) {
+		return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS).header(HttpHeaders.RETRY_AFTER,
+				String.valueOf(e.sekunden)).build();
+	}
+
+	/** Token bucket per client: abgelehnte Anfragen verbrauchen keinen Token. */
+	private static final class Bucket {
+		private double tokens = BUCKET_SIZE;
+		private long letzteAenderung;
+
+		Bucket(final long now) {
+			this.letzteAenderung = now;
+		}
+
+		synchronized long nimm(final long now) {
+			this.tokens = Math.min(BUCKET_SIZE, this.tokens + (now - this.letzteAenderung) * REFILL_PER_MS);
+			this.letzteAenderung = now;
+			if (this.tokens >= 1) {
+				this.tokens -= 1;
+				return 0;
+			}
+			return (long) Math.ceil((1 - this.tokens) / REFILL_PER_MS);
+		}
+	}
+
+	private static final class RateLimitedException extends RuntimeException {
+		private static final long serialVersionUID = 1L;
+		private final long sekunden;
+
+		RateLimitedException(final long sekunden) {
+			super("Zu viele Anfragen");
+			this.sekunden = sekunden;
+		}
 	}
 }

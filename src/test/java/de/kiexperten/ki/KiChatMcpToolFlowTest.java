@@ -195,6 +195,16 @@ class KiChatMcpToolFlowTest {
 	}
 
 	@Test
+	void rateLimitLehntUeberDemKontingentMitRetryAfterAb() throws Exception {
+		stubUmfrage();
+		for (int i = 0; i < 30; i++)
+			assertEquals(200, get("/api/ki/welcome").statusCode());
+		final HttpResponse<String> abgelehnt = get("/api/ki/welcome");
+		assertEquals(429, abgelehnt.statusCode());
+		assertTrue(Long.parseLong(abgelehnt.headers().firstValue("Retry-After").orElseThrow()) >= 1);
+	}
+
+	@Test
 	void executesModelToolCallsAgainstMcpAndReturnsTheFinalAnswer() throws Exception {
 		final var definitions = this.mapper.createArrayNode();
 		definitions.addObject().put("type", "function").putObject("function").put("name", "get_next_requirement_step");

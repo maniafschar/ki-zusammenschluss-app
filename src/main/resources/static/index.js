@@ -1072,7 +1072,7 @@ startBooking();
 				? { messages: history.slice(-10), gespraechId, auswahl }
 				: { messages: history.slice(-10), gespraechId });
 			let res = null;
-			for (let attempt = 1; attempt <= 20; attempt++) {
+			for (let attempt = 1; attempt <= 3; attempt++) {
 				res = await fetch('/ai-expert/api/ki/chat/stream', {
 					method: 'POST',
 					credentials: 'same-origin',
@@ -1080,7 +1080,9 @@ startBooking();
 					body: requestBody
 				});
 				if (res.status !== 429) break;
-				await new Promise((resolve) => setTimeout(resolve, 500));
+				const wartezeitMs = Number(res.headers.get('Retry-After') || 1) * 1000;
+				if (attempt === 3 || wartezeitMs > 5000) break;
+				await new Promise((resolve) => setTimeout(resolve, wartezeitMs));
 			}
 			if (!res.ok) throw new Error(res.status);
 			gespraechId = res.headers.get('X-Chat-Id') || gespraechId;
