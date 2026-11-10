@@ -571,7 +571,7 @@ startBooking();
 			detail.textContent = status;
 			assistant.append(detail);
 		}
-		text.append(assistant);
+		if (reply || status || thinking) text.append(assistant);
 		text.scrollTo({ top: 0, behavior: reducedMotion.matches ? 'auto' : 'smooth' });
 	}
 
@@ -1028,9 +1028,10 @@ startBooking();
 	function submitChatAnswer(answer, auswahl = null) {
 		if (!choiceReady || state === 'listening' || !String(answer).trim()) return;
 		const value = String(answer).trim();
+		const ausMultipleChoice = Boolean(text.querySelector('.chat-choices'));
 		choiceReady = false;
 		stopSpeech();
-		ask(value, auswahl);
+		ask(value, auswahl, ausMultipleChoice);
 	}
 
 	text.addEventListener('click', (event) => {
@@ -1098,14 +1099,18 @@ startBooking();
 		bereich.append(aktionen);
 	}
 
-	async function ask(question, auswahl = null) {
+	async function ask(question, auswahl = null, ausMultipleChoice = false) {
 		const turnId = ++chatTurn;
 		choiceReady = false;
 		state = 'thinking';
-		renderConversation(question, '', { thinking: true });
-		await ladeSprueche();
-		if (turnId !== chatTurn) return;
-		renderConversation(question, '', { thinking: true, thinkingQuote: naechsterSpruch() });
+		if (ausMultipleChoice) {
+			renderConversation(question, '');
+		} else {
+			renderConversation(question, '', { thinking: true });
+			await ladeSprueche();
+			if (turnId !== chatTurn) return;
+			renderConversation(question, '', { thinking: true, thinkingQuote: naechsterSpruch() });
+		}
 		history.push({ role: 'user', content: question });
 		let reply = '';
 
