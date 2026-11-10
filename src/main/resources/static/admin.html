@@ -849,6 +849,7 @@
 		<button type="button" data-type="interessenten">Interessenten</button>
 		<button type="button" data-type="logs">Logs</button>
 		<button type="button" data-type="chats">Chats</button>
+		<button type="button" data-type="sprueche">KI-Sprüche</button>
 		<button type="button" data-type="experten">Experten</button>
 		<button type="button" data-type="leistungen">Leistungen</button>
 		<button type="button" data-type="produkte">Produkte</button>
@@ -1073,6 +1074,14 @@
 					{ name: 'position', label: 'Reihenfolge', type: 'number' }
 				]
 			},
+			sprueche: {
+				base: '/ai-expert/api/admin/ki-sprueche',
+				public: '/ai-expert/api/ki/sprueche',
+				titleField: 'text',
+				fields: [
+					{ name: 'text', label: 'Spruch', type: 'textarea', required: true, maxlength: 240 }
+				]
+			},
 			experten: {
 				base: '/ai-expert/api/admin/experten',
 				public: '/ai-expert/api/admin/experten',
@@ -1172,6 +1181,7 @@
 				if (f.type === 'number') input.min = 0;
 				if (f.type === 'email' || f.type === 'password') input.autocomplete = f.type === 'email' ? 'off' : 'new-password';
 				if (f.minlength) input.minLength = f.minlength;
+				if (f.maxlength) input.maxLength = f.maxlength;
 				if (f.type === 'file') input.accept = 'image/png,image/jpeg,image/gif';
 				input.name = f.name;
 				input.required = !!f.required;
