@@ -81,10 +81,7 @@ public class KiChatController {
 			+ "1. Rufe speichere_zusammenfassung mit einer knappen, sachlichen Zusammenfassung der Antworten in Stichpunkten ohne Anrede und Grußformel auf. "
 			+ "2. Schlage keine Termine vor und frage nicht nach Terminen, Namen oder E-Mail-Adressen. Bedanke dich kurz für die Antworten. "
 			+ "Beantworte keine sachfremden Fragen; lenke freundlich zum aktuellen Schritt zurück.";
-	private static final String WELCOME_INTRO = "Schön, dass du da bist! Ich bin der KI-Assistent der KI Experten. "
-			+ "In sechs kurzen Fragen finden wir gemeinsam heraus, wo dein Unternehmen bei KI steht. "
-			+ "Sei ehrlich, es gibt keine falschen Antworten.\n\n"
-			+ "Los geht's mit der ersten Frage:";
+	private static final String WELCOME_INTRO = "Dann lass uns zuerst ein paar kurze Fragen gemeinsam beantworten, so dass ich einen ersten Überblick bekomme und konkret auf Deine Bedürfnisse antworten kann. Los geht's...";
 	private static final Set<String> LOKALE_WERKZEUGE = Set.of("speichere_zusammenfassung");
 	private static final int MAX_TOOL_ROUNDS = 5;
 	private static final int MAX_TOOL_CALLS = 10;
