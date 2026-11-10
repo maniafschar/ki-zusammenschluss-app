@@ -204,6 +204,7 @@ function startBooking() {
 			btn.disabled = !free;
 			if (free) {
 				btn.addEventListener('click', () => {
+					el('slots').classList.add('slots');
 					selectedDay = key;
 					selectedSlot = null;
 					bookingForm.hidden = true;
@@ -228,7 +229,6 @@ function startBooking() {
 			btn.className = 'slot' + (s.start === selectedSlot ? ' selected' : '');
 			btn.disabled = !s.frei;
 			btn.addEventListener('click', () => {
-				el('slots').classList.add('slots');
 				selectedSlot = s.start;
 				el('booking-selected').textContent =
 					`Dein Termin: ${day.toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long' })}, ${timeOf(s.start)} Uhr (30 Minuten)`;
