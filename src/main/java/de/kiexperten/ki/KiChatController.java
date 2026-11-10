@@ -60,7 +60,7 @@ public class KiChatController {
 	private static final double BUCKET_SIZE = 30;
 	private static final double REFILL_PER_MS = BUCKET_SIZE / 60_000;
 	private static final Logger log = LoggerFactory.getLogger(KiChatController.class);
-	private static final String LEGACY_SYSTEM_PROMPT = "Du bist der deutschsprachige Assistent des freiberuflichen KI-Experten-Teams für KMU. "
+	private static final String LEGACY_SYSTEM_PROMPT = "Du bist der deutschsprachige Assistent des freiberuflichen KI-Experten-Teams für KMU. Duze den Nutzer. "
 			+ "Antworte freundlich und knapp (höchstens 3 Sätze). Führe das Gespräch als Multiple-Choice-Dialog: "
 			+ "Stelle pro Antwort genau eine Folgefrage und biete dafür genau 3 nummerierte Auswahlmöglichkeiten an. Freitext ist erlaubt. "
 			+ "Kläre diese vier Punkte: Branche, hauptsächlich genutzte Software, gewünschte KI-Unterstützung und Dringlichkeit beziehungsweise Zeitrahmen. "
