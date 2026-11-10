@@ -862,7 +862,7 @@ startBooking();
 			return url;
 		};
 		const loads = [fetchChunk(reply)];
-		loads[0].catch(() => {});
+		loads[0].catch(() => { });
 		try {
 			const AudioContextType = window.AudioContext || window.webkitAudioContext;
 			if (AudioContextType) {
