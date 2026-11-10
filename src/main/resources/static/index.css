@@ -1182,6 +1182,102 @@ footer a {
 	font-size: .9rem;
 }
 
+.chat-thinking {
+	display: flex;
+	align-items: center;
+	gap: 1rem;
+	min-height: 4.5rem;
+	margin-top: .75rem;
+	padding: .75rem 1rem;
+	border: 1px solid rgba(133, 198, 238, .28);
+	border-radius: 1rem;
+	background: linear-gradient(115deg, rgba(8, 25, 48, .72), rgba(31, 82, 124, .34));
+	box-shadow: 0 0 2rem rgba(51, 190, 233, .12), inset 0 1px rgba(255, 255, 255, .08);
+	text-align: left;
+}
+
+.thinking-orb {
+	position: relative;
+	display: grid;
+	width: 2.75rem;
+	height: 2.75rem;
+	flex: 0 0 2.75rem;
+	place-items: center;
+	border: 1px solid rgba(157, 234, 255, .65);
+	border-radius: 50%;
+	background: radial-gradient(circle at 35% 30%, #e8ffff 0, #57e1ed 14%, #2764c7 48%, #6f38d4 76%, transparent 78%);
+	box-shadow: 0 0 1rem rgba(80, 219, 255, .7), inset 0 0 .75rem rgba(255, 255, 255, .7);
+	animation: thinking-pulse 1.8s ease-in-out infinite;
+}
+
+.thinking-orb::before,
+.thinking-orb::after {
+	position: absolute;
+	content: "";
+	border: 1px solid rgba(157, 234, 255, .72);
+	border-radius: 50%;
+	inset: -.3rem;
+	transform: rotate(-35deg) scaleX(1.35);
+	animation: thinking-orbit 3.2s linear infinite;
+}
+
+.thinking-orb::after {
+	border-color: rgba(192, 139, 255, .68);
+	transform: rotate(55deg) scaleX(1.35);
+	animation-direction: reverse;
+}
+
+.thinking-copy {
+	display: grid;
+	gap: .2rem;
+	min-width: 0;
+}
+
+.thinking-label {
+	color: #e9faff;
+	font-size: .92rem;
+	font-weight: 700;
+	letter-spacing: .04em;
+}
+
+.thinking-label::after {
+	content: "";
+	display: inline-block;
+	width: 1.25rem;
+	height: .25rem;
+	margin-left: .35rem;
+	background: radial-gradient(circle, #9deaff 1px, transparent 2px) 0 50% / .4rem .3rem repeat-x;
+	animation: thinking-dots 1.2s steps(3, end) infinite;
+}
+
+.thinking-quote {
+	color: #b7d7ee;
+	font-size: .85rem;
+	font-style: italic;
+	line-height: 1.4;
+}
+
+@keyframes thinking-pulse {
+	50% { filter: hue-rotate(25deg) brightness(1.25); transform: scale(1.08); }
+}
+
+@keyframes thinking-orbit {
+	to { transform: rotate(325deg) scaleX(1.35); }
+}
+
+@keyframes thinking-dots {
+	to { background-position: .8rem 50%; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.thinking-orb,
+	.thinking-orb::before,
+	.thinking-orb::after,
+	.thinking-label::after {
+		animation: none;
+	}
+}
+
 .chat-assistant a {
 	color: #9deaff;
 }

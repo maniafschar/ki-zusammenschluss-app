@@ -350,6 +350,9 @@ startBooking();
 	let state = 'idle'; // idle | listening | thinking | speaking
 	let recorder = null;
 	let chatTurn = 0;
+	let sprueche = [];
+	let spruecheLaden = null;
+	const verwendeteSprueche = new Set();
 	let activeSpeech = null;
 	let choiceReady = false;
 	let level = 0;
@@ -366,6 +369,29 @@ startBooking();
 	let lastFrame = 0;
 	const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
 	const inlineMarkdown = /(\*\*[^*]+\*\*|__[^_]+__|`[^`]+`|\*[^*]+\*|_[^_]+_|\[[^\]]+\]\(https?:\/\/[^\s)]+\))/g;
+
+	function ladeSprueche() {
+		if (!spruecheLaden) {
+			spruecheLaden = fetch('/ai-expert/api/ki/sprueche')
+				.then((response) => {
+					if (!response.ok) throw new Error('HTTP ' + response.status);
+					return response.json();
+				})
+				.then((items) => { sprueche = items; })
+				.catch((err) => {
+					console.error('KI-Sprüche konnten nicht geladen werden:', err);
+				});
+		}
+		return spruecheLaden;
+	}
+
+	function naechsterSpruch() {
+		const verfuegbar = sprueche.filter((spruch) => !verwendeteSprueche.has(spruch.id));
+		if (!verfuegbar.length) return '';
+		const spruch = verfuegbar[Math.floor(Math.random() * verfuegbar.length)];
+		verwendeteSprueche.add(spruch.id);
+		return spruch.text;
+	}
 
 	function appendInlineMarkdown(parent, value) {
 		let cursor = 0;
@@ -498,7 +524,9 @@ startBooking();
 		closeList();
 	}
 
-	function renderConversation(question, reply, { choices = false, status = '' } = {}) {
+	function renderConversation(question, reply, {
+		choices = false, status = '', thinking = false, thinkingQuote = ''
+	} = {}) {
 		text.replaceChildren();
 		const user = document.createElement('div');
 		user.className = 'chat-turn chat-user';
@@ -514,6 +542,29 @@ startBooking();
 		assistantLabel.textContent = 'KI';
 		assistant.append(assistantLabel);
 		if (reply) renderMarkdown(assistant, reply, choices);
+		if (thinking) {
+			const indicator = document.createElement('div');
+			indicator.className = 'chat-thinking';
+			indicator.setAttribute('role', 'status');
+			indicator.setAttribute('aria-label', 'Die KI formuliert eine Antwort');
+			const orb = document.createElement('span');
+			orb.className = 'thinking-orb';
+			orb.setAttribute('aria-hidden', 'true');
+			const copy = document.createElement('span');
+			copy.className = 'thinking-copy';
+			const label = document.createElement('span');
+			label.className = 'thinking-label';
+			label.textContent = 'KI denkt nach';
+			copy.append(label);
+			if (thinkingQuote) {
+				const quote = document.createElement('span');
+				quote.className = 'thinking-quote';
+				quote.textContent = `„${thinkingQuote}“`;
+				copy.append(quote);
+			}
+			indicator.append(orb, copy);
+			assistant.append(indicator);
+		}
 		if (status) {
 			const detail = document.createElement('p');
 			detail.className = 'chat-status';
@@ -1051,7 +1102,10 @@ startBooking();
 		const turnId = ++chatTurn;
 		choiceReady = false;
 		state = 'thinking';
-		renderConversation(question, '', { status: 'Die KI denkt nach …' });
+		renderConversation(question, '', { thinking: true });
+		await ladeSprueche();
+		if (turnId !== chatTurn) return;
+		renderConversation(question, '', { thinking: true, thinkingQuote: naechsterSpruch() });
 		history.push({ role: 'user', content: question });
 		let reply = '';
 

@@ -32,7 +32,7 @@ public class SecurityConfig {
 		http.authorizeHttpRequests(auth -> auth
 				.requestMatchers("/", "/index.html", "/index.css", "/index.js", "/api/leistungen", "/api/produkte",
 						"/api/experten", "/api/csrf", "/api/ki/welcome",
-						"/api/ki/chat", "/api/ki/chat/stream", "/api/ki/audio/transcriptions",
+						"/api/ki/chat", "/api/ki/chat/stream", "/api/ki/sprueche", "/api/ki/audio/transcriptions",
 						"/api/ki/audio/speech", "/api/termine", "/api/termine/bestaetigen", "/api/r/*", "/error")
 				.permitAll()
 				.requestMatchers(HttpMethod.GET, "/api/admin/termine", "/api/admin/interessenten",
