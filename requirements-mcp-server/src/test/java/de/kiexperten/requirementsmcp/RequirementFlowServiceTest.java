@@ -44,12 +44,12 @@ class RequirementFlowServiceTest {
 		assertEquals(6, completed.get("answeredSteps"));
 		final List<?> answerDetails = (List<?>) completed.get("answerDetails");
 		final Map<?, ?> firstAnswer = (Map<?, ?>) answerDetails.get(0);
-		assertEquals("Welche Rolle spielt Künstliche Intelligenz (KI) aktuell in Ihrem Unternehmen?",
+		assertEquals("Welche Rolle spielt Künstliche Intelligenz (KI) aktuell in Deinem Unternehmen?",
 				firstAnswer.get("question"));
 		assertEquals(List.of("Keine: Wir nutzen bisher keine KI-Tools und haben es kurzfristig auch nicht geplant."),
 				firstAnswer.get("answers"));
 		final Map<?, ?> lastAnswer = (Map<?, ?>) answerDetails.get(5);
-		assertEquals("Beschreiben Sie kurz einen Prozess oder eine tägliche Aufgabe in Ihrem Unternehmen, die Sie am liebsten an eine KI auslagern oder damit beschleunigen würden:",
+		assertEquals("Beschreibe kurz einen Prozess oder eine tägliche Aufgabe in Deinem Unternehmen, die Du am liebsten an eine KI auslagern oder damit beschleunigen würdest:",
 				lastAnswer.get("question"));
 		assertEquals(List.of("Rechnungen automatisch zuordnen und prüfen"), lastAnswer.get("answers"));
 		assertTrue((boolean) this.flow.nextStep(conversationId).get("completed"));

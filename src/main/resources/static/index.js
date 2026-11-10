@@ -230,7 +230,7 @@ function startBooking() {
 			btn.addEventListener('click', () => {
 				selectedSlot = s.start;
 				el('booking-selected').textContent =
-					`Ihr Termin: ${day.toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long' })}, ${timeOf(s.start)} Uhr (30 Minuten)`;
+					`Dein Termin: ${day.toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long' })}, ${timeOf(s.start)} Uhr (30 Minuten)`;
 				bookingForm.hidden = false;
 				setMessage('');
 				renderSlots();
@@ -264,7 +264,7 @@ function startBooking() {
 				})
 			});
 			if (res.status === 409) {
-				setMessage('Dieser Termin wurde gerade vergeben. Bitte wählen Sie einen anderen.', 'error');
+				setMessage('Dieser Termin wurde gerade vergeben. Bitte wähle einen anderen.', 'error');
 				selectedSlot = null;
 				await loadSlots();
 				return;
@@ -278,10 +278,10 @@ function startBooking() {
 			setMessage('', '');
 			bookingForm.hidden = true;
 			el('slots').classList.remove('slots');
-			el('slots').innerHTML = '<p class="booking-hint ok">Wir haben Ihnen eine E-Mail mit einem Bestätigungslink geschickt. '
-				+ 'Bitte bestätigen Sie Ihre Adresse innerhalb von 10 Minuten, sonst wird der Termin wieder freigegeben.</p>';
+			el('slots').innerHTML = '<p class="booking-hint ok">Wir haben Dir eine E-Mail mit einem Bestätigungslink geschickt. '
+				+ 'Bitte bestätige Deine Adresse innerhalb von 10 Minuten, sonst wird der Termin wieder freigegeben.</p>';
 		} catch (err) {
-			setMessage('Die Buchung hat nicht geklappt. Bitte versuchen Sie es erneut.', 'error');
+			setMessage('Die Buchung hat nicht geklappt. Bitte versuche es erneut.', 'error');
 			console.error(err);
 		} finally {
 			submit.disabled = false;
@@ -291,8 +291,8 @@ function startBooking() {
 	loadSlots().then(() => {
 		const result = new URLSearchParams(window.location.search).get('termin');
 		const texts = {
-			bestaetigt: ['Vielen Dank! Ihr Termin ist bestätigt.', 'ok'],
-			abgelaufen: ['Der Bestätigungslink ist abgelaufen. Bitte buchen Sie erneut.', 'error'],
+			bestaetigt: ['Vielen Dank! Dein Termin ist bestätigt.', 'ok'],
+			abgelaufen: ['Der Bestätigungslink ist abgelaufen. Bitte buche erneut.', 'error'],
 			ungueltig: ['Der Bestätigungslink ist ungültig.', 'error']
 		};
 		if (texts[result]) {
@@ -440,7 +440,7 @@ startBooking();
 				input.maxLength = 2000;
 				input.required = true;
 				input.placeholder = freeText[1].replace(/\*+$/g, '').trim();
-				input.setAttribute('aria-label', 'Ihre Antwort');
+				input.setAttribute('aria-label', 'Deine Antwort');
 				const submit = document.createElement('button');
 				submit.type = 'submit';
 				submit.className = 'chat-text-submit';
@@ -503,7 +503,7 @@ startBooking();
 		const user = document.createElement('div');
 		user.className = 'chat-turn chat-user';
 		const userLabel = document.createElement('strong');
-		userLabel.textContent = 'Sie';
+		userLabel.textContent = 'Du';
 		const userText = document.createElement('p');
 		userText.textContent = question;
 		user.append(userLabel, userText);
@@ -900,7 +900,7 @@ startBooking();
 			({ gespraechId, text: welcome } = await res.json());
 		} catch (e) {
 			console.error('Begrüßung konnte nicht geladen werden:', e);
-			text.textContent = 'Die Begrüßung konnte gerade nicht geladen werden. Bitte versuchen Sie es erneut.';
+			text.textContent = 'Die Begrüßung konnte gerade nicht geladen werden. Bitte versuche es erneut.';
 			start.disabled = false;
 			return;
 		}
@@ -1039,9 +1039,9 @@ startBooking();
 			aktionen.remove();
 			const danke = document.createElement('p');
 			danke.className = 'chat-status';
-			danke.textContent = 'Danke dir für deine ehrlichen Antworten! '
-				+ 'Wenn du noch eine Frage hast, klicke auf das Mikrofon, um sie zu stellen. '
-				+ 'Wenn du fertig bist, klicke es erneut, um die Frage abzusenden.';
+			danke.textContent = 'Danke Dir für Deine ehrlichen Antworten! '
+				+ 'Wenn Du noch eine Frage hast, klicke auf das Mikrofon, um sie zu stellen. '
+				+ 'Wenn Du fertig bist, klicke es erneut, um die Frage abzusenden.';
 			bereich.append(danke);
 		});
 		aktionen.append(termin, weiterchatten);
@@ -1204,7 +1204,7 @@ startBooking();
 			mic.classList.add('rec');
 			mic.setAttribute('aria-label', 'Aufnahme beenden');
 			mic.title = 'Aufnahme beenden';
-			text.textContent = 'Ich höre zu. Drücken Sie erneut, um die Aufnahme zu beenden.';
+			text.textContent = 'Ich höre zu. Drücke erneut, um die Aufnahme zu beenden.';
 		} catch (e) {
 			state = 'idle';
 			text.textContent = 'Mikrofonzugriff nicht möglich.';

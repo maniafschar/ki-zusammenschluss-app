@@ -52,11 +52,11 @@ public class InteressentenMailService {
 		final String greeting = greeting(i);
 		final String body = i.getText() == null ? "" : i.getText().strip();
 		final String contact = betreuer == null ? null
-				: "Ihr Ansprechpartner: " + betreuer.getName() + ", " + betreuer.getRolle();
+				: "Dein Ansprechpartner: " + betreuer.getName() + ", " + betreuer.getRolle();
 		final String plain = greeting + "\n\n" + body + "\n\n" + link + "\n"
 				+ (contact == null ? "" : "\n" + contact + "\n");
 		final String contactHtml = contact == null ? ""
-				: "<p style=\"margin:0 0 16px;font-size:15px;color:#1d2b3a;\"><strong>Ihr Ansprechpartner</strong><br>"
+				: "<p style=\"margin:0 0 16px;font-size:15px;color:#1d2b3a;\"><strong>Dein Ansprechpartner</strong><br>"
 						+ HtmlUtils.htmlEscape(betreuer.getName()) + " &middot; "
 						+ HtmlUtils.htmlEscape(betreuer.getRolle()) + "</p>";
 		final String html = """

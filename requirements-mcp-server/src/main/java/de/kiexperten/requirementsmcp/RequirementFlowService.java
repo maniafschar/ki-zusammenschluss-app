@@ -14,45 +14,45 @@ public class RequirementFlowService {
 	static final int MINIMUM_STEPS = 6;
 	private static final List<RequirementStep> STEPS = List.of(
 			new RequirementStep("maturity", "Reifegrad & aktuelle Nutzung (Wo steht das Unternehmen?)",
-					"Welche Rolle spielt Künstliche Intelligenz (KI) aktuell in Ihrem Unternehmen?",
+					"Welche Rolle spielt Künstliche Intelligenz (KI) aktuell in Deinem Unternehmen?",
 					List.of("Keine: Wir nutzen bisher keine KI-Tools und haben es kurzfristig auch nicht geplant.",
 							"Experimentell: Einzelne Mitarbeiter nutzen öffentliche Tools (z.B. ChatGPT) auf eigene Faust.",
 							"Punktuell: Wir setzen KI bereits gezielt in ausgewählten Prozessen ein (z.B. Marketing-Texte, Kundenservice).",
 							"Strategisch: KI ist fester Bestandteil unserer IT-/Unternehmensstrategie."),
 					"Die aktuelle KI-Nutzung ist einer der vier Reifegradstufen zugeordnet.", "single", 1, ""),
 			new RequirementStep("timeline", "Zeitrahmen & Absicht (Wann wird es relevant?)",
-					"In welchem Zeitraum planen Sie, (weitere) KI-Lösungen fest in Ihre Geschäftsprozesse zu integrieren?",
+					"In welchem Zeitraum planst Du, (weitere) KI-Lösungen fest in Deine Geschäftsprozesse zu integrieren?",
 					List.of("Sofort: Wir suchen aktuell aktiv nach passenden Lösungen (innerhalb der nächsten 3 Monate).",
 							"Mittelfristig: Wir planen eine Einführung in den nächsten 6 bis 12 Monaten.",
 							"Langfristig: Das Thema ist interessant, aber erst in über einem Jahr realistisch.",
 							"Gar nicht: Wir sehen in absehbarer Zeit keinen Einsatzbereich für uns."),
 					"Der geplante Zeitraum ist einer der vier Zeitrahmen zugeordnet.", "single", 1, ""),
 			new RequirementStep("areas", "Einsatzbereiche & Maße (Wo drückt der Schuh?)",
-					"In welchen Unternehmensbereichen sehen Sie das größte Potenzial für eine KI-Unterstützung?",
+					"In welchen Unternehmensbereichen siehst Du das größte Potenzial für eine KI-Unterstützung?",
 					List.of("Verwaltung & Backoffice: Automatisierung von Dokumentenverarbeitung, Rechnungen oder HR-Prozessen.",
 							"Vertrieb & Kundenservice: Intelligente Chatbots, CRM-Analysen oder automatisierte Mail-Beantwortung.",
 							"Marketing & Content: Erstellung von Texten, Bildmaterial oder Marktanalysen.",
 							"Produktion, Logistik & IT: Prozessoptimierung, vorausschauende Wartung (Predictive Maintenance) oder Code-Generierung."),
 					"Mindestens ein passender Unternehmensbereich wurde ausgewählt.", "multiple", 4, ""),
 			new RequirementStep("infrastructure", "Präferenz der Infrastruktur (Das In-House-Argument)",
-					"Welche Kriterien sind Ihnen bei der Einführung von KI-Lösungen am wichtigsten?",
+					"Welche Kriterien sind Dir bei der Einführung von KI-Lösungen am wichtigsten?",
 					List.of("Datenschutz & Compliance: Absolute Datensouveränität (Daten dürfen das Unternehmen nicht verlassen).",
 							"Maßschneiderung: Die KI muss perfekt auf unsere internen Daten und Fachbegriffe trainiert sein.",
 							"Einfachheit: Schnelle Integration ohne tiefes technisches Vorwissen unseres Teams.",
 							"Kostenstruktur: Planbare Einmalkosten/Lizenzen statt unvorhersehbarer API-Nutzungsgebühren."),
 					"Mindestens ein wichtiges Einführungskriterium wurde ausgewählt.", "multiple", 2, ""),
-			new RequirementStep("barrier", "Größte Hürde (Hebel für Ihr Vertriebsgespräch)",
-					"Was hält Sie aktuell noch am meisten von einer KI-Einführung ab?",
+			new RequirementStep("barrier", "Größte Hürde (Hebel für Dein Vertriebsgespräch)",
+					"Was hält Dich aktuell noch am meisten von einer KI-Einführung ab?",
 					List.of("Fehlendes Know-how: Wir wissen nicht genau, wie und wo wir anfangen sollen.",
 							"Sicherheitsbedenken: Unklarheiten bezüglich DSGVO und dem Schutz sensibler Firmendaten.",
 							"Ressourcenmangel: Uns fehlen die internen IT-Kapazitäten für die Implementierung und Wartung.",
 							"Budget: Die Befürchtung, dass maßgeschneiderte Lösungen für KMU zu teuer sind."),
 					"Die größte Hürde wurde einem der vier Bereiche zugeordnet.", "single", 1, ""),
 			new RequirementStep("use_case", "Freitext für den konkreten Use-Case",
-					"Beschreiben Sie kurz einen Prozess oder eine tägliche Aufgabe in Ihrem Unternehmen, die Sie am liebsten an eine KI auslagern oder damit beschleunigen würden:",
+					"Beschreibe kurz einen Prozess oder eine tägliche Aufgabe in Deinem Unternehmen, die Du am liebsten an eine KI auslagern oder damit beschleunigen würdest:",
 					List.of(),
 					"Ein konkreter Prozess oder eine tägliche Aufgabe ist beschrieben.", "text", 1,
-					"Wenn Sie eine konkrete Vorstellung haben oder eine bestimmte Herausforderung lösen möchten, beschreiben Sie diese bitte kurz hier..."));
+					"Wenn Du eine konkrete Vorstellung hast oder eine bestimmte Herausforderung lösen möchtest, beschreibe diese bitte kurz hier..."));
 
 	private final Map<String, Progress> progressByConversation = new ConcurrentHashMap<>();
 
@@ -103,7 +103,7 @@ public class RequirementFlowService {
 			if (!sufficient)
 				return Map.of("accepted", false, "completed", false, "step", current,
 						"clarificationQuestion",
-						clarificationQuestion == null ? "Bitte präzisieren Sie Ihre Antwort." : clarificationQuestion);
+						clarificationQuestion == null ? "Bitte präzisiere Deine Antwort." : clarificationQuestion);
 			progress.answers.put(current.id(), cleanAnswers);
 			progress.nextStepIndex++;
 			if (progress.nextStepIndex == STEPS.size()) {

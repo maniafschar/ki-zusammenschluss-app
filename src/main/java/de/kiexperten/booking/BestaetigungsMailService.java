@@ -48,17 +48,17 @@ public class BestaetigungsMailService {
 		}
 		final String when = FORMAT.format(start.atZone(zone));
 		final String text = "Hallo " + name + ",\n\n"
-				+ "Sie haben einen Termin (30 Minuten) für " + when + " angefragt.\n"
-				+ "Bitte bestätigen Sie Ihre E-Mail-Adresse innerhalb von " + minutesValid + " Minuten:\n\n"
+				+ "Du hast einen Termin (30 Minuten) für " + when + " angefragt.\n"
+				+ "Bitte bestätige Deine E-Mail-Adresse innerhalb von " + minutesValid + " Minuten:\n\n"
 				+ link + "\n\n"
-				+ "Wenn Sie den Termin nicht angefragt haben, ignorieren Sie diese Nachricht einfach.\n";
+				+ "Wenn Du den Termin nicht angefragt hast, ignoriere diese Nachricht einfach.\n";
 		try {
 			final MimeMessage mail = sender.createMimeMessage();
 			final MimeMessageHelper helper = new MimeMessageHelper(mail, MimeMessageHelper.MULTIPART_MODE_MIXED_RELATED,
 					"UTF-8");
 			helper.setFrom(this.from);
 			helper.setTo(to);
-			helper.setSubject("Bitte bestätigen Sie Ihren Termin");
+			helper.setSubject("Bitte bestätige Deinen Termin");
 			helper.setText(text, html(name, when, link, minutesValid));
 			sender.send(mail);
 		} catch (final MessagingException e) {
@@ -80,14 +80,14 @@ public class BestaetigungsMailService {
 				<tr><td style="background:#0f9d7a;padding:24px 32px;color:#ffffff;font-size:20px;font-weight:700;">KI-Experten Zusammenschluss</td></tr>
 				<tr><td style="padding:32px;">
 				<h1 style="margin:0 0 16px;font-size:22px;">Hallo %s,</h1>
-				<p style="margin:0 0 20px;font-size:16px;line-height:1.6;">vielen Dank für Ihre Terminanfrage. Bitte bestätigen Sie Ihre E-Mail-Adresse, damit wir den Termin für Sie reservieren.</p>
+				<p style="margin:0 0 20px;font-size:16px;line-height:1.6;">Vielen Dank für Deine Terminanfrage. Bitte bestätige Deine E-Mail-Adresse, damit wir den Termin für Dich reservieren.</p>
 				<table role="presentation" width="100%%" cellpadding="0" cellspacing="0" style="background:#e3f7f0;border-radius:10px;margin:0 0 24px;">
-				<tr><td style="padding:16px 20px;font-size:16px;"><strong>Ihr Wunschtermin</strong><br>%s<br><span style="color:#5b6b7d;font-size:14px;">Dauer: 30 Minuten</span></td></tr></table>
+				<tr><td style="padding:16px 20px;font-size:16px;"><strong>Dein Wunschtermin</strong><br>%s<br><span style="color:#5b6b7d;font-size:14px;">Dauer: 30 Minuten</span></td></tr></table>
 				<table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 0 24px;"><tr><td style="background:#0f9d7a;border-radius:8px;">
 				<a href="%s" style="display:inline-block;padding:14px 28px;color:#ffffff;font-size:16px;font-weight:600;text-decoration:none;">Termin bestätigen</a></td></tr></table>
 				<p style="margin:0 0 8px;font-size:14px;color:#5b6b7d;">Der Link ist %d Minuten gültig. Danach wird der Zeitslot wieder freigegeben.</p>
-				<p style="margin:0 0 8px;font-size:14px;color:#5b6b7d;">Funktioniert der Button nicht? Kopieren Sie diesen Link in Ihren Browser:<br><a href="%s" style="color:#0f9d7a;word-break:break-all;">%s</a></p>
-				<p style="margin:16px 0 0;font-size:13px;color:#5b6b7d;">Wenn Sie den Termin nicht angefragt haben, ignorieren Sie diese Nachricht einfach.</p>
+				<p style="margin:0 0 8px;font-size:14px;color:#5b6b7d;">Funktioniert der Button nicht? Kopiere diesen Link in Deinen Browser:<br><a href="%s" style="color:#0f9d7a;word-break:break-all;">%s</a></p>
+				<p style="margin:16px 0 0;font-size:13px;color:#5b6b7d;">Wenn Du den Termin nicht angefragt hast, ignoriere diese Nachricht einfach.</p>
 				</td></tr></table></td></tr></table></body></html>
 				""".formatted(n, w, l, minutes, l, l);
 	}
