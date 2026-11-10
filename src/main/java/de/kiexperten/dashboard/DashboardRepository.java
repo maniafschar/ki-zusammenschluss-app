@@ -11,7 +11,10 @@ import de.kiexperten.audit.Auditable;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 
-/** JPA access to the dashboard tables (knowledge sources, todos, info) in the main database. */
+/**
+ * JPA access to the dashboard tables (knowledge sources, todos, info) in the
+ * main database.
+ */
 @Repository
 @Transactional
 public class DashboardRepository {
@@ -33,20 +36,28 @@ public class DashboardRepository {
 				AnhangInfo.class).getResultList();
 	}
 
-	public Wissensquelle addWissen(final String title, final String content) {
+	public List<Wissensquelle> kiWissen() {
+		return this.em.createQuery("from Wissensquelle where kiVerfuegbar = true order by lower(title), id",
+				Wissensquelle.class).getResultList();
+	}
+
+	public Wissensquelle addWissen(final String title, final String content, final boolean kiVerfuegbar) {
 		final Wissensquelle w = new Wissensquelle();
 		w.setTitle(title);
 		w.setContent(content);
+		w.setKiVerfuegbar(kiVerfuegbar);
 		this.em.persist(w);
 		return w;
 	}
 
-	public Wissensquelle updateWissen(final BigInteger id, final String title, final String content) {
+	public Wissensquelle updateWissen(final BigInteger id, final String title, final String content,
+			final boolean kiVerfuegbar) {
 		final Wissensquelle w = this.em.find(Wissensquelle.class, id);
 		if (w == null)
 			return null;
 		w.setTitle(title);
 		w.setContent(content);
+		w.setKiVerfuegbar(kiVerfuegbar);
 		return w;
 	}
 
@@ -96,7 +107,10 @@ public class DashboardRepository {
 		return todo;
 	}
 
-	/** Changes only what the caller supplies; expert and due date can be cleared explicitly. */
+	/**
+	 * Changes only what the caller supplies; expert and due date can be cleared
+	 * explicitly.
+	 */
 	public Todo updateTodo(final BigInteger id, final Boolean completed, final boolean changeAssignment,
 			final Long expertId, final LocalDate dueDate) {
 		final Todo todo = this.em.find(Todo.class, id);

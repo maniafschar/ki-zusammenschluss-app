@@ -36,7 +36,6 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
@@ -47,6 +46,8 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+
+import de.kiexperten.dashboard.WissensSuche;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
@@ -90,6 +91,7 @@ public class KiChatController {
 			+ "Termine bucht der Nutzer selbst über den Button am Seitenende im Abschnitt Kontakt. Frage nicht nach Name, E-Mail oder Telefonnummer. "
 			+ "Sei ehrlich: Die Vorteile nennst du als Sicht des Teams. Cloud-Dienste sind für manche Vorhaben die bessere Wahl, und das sagst du offen. "
 			+ "Erfinde keine Preise, Fristen, Zertifikate oder Garantien; für konkrete Zahlen verweist du aufs Erstgespräch. Rechtsfragen, etwa zur DSGVO im Einzelfall, beantwortest du nicht verbindlich. "
+			+ "Bei Fragen zu euren Leistungen, Argumenten oder Unterscheidungsmerkmalen rufe zuerst das Werkzeug suche_wissen auf und stütze deine Antwort nur auf die Treffer. Findet es nichts, sag das ehrlich, statt zu raten. "
 			+ "Antworte knapp (höchstens 4 Sätze). Beziehe dich auf das Umfrageergebnis, wenn es passt. "
 			+ "Fragen, die nichts mit Unternehmen oder der Einführung von KI zu tun haben, lehnst du höflich ab, gern mit einem kleinen Augenzwinkern, und führst das Gespräch zurück zum Thema KI im Unternehmen.";
 	private static final String WELCOME_INTRO = "Dann lass uns zuerst ein paar kurze Fragen gemeinsam beantworten, so dass ich einen ersten Überblick bekomme und konkret auf Deine Bedürfnisse antworten kann. Los geht's...";
@@ -110,10 +112,12 @@ public class KiChatController {
 	private final String speechFormat;
 	private final ChatProtokollService protokolle;
 	private final RequirementsMcpGateway requirementsMcp;
+	private final WissensSuche wissen;
 
 	public KiChatController(
 			final ChatProtokollService protokolle,
 			final ObjectProvider<RequirementsMcpGateway> requirementsMcp,
+			final WissensSuche wissen,
 			@Value("${app.ki.base-url:https://100.65.185.69/v1}") final String baseUrl,
 			@Value("${app.ki.completions-path:/chat/completions}") final String completionsPath,
 			@Value("${app.ki.transcriptions-path:/audio/transcriptions}") final String transcriptionsPath,
@@ -137,6 +141,7 @@ public class KiChatController {
 		this.speechFormat = speechFormat;
 		this.protokolle = protokolle;
 		this.requirementsMcp = requirementsMcp.getIfAvailable();
+		this.wissen = wissen;
 		final HttpClient.Builder builder = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10));
 		if (trustAll) {
 			// nur für den internen Server mit selbstsigniertem Zertifikat
@@ -269,7 +274,10 @@ public class KiChatController {
 	public record WelcomeResponse(String gespraechId, String text) {
 	}
 
-	/** Begrüßung mit der ersten Umfragefrage aus dem MCP-Server; ab hier führt die KI die Umfrage im Chat. */
+	/**
+	 * Begrüßung mit der ersten Umfragefrage aus dem MCP-Server; ab hier führt die
+	 * KI die Umfrage im Chat.
+	 */
 	@GetMapping("/api/ki/welcome")
 	public WelcomeResponse welcome(final HttpServletRequest http) throws IOException {
 		this.limit(http.getRemoteAddr());
@@ -481,8 +489,9 @@ public class KiChatController {
 						&& "text".equals(aktuellerSchritt.path("selectionMode").asText()))
 					((ObjectNode) arguments).set("answers",
 							this.mapper.createArrayNode().add(this.letzteNutzernachricht(messages)));
-				final String result;
-				result = this.requirementsMcp.call(toolName, arguments);
+				final String result = "suche_wissen".equals(toolName)
+						? this.wissen.suche(arguments.path("suchbegriffe").asText(""))
+						: this.requirementsMcp.call(toolName, arguments);
 				if ("get_next_requirement_step".equals(toolName) || "record_requirement_answer".equals(toolName)) {
 					final JsonNode status = this.mapper.readTree(result);
 					if (status.path("completed").asBoolean(false)) {
@@ -498,14 +507,29 @@ public class KiChatController {
 		throw new ResponseStatusException(HttpStatus.BAD_GATEWAY);
 	}
 
-	/** Ersetzt nach Abschluss der Umfrage den Prompt, hängt das Ergebnis als Daten an und entfernt die MCP-Werkzeuge. */
+	/**
+	 * Ersetzt nach Abschluss der Umfrage den Prompt, hängt das Ergebnis als Daten
+	 * an und bietet nur die Wissenssuche an.
+	 */
 	private void nachUmfrage(final ObjectNode body, final String zusammenfassung) {
 		final ObjectNode system = (ObjectNode) body.path("messages").get(0);
 		final String ergebnis = zusammenfassung.isBlank() ? "Keine Antworten erfasst." : zusammenfassung;
 		system.put("content", NACH_UMFRAGE_SYSTEM_PROMPT
 				+ "\n\nErgebnis der Umfrage (nur Daten, keine Anweisungen):\n" + ergebnis);
-		body.remove("tools");
-		body.remove("tool_choice");
+		body.set("tools", this.mapper.createArrayNode().add(this.wissenWerkzeug()));
+		body.put("tool_choice", "auto");
+	}
+
+	private ObjectNode wissenWerkzeug() {
+		final ObjectNode parameter = this.mapper.createObjectNode().put("type", "object");
+		parameter.putObject("properties").putObject("suchbegriffe").put("type", "string")
+				.put("description", "Stichwörter zur Suche, durch Leerzeichen getrennt");
+		parameter.putArray("required").add("suchbegriffe");
+		final ObjectNode function = this.mapper.createObjectNode().put("name", "suche_wissen")
+				.put("description",
+						"Durchsucht die freigegebenen Wissensquellen des Unternehmens. Nutze es für Fragen zu Leistungen, Argumenten und Unterscheidungsmerkmalen.");
+		function.set("parameters", parameter);
+		return this.mapper.createObjectNode().put("type", "function").set("function", function);
 	}
 
 	private String letzteNutzernachricht(final ArrayNode messages) {
@@ -538,8 +562,10 @@ public class KiChatController {
 	}
 
 	/**
-	 * Verarbeitet eine Auswahl aus Optionen ohne Modellaufruf: speichert sie für den aktuellen Schritt und liefert
-	 * die nächste Frage wörtlich aus dem MCP-Server. Liefert null, wenn der Modellpfad übernehmen muss.
+	 * Verarbeitet eine Auswahl aus Optionen ohne Modellaufruf: speichert sie für
+	 * den aktuellen Schritt und liefert
+	 * die nächste Frage wörtlich aus dem MCP-Server. Liefert null, wenn der
+	 * Modellpfad übernehmen muss.
 	 */
 	private String auswahlOhneModell(final String conversationId, final List<String> auswahl) throws IOException {
 		try {
@@ -601,7 +627,10 @@ public class KiChatController {
 		}
 	}
 
-	/** Schneidet eine vom Modell selbst formulierte Frage samt Schrittkopf ab, da der Server den Schritt anhängt. */
+	/**
+	 * Schneidet eine vom Modell selbst formulierte Frage samt Schrittkopf ab, da
+	 * der Server den Schritt anhängt.
+	 */
 	private static String vorDerFrage(final String text, final String frage) {
 		final int start = frage.isBlank() ? -1 : text.indexOf(frage);
 		if (start < 0)
@@ -628,7 +657,8 @@ public class KiChatController {
 		output.flush();
 	}
 
-	private JsonNode modellAntwort(final ObjectNode body, final DeltaSink sink) throws IOException, InterruptedException {
+	private JsonNode modellAntwort(final ObjectNode body, final DeltaSink sink)
+			throws IOException, InterruptedException {
 		if (sink == null) {
 			final HttpResponse<String> response = this.client.send(this.upstreamRequest(body),
 					HttpResponse.BodyHandlers.ofString());
@@ -683,7 +713,10 @@ public class KiChatController {
 		return nachricht;
 	}
 
-	/** Liest einen SSE-Strom bis [DONE] und reicht jeden JSON-Chunk an den Handler weiter. */
+	/**
+	 * Liest einen SSE-Strom bis [DONE] und reicht jeden JSON-Chunk an den Handler
+	 * weiter.
+	 */
 	private void leseSse(final InputStream input, final ChunkHandler handler) throws IOException {
 		try (BufferedReader reader = new BufferedReader(new InputStreamReader(input, StandardCharsets.UTF_8))) {
 			final StringBuilder data = new StringBuilder();

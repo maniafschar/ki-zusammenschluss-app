@@ -6,7 +6,6 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentCaptor.forClass;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.atLeastOnce;
@@ -42,13 +41,13 @@ import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.util.ReflectionTestUtils;
 
-import de.kiexperten.Zeit;
-import de.kiexperten.booking.BestaetigungsMailService;
-import de.kiexperten.booking.TerminRepository;
-
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sun.net.httpserver.HttpServer;
+
+import de.kiexperten.Zeit;
+import de.kiexperten.booking.BestaetigungsMailService;
+import de.kiexperten.booking.TerminRepository;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties = {
 		"spring.datasource.url=jdbc:h2:mem:ki-mcp-chat-test",
@@ -80,7 +79,7 @@ class KiChatMcpToolFlowTest {
 									? "Danke, notiert. Welches Ziel verfolgt ihr?"
 									: "Schritt 1: Was soll das Projekt erreichen?";
 					response = "{\"choices\":[{\"message\":{\"content\":\"" + text + "\"}}]}";
-				} else if (!request.path("tools").isArray()) {
+				} else if (!nutztMcpWerkzeuge(request)) {
 					ohneWerkzeuge.set(request);
 					response = "{\"choices\":[{\"message\":{\"content\":\"Danke, das hilft mir weiter.\"}}]}";
 				} else {
@@ -98,11 +97,13 @@ class KiChatMcpToolFlowTest {
 								List.of("Diesen Satz bitte genau übernehmen!")));
 						response = toolCall("record_requirement_answer", arguments);
 					} else if (userText.contains("[zusammenfassung]")) {
-						final String summary = userText.substring(userText.indexOf("[zusammenfassung]") + "[zusammenfassung]".length()).trim();
+						final String summary = userText
+								.substring(userText.indexOf("[zusammenfassung]") + "[zusammenfassung]".length()).trim();
 						response = "{\"choices\":[{\"message\":{\"content\":\"" + summary + "\"}}]}";
 					} else if (answer.find()) {
 						final String arguments = MAPPER.writeValueAsString(Map.of("conversationId", matcher.group(1),
-								"stepId", answer.group(1), "sufficient", true, "answers", List.of(answer.group(2).trim())));
+								"stepId", answer.group(1), "sufficient", true, "answers",
+								List.of(answer.group(2).trim())));
 						response = toolCall("record_requirement_answer", arguments);
 					} else {
 						final String arguments = MAPPER.writeValueAsString(Map.of("conversationId", matcher.group(1)));
@@ -125,7 +126,10 @@ class KiChatMcpToolFlowTest {
 		}
 	}
 
-	/** Zerlegt eine Nicht-Stream-Antwort in SSE-Chunks; Text und Tool-Argumente werden absichtlich geteilt. */
+	/**
+	 * Zerlegt eine Nicht-Stream-Antwort in SSE-Chunks; Text und Tool-Argumente
+	 * werden absichtlich geteilt.
+	 */
 	private static String toSse(final String json) throws IOException {
 		final JsonNode message = MAPPER.readTree(json).at("/choices/0/message");
 		final StringBuilder sse = new StringBuilder();
@@ -142,7 +146,8 @@ class KiChatMcpToolFlowTest {
 			final int half = arguments.length() / 2;
 			sse.append("data: ").append(MAPPER.writeValueAsString(Map.of("choices", List.of(Map.of("delta",
 					Map.of("tool_calls", List.of(Map.of("index", index, "id", call.path("id").asText(), "type",
-							"function", "function", Map.of("name", name, "arguments", arguments.substring(0, half))))))))))
+							"function", "function",
+							Map.of("name", name, "arguments", arguments.substring(0, half))))))))))
 					.append("\n\n");
 			sse.append("data: ").append(MAPPER.writeValueAsString(Map.of("choices", List.of(Map.of("delta",
 					Map.of("tool_calls", List.of(Map.of("index", index, "function",
@@ -151,6 +156,13 @@ class KiChatMcpToolFlowTest {
 			index++;
 		}
 		return sse.append("data: [DONE]\n\n").toString();
+	}
+
+	private static boolean nutztMcpWerkzeuge(final JsonNode request) {
+		for (final JsonNode tool : request.path("tools"))
+			if ("get_next_requirement_step".equals(tool.path("function").path("name").asText()))
+				return true;
+		return false;
 	}
 
 	private static String lastUserText(final JsonNode messages) {
@@ -200,7 +212,10 @@ class KiChatMcpToolFlowTest {
 	@Autowired
 	KiChatController controller;
 
-	/** Die Tests teilen sich einen Kontext; das Minuten-Limit pro IP darf nicht zwischen Tests greifen. */
+	/**
+	 * Die Tests teilen sich einen Kontext; das Minuten-Limit pro IP darf nicht
+	 * zwischen Tests greifen.
+	 */
 	@BeforeEach
 	void rateLimitZuruecksetzen() {
 		((Map<?, ?>) ReflectionTestUtils.getField(this.controller, "hits")).clear();
@@ -208,10 +223,10 @@ class KiChatMcpToolFlowTest {
 
 	@Test
 	void rateLimitLehntUeberDemKontingentMitRetryAfterAb() throws Exception {
-		stubUmfrage();
+		this.stubUmfrage();
 		for (int i = 0; i < 30; i++)
-			assertEquals(200, get("/api/ki/welcome").statusCode());
-		final HttpResponse<String> abgelehnt = get("/api/ki/welcome");
+			assertEquals(200, this.get("/api/ki/welcome").statusCode());
+		final HttpResponse<String> abgelehnt = this.get("/api/ki/welcome");
 		assertEquals(429, abgelehnt.statusCode());
 		assertTrue(Long.parseLong(abgelehnt.headers().firstValue("Retry-After").orElseThrow()) >= 1);
 	}
@@ -254,7 +269,10 @@ class KiChatMcpToolFlowTest {
 			+ "{\"question\":\"Welche Rolle spielt KI?\",\"answers\":[\"Strategisch: viel.\"]},"
 			+ "{\"question\":\"Welches Ziel verfolgt ihr?\",\"answers\":[\"[antwort:goal] Prozesse automatisieren.\"]}]}";
 
-	/** Stateful MCP-Stub: liefert den nächsten offenen Schritt, nachdem Antworten gespeichert wurden. */
+	/**
+	 * Stateful MCP-Stub: liefert den nächsten offenen Schritt, nachdem Antworten
+	 * gespeichert wurden.
+	 */
 	private void stubUmfrage() throws Exception {
 		when(this.requirementsMcp.toolDefinitions()).thenReturn(this.mapper.createArrayNode()
 				.add(this.mapper.createObjectNode().put("type", "function")
@@ -289,7 +307,7 @@ class KiChatMcpToolFlowTest {
 
 	@Test
 	void welcomeNenntKurzenIntroUndStelltDieErsteFrageOhneKiAufruf() throws Exception {
-		stubUmfrage();
+		this.stubUmfrage();
 		final var response = this.get("/api/ki/welcome");
 
 		assertEquals(200, response.statusCode());
@@ -315,7 +333,7 @@ class KiChatMcpToolFlowTest {
 	@Test
 	void streamBautZusammenfassungAusOriginalfragenUndAntwortenStattAusKiText() throws Exception {
 		this.beantwortet.set(0);
-		stubUmfrage();
+		this.stubUmfrage();
 		when(this.requirementsMcp.call(eq("get_next_requirement_step"), any(JsonNode.class)))
 				.thenReturn("{\"completed\":false,\"step\":{\"id\":\"use_case\","
 						+ "\"question\":\"Welche Frage wurde gestellt?\",\"selectionMode\":\"text\"}}");
@@ -364,11 +382,11 @@ class KiChatMcpToolFlowTest {
 	@Test
 	void frageDesModellsWirdNichtDoppeltAngezeigt() throws Exception {
 		this.beantwortet.set(0);
-		stubUmfrage();
+		this.stubUmfrage();
 		final String id = this.mapper.readTree(this.get("/api/ki/welcome").body()).path("gespraechId").asText();
 
 		final String body = this.chat(id, "[frage-im-text] [antwort:maturity] Strategisch: viel.").body();
-		final String text = doneText(body);
+		final String text = this.doneText(body);
 
 		assertEquals(0, countOccurrences(text, "Welche Rolle spielt KI?"), text);
 		assertEquals(1, countOccurrences(text, "Welches Ziel verfolgt ihr?"), text);
@@ -377,41 +395,41 @@ class KiChatMcpToolFlowTest {
 	@Test
 	void streamLiefertDeltasUndKanonischenEndtextImDoneEvent() throws Exception {
 		this.beantwortet.set(0);
-		stubUmfrage();
+		this.stubUmfrage();
 		final String id = this.mapper.readTree(this.get("/api/ki/welcome").body()).path("gespraechId").asText();
 
 		final String body = this.chat(id, "[frage-im-text] [antwort:maturity] Strategisch: viel.").body();
 
 		assertTrue(countOccurrences(body, "event: delta\n") >= 2, body);
-		assertTrue(doneText(body).contains("**Schritt 2 von 2:** Welches Ziel verfolgt ihr?"), body);
+		assertTrue(this.doneText(body).contains("**Schritt 2 von 2:** Welches Ziel verfolgt ihr?"), body);
 	}
 
 	@Test
 	void optionAuswahlWirdOhneModellGespeichertUndNaechsteFrageGeliefert() throws Exception {
 		this.beantwortet.set(0);
-		stubUmfrage();
+		this.stubUmfrage();
 		final String id = this.mapper.readTree(this.get("/api/ki/welcome").body()).path("gespraechId").asText();
 
 		final String body = this.chatMitAuswahl(id, "Strategisch: viel.", "Strategisch: viel.").body();
 
-		final String text = doneText(body);
+		final String text = this.doneText(body);
 		assertTrue(text.startsWith("**Schritt 2 von 2:** Welches Ziel verfolgt ihr?"), text);
 		assertTrue(text.contains("Freitextfeld: Dein Ziel in einem Satz"), text);
-		verify(this.requirementsMcp).call(eq("record_requirement_answer"), argThat(args ->
-				"maturity".equals(args.path("stepId").asText())
+		verify(this.requirementsMcp).call(eq("record_requirement_answer"),
+				argThat(args -> "maturity".equals(args.path("stepId").asText())
 						&& "Strategisch: viel.".equals(args.path("answers").path(0).asText())));
 	}
 
 	@Test
 	void unbekannteOptionWirdNichtGespeichert() throws Exception {
 		this.beantwortet.set(0);
-		stubUmfrage();
+		this.stubUmfrage();
 		final String id = this.mapper.readTree(this.get("/api/ki/welcome").body()).path("gespraechId").asText();
 
 		this.chatMitAuswahl(id, "Irgendwas", "Irgendwas");
 
-		verify(this.requirementsMcp, never()).call(eq("record_requirement_answer"), argThat(args ->
-				args.path("answers").toString().contains("Irgendwas")));
+		verify(this.requirementsMcp, never()).call(eq("record_requirement_answer"),
+				argThat(args -> args.path("answers").toString().contains("Irgendwas")));
 	}
 
 	private HttpResponse<String> chatMitAuswahl(final String gespraechId, final String userContent,
@@ -452,7 +470,7 @@ class KiChatMcpToolFlowTest {
 	@Test
 	void umfrageUndTerminbuchungUebernehmenDieUmfrageergebnisseInDasTextfeld() throws Exception {
 		this.beantwortet.set(0);
-		stubUmfrage();
+		this.stubUmfrage();
 		final String id = this.mapper.readTree(this.get("/api/ki/welcome").body()).path("gespraechId").asText();
 		final Csrf csrf = this.csrf();
 
@@ -485,7 +503,9 @@ class KiChatMcpToolFlowTest {
 		assertEquals("Danke, das hilft mir weiter.", this.doneEvent(company.body()).path("text").asText());
 		final JsonNode upstreamRequest = ohneWerkzeuge.get();
 		assertNotNull(upstreamRequest);
-		assertTrue(upstreamRequest.path("tools").isMissingNode(), upstreamRequest.toString());
+		assertEquals(1, upstreamRequest.path("tools").size(), upstreamRequest.toString());
+		assertEquals("suche_wissen",
+				upstreamRequest.path("tools").get(0).path("function").path("name").asText());
 		final String systemPrompt = upstreamRequest.path("messages").get(0).path("content").asText();
 		assertTrue(systemPrompt.contains("KI inhouse"), systemPrompt);
 		assertTrue(systemPrompt.contains("Ergebnis der Umfrage"), systemPrompt);
@@ -570,8 +590,9 @@ class KiChatMcpToolFlowTest {
 		definitions.addObject().put("type", "function").putObject("function").put("name", "get_next_requirement_step");
 		when(this.requirementsMcp.toolDefinitions()).thenReturn(definitions);
 		when(this.requirementsMcp.call(eq("get_next_requirement_step"), any(JsonNode.class)))
-				.thenReturn("{\"completed\":false,\"stepNumber\":2,\"totalSteps\":6,\"step\":{\"question\":\"Welche Rolle spielt KI?\","
-						+ "\"options\":[\"Keine: nichts.\",\"Strategisch: viel.\"],\"selectionMode\":\"single\"}}");
+				.thenReturn(
+						"{\"completed\":false,\"stepNumber\":2,\"totalSteps\":6,\"step\":{\"question\":\"Welche Rolle spielt KI?\","
+								+ "\"options\":[\"Keine: nichts.\",\"Strategisch: viel.\"],\"selectionMode\":\"single\"}}");
 		final var messages = this.mapper.createArrayNode();
 		messages.addObject().put("role", "user").put("content", "Ich möchte ein Softwareprojekt planen.");
 		final var chatRequest = this.mapper.createObjectNode();
@@ -593,4 +614,3 @@ class KiChatMcpToolFlowTest {
 	}
 
 }
-

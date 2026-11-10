@@ -2,9 +2,12 @@ package de.kiexperten.dashboard;
 
 import java.io.IOException;
 import java.math.BigInteger;
-import java.security.Principal;
 import java.nio.charset.StandardCharsets;
+import java.security.GeneralSecurityException;
+import java.security.Principal;
+import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Collectors;
@@ -14,16 +17,10 @@ import org.jsoup.nodes.Document;
 import org.jsoup.safety.Safelist;
 import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpHeaders;
-import org.springframework.http.MediaType;
-import org.springframework.util.StringUtils;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.multipart.MultipartFile;
-import java.security.GeneralSecurityException;
-import java.time.LocalDate;
-import java.util.List;
-
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -31,7 +28,9 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -43,7 +42,10 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 
-/** Dashboard API; protected by the admin login like every /api/admin style endpoint. */
+/**
+ * Dashboard API; protected by the admin login like every /api/admin style
+ * endpoint.
+ */
 @RestController
 public class DashboardController {
 
@@ -63,14 +65,15 @@ public class DashboardController {
 	record ExpertRef(Long id, String name) {
 	}
 
-	record Wissen(BigInteger id, String title, String content, java.sql.Timestamp modifiedAt,
+	record Wissen(BigInteger id, String title, String content, boolean kiVerfuegbar, java.sql.Timestamp modifiedAt,
 			List<DashboardRepository.AnhangInfo> anhaenge) {
 	}
 
 	record Snapshot(List<Wissen> wissen, List<Todo> todos, String info, List<ExpertRef> experten) {
 	}
 
-	record WissenRequest(@NotBlank @Size(max = 200) String title, @Size(max = 2_000_000) String content) {
+	record WissenRequest(@NotBlank @Size(max = 200) String title, @Size(max = 2_000_000) String content,
+			boolean kiVerfuegbar) {
 	}
 
 	private static final Safelist HTML = Safelist.relaxed().removeTags("img")
@@ -80,7 +83,10 @@ public class DashboardController {
 	record TodoRequest(@NotBlank @Size(max = 200) String note, Long expertId, LocalDate dueDate) {
 	}
 
-	/** assignment is only applied when the client sends "expertId" or "dueDate" (see TodoUpdate#changesAssignment). */
+	/**
+	 * assignment is only applied when the client sends "expertId" or "dueDate" (see
+	 * TodoUpdate#changesAssignment).
+	 */
 	record TodoUpdate(Boolean completed, Long expertId, LocalDate dueDate, Boolean assign) {
 		boolean changesAssignment() {
 			return Boolean.TRUE.equals(this.assign);
@@ -90,7 +96,10 @@ public class DashboardController {
 	record InfoRequest(@Size(max = 1_000_000) String note) {
 	}
 
-	/** Everything is returned encrypted for the RSA public key the browser generated for this request. */
+	/**
+	 * Everything is returned encrypted for the RSA public key the browser generated
+	 * for this request.
+	 */
 	@GetMapping("/api/dashboard")
 	HybridEncryption.Encrypted load(@RequestHeader("publicKey") final String publicKey) {
 		final Map<BigInteger, List<DashboardRepository.AnhangInfo>> files = this.repository.anhaenge().stream()
@@ -110,11 +119,14 @@ public class DashboardController {
 	}
 
 	private static Wissen toWissen(final Wissensquelle w, final List<DashboardRepository.AnhangInfo> files) {
-		return new Wissen(w.getId(), w.getTitle(), w.getContent(), w.getModifiedAt(),
+		return new Wissen(w.getId(), w.getTitle(), w.getContent(), w.isKiVerfuegbar(), w.getModifiedAt(),
 				files == null ? List.of() : files);
 	}
 
-	/** Rich text comes from a contenteditable; whatever the client sends is reduced to harmless markup. */
+	/**
+	 * Rich text comes from a contenteditable; whatever the client sends is reduced
+	 * to harmless markup.
+	 */
 	private static String clean(final String html) {
 		return html == null ? "" : Jsoup.clean(html, "", HTML, new Document.OutputSettings().prettyPrint(false));
 	}
@@ -122,12 +134,15 @@ public class DashboardController {
 	@PostMapping("/api/dashboard/wissen")
 	Wissen addWissen(@Valid @RequestBody final WissenRequest request, final Principal principal) {
 		this.guard.require(principal);
-		return toWissen(this.repository.addWissen(request.title().trim(), clean(request.content())), null);
+		return toWissen(
+				this.repository.addWissen(request.title().trim(), clean(request.content()), request.kiVerfuegbar()),
+				null);
 	}
 
 	@PutMapping("/api/dashboard/wissen/{id}")
 	Wissen updateWissen(@PathVariable final BigInteger id, @Valid @RequestBody final WissenRequest request) {
-		final Wissensquelle w = this.repository.updateWissen(id, request.title().trim(), clean(request.content()));
+		final Wissensquelle w = this.repository.updateWissen(id, request.title().trim(), clean(request.content()),
+				request.kiVerfuegbar());
 		if (w == null) {
 			throw new ResponseStatusException(HttpStatus.NOT_FOUND);
 		}
@@ -167,7 +182,8 @@ public class DashboardController {
 		}
 		return ResponseEntity.ok()
 				.header(HttpHeaders.CONTENT_DISPOSITION,
-						ContentDisposition.attachment().filename(a.getName(), StandardCharsets.UTF_8).build().toString())
+						ContentDisposition.attachment().filename(a.getName(), StandardCharsets.UTF_8).build()
+								.toString())
 				.header("X-Content-Type-Options", "nosniff")
 				.contentType(MediaType.APPLICATION_OCTET_STREAM).body(a.getData());
 	}
@@ -181,13 +197,13 @@ public class DashboardController {
 	@PostMapping("/api/dashboard/todo")
 	Todo addTodo(@Valid @RequestBody final TodoRequest request, final Principal principal) {
 		this.guard.require(principal);
-		return this.repository.addTodo(request.note().trim(), checkedExpert(request.expertId()), request.dueDate());
+		return this.repository.addTodo(request.note().trim(), this.checkedExpert(request.expertId()), request.dueDate());
 	}
 
 	@PutMapping("/api/dashboard/todo/{id}")
 	Todo updateTodo(@PathVariable final BigInteger id, @RequestBody final TodoUpdate update) {
 		final Todo todo = this.repository.updateTodo(id, update.completed(), update.changesAssignment(),
-				update.changesAssignment() ? checkedExpert(update.expertId()) : null, update.dueDate());
+				update.changesAssignment() ? this.checkedExpert(update.expertId()) : null, update.dueDate());
 		if (todo == null) {
 			throw new ResponseStatusException(HttpStatus.NOT_FOUND);
 		}

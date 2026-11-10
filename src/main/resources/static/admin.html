@@ -991,6 +991,8 @@
 						</div>
 						<div id="wissen-content" class="rt-editor" contenteditable="true" role="textbox"
 							aria-multiline="true" aria-labelledby="wissen-text-label"></div>
+						<label class="wissen-ki"><input id="wissen-ki" type="checkbox"> Im KI-Assistenten verwenden
+							(Chat-Besucher können diese Inhalte erfragen)</label>
 						<label for="wissen-files">Anhänge</label>
 						<ul class="todo-list" id="wissen-files-list"></ul>
 						<input id="wissen-files" type="file" multiple>
@@ -1776,6 +1778,7 @@
 			const wissenTitle = document.getElementById('wissen-title');
 			const wissenContent = document.getElementById('wissen-content');
 			const wissenFiles = document.getElementById('wissen-files');
+			const wissenKi = document.getElementById('wissen-ki');
 			const wissenFilesList = document.getElementById('wissen-files-list');
 			const wissenDelete = document.getElementById('wissen-delete');
 			let editing = null; // knowledge source being edited, or {} for a new one
@@ -1809,7 +1812,8 @@
 					open.className = 'todo-note';
 					open.style.cssText = 'background:none;border:0;text-align:left;cursor:pointer;font:inherit;color:inherit';
 					const files = w.anhaenge.length ? ` 📎 ${w.anhaenge.length}` : '';
-					open.textContent = w.title + files;
+					const ki = w.kiVerfuegbar ? ' [KI]' : '';
+					open.textContent = w.title + ki + files;
 					open.addEventListener('click', () => openEditor(w));
 					item.appendChild(open);
 					wissenList.appendChild(item);
@@ -1866,6 +1870,7 @@
 				wissenFiles.value = '';
 				wissenTitle.value = editing.title || '';
 				wissenContent.innerHTML = editing.content || '';
+				wissenKi.checked = !!editing.kiVerfuegbar;
 				wissenDelete.hidden = !editing.id;
 				wissenForm.hidden = false;
 				renderFiles();
@@ -1901,13 +1906,14 @@
 				const title = wissenTitle.value.trim();
 				if (!title) return;
 				const content = wissenContent.innerHTML;
+				const kiVerfuegbar = wissenKi.checked;
 				try {
 					let saved;
 					if (editing.id) {
-						saved = await api('PUT', '/wissen/' + editing.id, { title, content });
+						saved = await api('PUT', '/wissen/' + editing.id, { title, content, kiVerfuegbar });
 						wissen = wissen.filter(w => w.id !== saved.id);
 					} else {
-						saved = await api('POST', '/wissen', { title, content });
+						saved = await api('POST', '/wissen', { title, content, kiVerfuegbar });
 					}
 					if (pending.length) {
 						const form = new FormData();
