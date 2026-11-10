@@ -157,7 +157,7 @@ public class KiChatController {
 	}
 
 	public record ChatRequest(@NotNull @Size(min = 1, max = 20) List<@NotNull @Valid ChatMessage> messages,
-			UUID gespraechId) {
+			UUID gespraechId, @Size(max = 20) List<@NotBlank @Size(max = 500) String> auswahl) {
 	}
 
 	public record ChatResponse(String reply) {
@@ -320,6 +320,19 @@ public class KiChatController {
 	public ResponseEntity<StreamingResponseBody> stream(@RequestBody @Valid final ChatRequest request,
 			final HttpServletRequest http) throws Exception {
 		final ChatProtokoll protokoll = this.protokolle.beginne(request);
+		if (this.requirementsMcp != null && request.auswahl() != null && !request.auswahl().isEmpty()) {
+			final String naechsteFrage = this.auswahlOhneModell(protokoll.getGespraechId(), request.auswahl());
+			if (naechsteFrage != null) {
+				this.protokolle.abschliessen(protokoll, naechsteFrage, "ABGESCHLOSSEN");
+				final StreamingResponseBody direkt = output -> {
+					this.sendEvent(output, "delta", naechsteFrage);
+					this.sendEvent(output, "done", Map.of("text", naechsteFrage, "zusammenfassung", ""));
+				};
+				return ResponseEntity.ok().header("Cache-Control", "no-cache, no-transform")
+						.header("X-Accel-Buffering", "no").header("X-Chat-Id", protokoll.getGespraechId())
+						.contentType(MediaType.TEXT_EVENT_STREAM).body(direkt);
+			}
+		}
 		if (this.requirementsMcp != null) {
 			final var toolBody = this.createBody(request, http, false);
 			final StreamingResponseBody toolStream = output -> {
@@ -483,6 +496,50 @@ public class KiChatController {
 			}
 		}
 		throw new ResponseStatusException(HttpStatus.BAD_GATEWAY);
+	}
+
+	/**
+	 * Verarbeitet eine Auswahl aus Optionen ohne Modellaufruf: speichert sie für den aktuellen Schritt und liefert
+	 * die nächste Frage wörtlich aus dem MCP-Server. Liefert null, wenn der Modellpfad übernehmen muss.
+	 */
+	private String auswahlOhneModell(final String conversationId, final List<String> auswahl) throws IOException {
+		try {
+			final var argumente = this.mapper.createObjectNode().put("conversationId", conversationId);
+			final ObjectNode aktuell = (ObjectNode) this.mapper
+					.readTree(this.requirementsMcp.call("get_next_requirement_step", argumente));
+			if (aktuell.path("completed").asBoolean(false))
+				return null;
+			final JsonNode step = aktuell.path("step");
+			final String modus = step.path("selectionMode").asText();
+			if (!"single".equals(modus) && !"multiple".equals(modus))
+				return null;
+			final int maximum = "multiple".equals(modus) ? step.path("maxSelections").asInt(1) : 1;
+			final Set<String> optionen = new java.util.HashSet<>();
+			step.path("options").forEach(option -> optionen.add(option.asText()));
+			final Set<String> gewaehlt = new java.util.LinkedHashSet<>();
+			for (final String antwort : auswahl)
+				gewaehlt.add(antwort.trim());
+			if (gewaehlt.isEmpty() || gewaehlt.size() > maximum || !optionen.containsAll(gewaehlt))
+				return null;
+
+			final var speichern = this.mapper.createObjectNode().put("conversationId", conversationId)
+					.put("stepId", step.path("id").asText()).put("sufficient", true);
+			final ArrayNode antworten = speichern.putArray("answers");
+			gewaehlt.forEach(antworten::add);
+			final JsonNode ergebnis = this.mapper
+					.readTree(this.requirementsMcp.call("record_requirement_answer", speichern));
+			if (!ergebnis.path("accepted").asBoolean(false))
+				return null;
+
+			final ObjectNode naechster = (ObjectNode) this.mapper
+					.readTree(this.requirementsMcp.call("get_next_requirement_step", argumente));
+			if (naechster.path("completed").asBoolean(false))
+				return null;
+			return this.schrittAlsMarkdown(naechster, naechster.path("step"));
+		} catch (final RuntimeException e) {
+			log.warn("Auswahl konnte nicht ohne Modell verarbeitet werden, Modellpfad wird genutzt", e);
+			return null;
+		}
 	}
 
 	private KiAntwort mitAktuellemSchritt(final String text, final String conversationId, final String zusammenfassung)

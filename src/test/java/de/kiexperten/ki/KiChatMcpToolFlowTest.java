@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentCaptor.forClass;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.never;
@@ -336,6 +337,54 @@ class KiChatMcpToolFlowTest {
 
 		assertTrue(countOccurrences(body, "event: delta\n") >= 2, body);
 		assertTrue(doneText(body).contains("**Schritt 2 von 2:** Welches Ziel verfolgt ihr?"), body);
+	}
+
+	@Test
+	void optionAuswahlWirdOhneModellGespeichertUndNaechsteFrageGeliefert() throws Exception {
+		this.beantwortet.set(0);
+		stubUmfrage();
+		final String id = this.mapper.readTree(this.get("/api/ki/welcome").body()).path("gespraechId").asText();
+
+		final String body = this.chatMitAuswahl(id, "Strategisch: viel.", "Strategisch: viel.").body();
+
+		final String text = doneText(body);
+		assertTrue(text.startsWith("**Schritt 2 von 2:** Welches Ziel verfolgt ihr?"), text);
+		assertTrue(text.contains("Freitextfeld: Dein Ziel in einem Satz"), text);
+		verify(this.requirementsMcp).call(eq("record_requirement_answer"), argThat(args ->
+				"maturity".equals(args.path("stepId").asText())
+						&& "Strategisch: viel.".equals(args.path("answers").path(0).asText())));
+	}
+
+	@Test
+	void unbekannteOptionWirdNichtGespeichert() throws Exception {
+		this.beantwortet.set(0);
+		stubUmfrage();
+		final String id = this.mapper.readTree(this.get("/api/ki/welcome").body()).path("gespraechId").asText();
+
+		this.chatMitAuswahl(id, "Irgendwas", "Irgendwas");
+
+		verify(this.requirementsMcp, never()).call(eq("record_requirement_answer"), argThat(args ->
+				args.path("answers").toString().contains("Irgendwas")));
+	}
+
+	private HttpResponse<String> chatMitAuswahl(final String gespraechId, final String userContent,
+			final String... auswahl) throws Exception {
+		final var messages = this.mapper.createArrayNode();
+		messages.addObject().put("role", "user").put("content", userContent);
+		final var chatRequest = this.mapper.createObjectNode().put("gespraechId", gespraechId);
+		chatRequest.set("messages", messages);
+		final var antworten = chatRequest.putArray("auswahl");
+		for (final String antwort : auswahl)
+			antworten.add(antwort);
+		final String authorization = Base64.getEncoder()
+				.encodeToString("admin:local-test-password".getBytes(StandardCharsets.UTF_8));
+		return HttpClient.newHttpClient().send(HttpRequest
+				.newBuilder(URI.create("http://127.0.0.1:" + this.port + "/api/ki/chat/stream"))
+				.header("Authorization", "Basic " + authorization)
+				.header("X-API-Client", "test")
+				.header("Content-Type", "application/json")
+				.POST(HttpRequest.BodyPublishers.ofString(this.mapper.writeValueAsString(chatRequest))).build(),
+				HttpResponse.BodyHandlers.ofString());
 	}
 
 	private String doneText(final String sse) throws IOException {
