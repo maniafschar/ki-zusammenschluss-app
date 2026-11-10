@@ -28,6 +28,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.regex.Pattern;
 
 import org.junit.jupiter.api.AfterAll;
@@ -61,6 +62,7 @@ class KiChatMcpToolFlowTest {
 	private static final Pattern CONVERSATION_ID = Pattern.compile("Gesprächs-ID für MCP-Werkzeuge: ([0-9a-f-]+)");
 	private static final Pattern ANSWER = Pattern.compile("\\[antwort:([a-z]+)\\]\\s*(.*)", Pattern.DOTALL);
 	private static final HttpServer upstream;
+	private static final AtomicReference<JsonNode> ohneWerkzeuge = new AtomicReference<>();
 
 	static {
 		try {
@@ -78,9 +80,12 @@ class KiChatMcpToolFlowTest {
 									? "Danke, notiert. Welches Ziel verfolgt ihr?"
 									: "Schritt 1: Was soll das Projekt erreichen?";
 					response = "{\"choices\":[{\"message\":{\"content\":\"" + text + "\"}}]}";
+				} else if (!request.path("tools").isArray()) {
+					ohneWerkzeuge.set(request);
+					response = "{\"choices\":[{\"message\":{\"content\":\"Danke, das hilft mir weiter.\"}}]}";
 				} else {
 					final var matcher = CONVERSATION_ID.matcher(messages.get(0).path("content").asText());
-					if (!matcher.find() || !request.path("tools").isArray()) {
+					if (!matcher.find()) {
 						exchange.sendResponseHeaders(400, -1);
 						exchange.close();
 						return;
@@ -245,7 +250,9 @@ class KiChatMcpToolFlowTest {
 			+ "\"question\":\"Welche Rolle spielt KI?\",\"options\":[\"Keine: nichts.\",\"Strategisch: viel.\"],\"selectionMode\":\"single\"}}";
 	private static final String SCHRITT_ZIEL = "{\"completed\":false,\"stepNumber\":2,\"totalSteps\":2,\"step\":{\"id\":\"goal\","
 			+ "\"question\":\"Welches Ziel verfolgt ihr?\",\"selectionMode\":\"text\",\"inputPlaceholder\":\"Dein Ziel in einem Satz\"}}";
-	private static final String FERTIG = "{\"completed\":true,\"minimumSteps\":2,\"answeredSteps\":2}";
+	private static final String FERTIG = "{\"completed\":true,\"minimumSteps\":2,\"answeredSteps\":2,\"answerDetails\":["
+			+ "{\"question\":\"Welche Rolle spielt KI?\",\"answers\":[\"Strategisch: viel.\"]},"
+			+ "{\"question\":\"Welches Ziel verfolgt ihr?\",\"answers\":[\"[antwort:goal] Prozesse automatisieren.\"]}]}";
 
 	/** Stateful MCP-Stub: liefert den nächsten offenen Schritt, nachdem Antworten gespeichert wurden. */
 	private void stubUmfrage() throws Exception {
@@ -472,6 +479,17 @@ class KiChatMcpToolFlowTest {
 		assertEquals(200, stream.statusCode());
 		final String zusammenfassung = this.doneEvent(stream.body()).path("zusammenfassung").asText();
 		assertEquals(summary, zusammenfassung);
+
+		final var company = this.chat(id, "Was macht ihr bei KI inhouse?");
+		assertEquals(200, company.statusCode());
+		assertEquals("Danke, das hilft mir weiter.", this.doneEvent(company.body()).path("text").asText());
+		final JsonNode upstreamRequest = ohneWerkzeuge.get();
+		assertNotNull(upstreamRequest);
+		assertTrue(upstreamRequest.path("tools").isMissingNode(), upstreamRequest.toString());
+		final String systemPrompt = upstreamRequest.path("messages").get(0).path("content").asText();
+		assertTrue(systemPrompt.contains("KI inhouse"), systemPrompt);
+		assertTrue(systemPrompt.contains("Ergebnis der Umfrage"), systemPrompt);
+		assertTrue(systemPrompt.contains(summary), systemPrompt);
 
 		final JsonNode slots = this.mapper.readTree(this.get("/api/termine").body());
 		String start = null;
