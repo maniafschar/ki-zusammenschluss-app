@@ -1833,12 +1833,12 @@
 					open.type = 'button';
 					open.className = 'todo-note';
 					open.style.cssText = 'background:none;border:0;text-align:left;cursor:pointer;font:inherit;color:inherit';
-					const files = w.anhaenge.length ? ` 📎 ${w.anhaenge.length}` : '';
-					open.textContent = w.title + files;
 					const badge = document.createElement('span');
 					badge.className = 'wissen-badge ' + (w.kiVerfuegbar ? 'ki' : 'intern');
 					badge.textContent = w.kiVerfuegbar ? 'KI' : 'nur intern';
 					open.appendChild(badge);
+					const files = w.anhaenge.length ? ` 📎 ${w.anhaenge.length}` : '';
+					open.textContent = w.title + files;
 					open.addEventListener('click', () => openEditor(w));
 					item.appendChild(open);
 					wissenList.appendChild(item);
