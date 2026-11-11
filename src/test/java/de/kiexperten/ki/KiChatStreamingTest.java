@@ -21,8 +21,11 @@ import java.util.concurrent.TimeUnit;
 
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
@@ -97,6 +100,15 @@ class KiChatStreamingTest {
 			});
 			upstream.createContext("/audio/speech", exchange -> {
 				final String request = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
+				if (request.contains("\"input\":\"private speech text\"")) {
+					final byte[] body = "{\"error\":{\"message\":\"Invalid input: private speech text; voice not found\"}}"
+							.getBytes(StandardCharsets.UTF_8);
+					exchange.sendResponseHeaders(400, body.length);
+					try (var out = exchange.getResponseBody()) {
+						out.write(body);
+					}
+					return;
+				}
 				if (!request.contains("\"model\":\"stimme\"") || !request.contains("\"voice\":\"1930\"")
 						|| !request.contains("\"response_format\":\"mp3\"")
 						|| request.contains("\"stream_format\"")) {
@@ -320,6 +332,24 @@ class KiChatStreamingTest {
 		assertEquals(16386, remainingAudio.length);
 		assertEquals(3, remainingAudio[remainingAudio.length - 2]);
 		assertEquals(4, remainingAudio[remainingAudio.length - 1]);
+	}
+
+	@Test
+	@ExtendWith(OutputCaptureExtension.class)
+	void logsSpeechErrorBodyWithoutEchoingUserInput(final CapturedOutput output) throws Exception {
+		final String auth = Base64.getEncoder()
+				.encodeToString("admin:local-test-password".getBytes(StandardCharsets.UTF_8));
+		final var response = HttpClient.newHttpClient().send(HttpRequest.newBuilder(
+				URI.create("http://127.0.0.1:" + this.port + "/api/ki/audio/speech"))
+				.header("Authorization", "Basic " + auth).header("X-API-Client", "test")
+				.header("Content-Type", "application/json")
+				.POST(HttpRequest.BodyPublishers.ofString("{\"input\":\"private speech text\"}"))
+				.build(), HttpResponse.BodyHandlers.ofString());
+
+		assertEquals(502, response.statusCode());
+		assertTrue(output.getAll().contains("KI-Sprachausgabe antwortete mit HTTP 400"));
+		assertTrue(output.getAll().contains("[redacted input]; voice not found"));
+		assertFalse(output.getAll().contains("private speech text"));
 	}
 
 	@Test
