@@ -564,7 +564,7 @@ public class KiChatController {
 				if ("suche_wissen".equals(toolName) && result.startsWith("Keine Treffer")) {
 					final String frage = this.letzteNutzernachricht(messages);
 					if (!frage.isBlank())
-						this.dashboard.addTodo(frage, null, null);
+						this.dashboard.addTodo("Chat, keine Treffer für Frage: " + frage, null, null);
 				}
 				if ("get_next_requirement_step".equals(toolName) || "record_requirement_answer".equals(toolName)) {
 					final JsonNode status = this.mapper.readTree(result);
