@@ -869,6 +869,10 @@ h2 {
 	margin-bottom: 1rem;
 }
 
+#slots-title {
+	scroll-margin-top: 5rem;
+}
+
 .slot {
 	border: 1px solid #a9d8cb;
 	background: #ffffff;
