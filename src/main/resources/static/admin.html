@@ -556,6 +556,26 @@
 			font-size: .85em;
 		}
 
+		#dashboard-panel .wissen-badge {
+			display: inline-block;
+			margin-left: .5em;
+			padding: .1em .5em;
+			border-radius: 999px;
+			font-size: .75em;
+			font-weight: 600;
+			vertical-align: middle;
+		}
+
+		#dashboard-panel .wissen-badge.ki {
+			background: #e6f4ff;
+			color: #1d4ed8;
+		}
+
+		#dashboard-panel .wissen-badge.intern {
+			background: #f2f4f7;
+			color: #667085;
+		}
+
 		#dashboard-panel input:focus,
 		#dashboard-panel *:focus-visible {
 			outline: 2px solid var(--primary);
@@ -1812,8 +1832,11 @@
 					open.className = 'todo-note';
 					open.style.cssText = 'background:none;border:0;text-align:left;cursor:pointer;font:inherit;color:inherit';
 					const files = w.anhaenge.length ? ` 📎 ${w.anhaenge.length}` : '';
-					const ki = w.kiVerfuegbar ? ' [KI]' : '';
-					open.textContent = w.title + ki + files;
+					open.textContent = w.title + files;
+					const badge = document.createElement('span');
+					badge.className = 'wissen-badge ' + (w.kiVerfuegbar ? 'ki' : 'intern');
+					badge.textContent = w.kiVerfuegbar ? 'KI' : 'nur intern';
+					open.appendChild(badge);
 					open.addEventListener('click', () => openEditor(w));
 					item.appendChild(open);
 					wissenList.appendChild(item);
