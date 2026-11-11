@@ -138,6 +138,20 @@
 			background: #e3f7f0;
 		}
 
+		#log-table th button {
+			width: 100%;
+			padding: 0;
+			border: 0;
+			background: transparent;
+			color: inherit;
+			font-weight: 600;
+			text-align: left;
+		}
+
+		#log-table th button:hover {
+			text-decoration: underline;
+		}
+
 		#log-table td.err {
 			color: #b42318;
 			font-weight: 600;
@@ -936,12 +950,12 @@
 			<table id="log-table">
 				<thead>
 					<tr>
-						<th>Zeit</th>
-						<th>Methode</th>
-						<th>Pfad</th>
-						<th>Status</th>
-						<th>ms</th>
-						<th>IP</th>
+						<th scope="col"><button type="button" data-log-sort="zeitpunkt">Zeit</button></th>
+						<th scope="col"><button type="button" data-log-sort="methode">Methode</button></th>
+						<th scope="col"><button type="button" data-log-sort="pfad">Pfad</button></th>
+						<th scope="col"><button type="button" data-log-sort="status">Status</button></th>
+						<th scope="col"><button type="button" data-log-sort="dauerMs">ms</button></th>
+						<th scope="col"><button type="button" data-log-sort="ip">IP</button></th>
 					</tr>
 				</thead>
 				<tbody></tbody>
@@ -1498,17 +1512,44 @@
 			chatPage++; loadChats().catch((err) => { $('chats-message').textContent = err.message; });
 		});
 
-		async function loadLogs() {
-			const params = new URLSearchParams();
-			const f = $('log-form');
-			// datetime-local is in the browser's time zone; the server expects UTC.
-			if (f.von.value) params.set('von', new Date(f.von.value + ':00').toISOString());
-			if (f.bis.value) params.set('bis', new Date(f.bis.value + ':59').toISOString());
-			if (f.text.value.trim()) params.set('text', f.text.value.trim());
-			const r = await api('/ai-expert/api/admin/logs?' + params);
+		let logEntries = [];
+		let logSort = { key: null, direction: 1 };
+
+		function renderLogs() {
 			const body = document.querySelector('#log-table tbody');
-			body.innerHTML = '';
-			r.eintraege.forEach((e) => {
+			body.replaceChildren();
+			const entries = logEntries.map((entry, index) => ({ entry, index }));
+			if (logSort.key) {
+				entries.sort((a, b) => {
+					const value = (entry) => {
+						switch (logSort.key) {
+							case 'zeitpunkt': return new Date(entry.zeitpunkt).getTime();
+							case 'pfad': return entry.pfad + (entry.query ? '?' + entry.query : '');
+							case 'ip': return entry.weitergeleitetVon ? entry.weitergeleitetVon : entry.ip;
+							default: return entry[logSort.key];
+						}
+					};
+					const left = value(a.entry);
+					const right = value(b.entry);
+					const comparison = typeof left === 'number' && typeof right === 'number'
+						? left - right
+						: String(left ?? '').localeCompare(String(right ?? ''), 'de', { numeric: true, sensitivity: 'base' });
+					return comparison * logSort.direction || a.index - b.index;
+				});
+			}
+			document.querySelectorAll('#log-table th').forEach((th) => {
+				const button = th.querySelector('[data-log-sort]');
+				if (!button) return;
+				if (button.dataset.logSort === logSort.key) {
+					th.setAttribute('aria-sort', logSort.direction === 1 ? 'ascending' : 'descending');
+					button.textContent = button.textContent.replace(/[▲▼]$/, '').trim()
+						+ (logSort.direction === 1 ? ' ▲' : ' ▼');
+				} else {
+					th.removeAttribute('aria-sort');
+					button.textContent = button.textContent.replace(/[▲▼]$/, '').trim();
+				}
+			});
+			entries.forEach(({ entry: e }) => {
 				const tr = document.createElement('tr');
 				const cells = [
 					new Date(e.zeitpunkt).toLocaleString('de-DE'), e.methode,
@@ -1545,6 +1586,26 @@
 				tr.addEventListener('click', () => { detail.hidden = !detail.hidden; });
 				body.append(tr, detail);
 			});
+		}
+
+		document.querySelectorAll('#log-table [data-log-sort]').forEach((button) => {
+			button.addEventListener('click', () => {
+				const key = button.dataset.logSort;
+				logSort = { key, direction: logSort.key === key ? -logSort.direction : 1 };
+				renderLogs();
+			});
+		});
+
+		async function loadLogs() {
+			const params = new URLSearchParams();
+			const f = $('log-form');
+			// datetime-local is in the browser's time zone; the server expects UTC.
+			if (f.von.value) params.set('von', new Date(f.von.value + ':00').toISOString());
+			if (f.bis.value) params.set('bis', new Date(f.bis.value + ':59').toISOString());
+			if (f.text.value.trim()) params.set('text', f.text.value.trim());
+			const r = await api('/ai-expert/api/admin/logs?' + params);
+			logEntries = r.eintraege;
+			renderLogs();
 			$('log-message').textContent = r.gesamt === 0 ? 'Keine Einträge gefunden.'
 				: `${r.gesamt} Einträge gefunden` + (r.abgeschnitten ? ` – angezeigt werden die neuesten ${r.eintraege.length}. Bitte Filter eingrenzen.` : '.');
 		}
