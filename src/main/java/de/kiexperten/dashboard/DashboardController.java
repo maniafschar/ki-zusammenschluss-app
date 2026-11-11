@@ -80,7 +80,7 @@ public class DashboardController {
 			.addTags("s", "u", "div", "span").addEnforcedAttribute("a", "rel", "noopener noreferrer")
 			.addEnforcedAttribute("a", "target", "_blank").removeProtocols("a", "href", "ftp");
 
-	record TodoRequest(@NotBlank @Size(max = 200) String note, Long expertId, LocalDate dueDate) {
+	record TodoRequest(@NotBlank @Size(max = 2000) String note, Long expertId, LocalDate dueDate) {
 	}
 
 	/**
