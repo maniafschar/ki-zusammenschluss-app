@@ -1838,7 +1838,7 @@
 					badge.textContent = w.kiVerfuegbar ? 'KI' : 'nur intern';
 					open.appendChild(badge);
 					const files = w.anhaenge.length ? ` 📎 ${w.anhaenge.length}` : '';
-					open.textContent = w.title + files;
+					open.appendChild(document.createElement('span')).textContent = w.title + files;
 					open.addEventListener('click', () => openEditor(w));
 					item.appendChild(open);
 					wissenList.appendChild(item);
