@@ -23,7 +23,7 @@ public class Todo extends Auditable {
 	@Column(columnDefinition = "BIGINT")
 	private BigInteger id;
 
-	@Column(nullable = false, length = 200)
+	@Column(nullable = false, length = 2000)
 	private String note;
 
 	@Column(nullable = false)

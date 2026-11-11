@@ -48,6 +48,9 @@ import com.sun.net.httpserver.HttpServer;
 import de.kiexperten.Zeit;
 import de.kiexperten.booking.BestaetigungsMailService;
 import de.kiexperten.booking.TerminRepository;
+import de.kiexperten.dashboard.DashboardRepository;
+import de.kiexperten.dashboard.Todo;
+import de.kiexperten.dashboard.WissensSuche;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties = {
 		"spring.datasource.url=jdbc:h2:mem:ki-mcp-chat-test",
@@ -75,10 +78,14 @@ class KiChatMcpToolFlowTest {
 				if (hasToolResult) {
 					final String text = lastUserText(messages).contains("[abschluss]")
 							? "Die KI hat die Antwort umgeschrieben."
-							: lastUserText(messages).contains("[frage-im-text]")
-									? "Danke, notiert. Welches Ziel verfolgt ihr?"
-									: "Schritt 1: Was soll das Projekt erreichen?";
+							: lastUserText(messages).contains("[suche-wissen]")
+									? "Keine Treffer, ich habe die Frage notiert."
+									: lastUserText(messages).contains("[frage-im-text]")
+											? "Danke, notiert. Welches Ziel verfolgt ihr?"
+											: "Schritt 1: Was soll das Projekt erreichen?";
 					response = "{\"choices\":[{\"message\":{\"content\":\"" + text + "\"}}]}";
+				} else if (nutztWissenssuche(request) && lastUserText(messages).contains("[suche-wissen]")) {
+					response = toolCall("suche_wissen", "{\"suchbegriffe\":\"keinepassenden\"}");
 				} else if (!nutztMcpWerkzeuge(request)) {
 					ohneWerkzeuge.set(request);
 					response = "{\"choices\":[{\"message\":{\"content\":\"Danke, das hilft mir weiter.\"}}]}";
@@ -165,6 +172,13 @@ class KiChatMcpToolFlowTest {
 		return false;
 	}
 
+	private static boolean nutztWissenssuche(final JsonNode request) {
+		for (final JsonNode tool : request.path("tools"))
+			if ("suche_wissen".equals(tool.path("function").path("name").asText()))
+				return true;
+		return false;
+	}
+
 	private static String lastUserText(final JsonNode messages) {
 		String text = "";
 		for (final JsonNode message : messages)
@@ -205,6 +219,12 @@ class KiChatMcpToolFlowTest {
 
 	@MockBean
 	BestaetigungsMailService mail;
+
+	@MockBean
+	WissensSuche wissen;
+
+	@Autowired
+	DashboardRepository dashboard;
 
 	@Autowired
 	TerminRepository termine;
@@ -257,6 +277,21 @@ class KiChatMcpToolFlowTest {
 		final var invocation = forClass(JsonNode.class);
 		verify(this.requirementsMcp, atLeastOnce()).call(eq("get_next_requirement_step"), invocation.capture());
 		assertTrue(UUID.fromString(invocation.getValue().path("conversationId").asText()) != null);
+	}
+
+	@Test
+	void createsTodoWithExactQuestionWhenKnowledgeSearchHasNoResults() throws Exception {
+		final String question = "[suche-wissen] " + "Warum gibt es dazu keine passenden Informationen? ".repeat(6);
+		when(this.requirementsMcp.call(eq("get_next_requirement_step"), any(JsonNode.class)))
+				.thenReturn("{\"completed\":true,\"minimumSteps\":6,\"answeredSteps\":6}");
+		when(this.wissen.suche("keinepassenden")).thenReturn("Keine Treffer in den Wissensquellen.");
+
+		final HttpResponse<String> response = this.post("/api/ki/chat", question);
+
+		assertEquals(200, response.statusCode());
+		final List<Todo> todos = this.dashboard.todos();
+		assertTrue(todos.stream().anyMatch(todo -> question.equals(todo.getNote())));
+		verify(this.wissen).suche("keinepassenden");
 	}
 
 	private final AtomicInteger beantwortet = new AtomicInteger();

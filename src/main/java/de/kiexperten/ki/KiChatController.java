@@ -53,6 +53,7 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import de.kiexperten.Zeit;
 import de.kiexperten.booking.Termin;
 import de.kiexperten.booking.TerminRepository;
+import de.kiexperten.dashboard.DashboardRepository;
 import de.kiexperten.dashboard.WissensSuche;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
@@ -121,12 +122,14 @@ public class KiChatController {
 	private final ChatProtokollService protokolle;
 	private final RequirementsMcpGateway requirementsMcp;
 	private final WissensSuche wissen;
+	private final DashboardRepository dashboard;
 	private final TerminRepository termine;
 
 	public KiChatController(
 			final ChatProtokollService protokolle,
 			final ObjectProvider<RequirementsMcpGateway> requirementsMcp,
 			final WissensSuche wissen,
+			final DashboardRepository dashboard,
 			final TerminRepository termine,
 			@Value("${app.ki.base-url:https://100.65.185.69/v1}") final String baseUrl,
 			@Value("${app.ki.completions-path:/chat/completions}") final String completionsPath,
@@ -152,6 +155,7 @@ public class KiChatController {
 		this.protokolle = protokolle;
 		this.requirementsMcp = requirementsMcp.getIfAvailable();
 		this.wissen = wissen;
+		this.dashboard = dashboard;
 		this.termine = termine;
 		final HttpClient.Builder builder = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10));
 		if (trustAll) {
@@ -503,6 +507,11 @@ public class KiChatController {
 				final String result = "suche_wissen".equals(toolName)
 						? this.wissen.suche(arguments.path("suchbegriffe").asText(""))
 						: this.requirementsMcp.call(toolName, arguments);
+				if ("suche_wissen".equals(toolName) && result.startsWith("Keine Treffer")) {
+					final String frage = this.letzteNutzernachricht(messages);
+					if (!frage.isBlank())
+						this.dashboard.addTodo(frage, null, null);
+				}
 				if ("get_next_requirement_step".equals(toolName) || "record_requirement_answer".equals(toolName)) {
 					final JsonNode status = this.mapper.readTree(result);
 					if (status.path("completed").asBoolean(false)) {
