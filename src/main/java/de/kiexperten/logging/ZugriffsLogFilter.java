@@ -44,7 +44,8 @@ public class ZugriffsLogFilter extends OncePerRequestFilter {
 			final FilterChain chain) throws ServletException, IOException {
 		final long start = System.nanoTime();
 		if ("POST".equals(request.getMethod())
-				&& (request.getContextPath() + "/api/ki/chat/stream").equals(request.getRequestURI())) {
+				&& (request.getRequestURI().equals(request.getContextPath() + "/api/ki/chat/stream")
+						|| request.getRequestURI().equals(request.getContextPath() + "/api/ki/audio/speech"))) {
 			logStream(request, response, chain, start);
 			return;
 		}
