@@ -842,13 +842,45 @@ startBooking();
 		activeSpeech.player?.pause();
 	}
 
-	/** Teilt die Antwort in Sprechabschnitte; kurze Sätze werden zusammengefasst, damit nicht zu viele Anfragen entstehen. */
+	/** Spielt kurze Textabschnitte direkt ab und lädt den jeweils nächsten Abschnitt parallel vor. */
 	async function speak(reply, turnId = null) {
-		const playback = { controller: new AbortController(), player: null, finish: null, cancelled: false };
+		const playback = { controller: new AbortController(), player: null, finish: null, cancelled: false, turnId };
 		activeSpeech = playback;
 		const urls = [];
 		let source = null;
 		let playbackAnalyser = null;
+		async function* speechChunks(input) {
+			const sourceText = typeof input === 'string'
+				? (async function* () { yield input; })()
+				: input;
+			let buffer = '';
+			for await (const textChunk of sourceText) {
+				buffer += textChunk;
+				while (true) {
+					const sentenceEnd = /[.!?…](?:["'”’)\]]*)\s+/g;
+					let match;
+					let cut = 0;
+					while ((match = sentenceEnd.exec(buffer))) {
+						const end = match.index + match[0].trimEnd().length;
+						if (end >= 50) {
+							cut = end;
+							break;
+						}
+					}
+					if (!cut && buffer.length >= 100) {
+						cut = buffer.lastIndexOf(' ', 100);
+						if (cut < 50) cut = buffer.indexOf(' ', 100);
+						if (cut < 0) cut = Math.min(buffer.length, 100);
+					}
+					if (!cut) break;
+					const chunk = plainMarkdown(buffer.slice(0, cut));
+					buffer = buffer.slice(cut);
+					if (chunk) yield chunk;
+				}
+			}
+			const lastChunk = plainMarkdown(buffer);
+			if (lastChunk) yield lastChunk;
+		}
 		const fetchChunk = async (input) => {
 			const token = await csrfToken();
 			const res = await fetch('/ai-expert/api/ki/audio/speech', {
@@ -928,8 +960,14 @@ startBooking();
 			await ready;
 			return { player, streamDone };
 		};
-		const loads = [fetchChunk(reply)];
-		loads[0].catch(() => { });
+		const chunks = speechChunks(reply)[Symbol.asyncIterator]();
+		const nextLoad = async () => {
+			const { value, done } = await chunks.next();
+			if (done) return null;
+			const promise = fetchChunk(value);
+			promise.catch(() => { });
+			return { promise };
+		};
 		try {
 			const AudioContextType = window.AudioContext || window.webkitAudioContext;
 			if (AudioContextType) {
@@ -952,8 +990,9 @@ startBooking();
 					console.warn('Audioanalyse nicht verfügbar:', error);
 				}
 			}
-			for (let index = 0; index < loads.length && !playback.cancelled; index++) {
-				const { player, streamDone } = await loads[index];
+			let load = await nextLoad();
+			while (load && !playback.cancelled) {
+				const { player, streamDone } = await load.promise;
 				if (playback.cancelled) break;
 				playback.player = player;
 				if (playbackAnalyser) {
@@ -974,14 +1013,17 @@ startBooking();
 					if (!playback.cancelled && (turnId === null || turnId === chatTurn)) state = 'speaking';
 				}, { once: true });
 				await player.play();
+				const followingLoad = nextLoad();
 				await Promise.all([finished, streamDone]);
 				playback.finish = null;
 				source?.disconnect();
 				source = null;
+				load = await followingLoad;
 			}
 		} catch (error) {
 			if (!playback.cancelled && error.name !== 'AbortError') throw error;
 		} finally {
+			if (playback.cancelled) await chunks.return?.();
 			playback.finish = null;
 			source?.disconnect();
 			playbackAnalyser?.disconnect();
@@ -1175,6 +1217,36 @@ startBooking();
 		const turnId = ++chatTurn;
 		choiceReady = false;
 		state = 'thinking';
+		const speechItems = [];
+		let speechClosed = false;
+		let speechWake;
+		let speechTask = null;
+		async function* speechStream() {
+			while (true) {
+				if (speechItems.length) {
+					yield speechItems.shift();
+				} else if (speechClosed) {
+					return;
+				} else {
+					await new Promise((resolve) => { speechWake = resolve; });
+				}
+			}
+		}
+		function wakeSpeech() {
+			const wake = speechWake;
+			speechWake = null;
+			wake?.();
+		}
+		function enqueueSpeech(chunk) {
+			speechItems.push(chunk);
+			if (!speechTask) speechTask = speak(speechStream(), turnId);
+			speechTask.catch(() => closeSpeech());
+			wakeSpeech();
+		}
+		function closeSpeech() {
+			speechClosed = true;
+			wakeSpeech();
+		}
 		if (ausMultipleChoice) {
 			renderConversation(question, '');
 		} else {
@@ -1192,6 +1264,7 @@ startBooking();
 
 		function addText(chunk) {
 			reply += chunk;
+			enqueueSpeech(chunk);
 			renderReply();
 		}
 
@@ -1240,7 +1313,12 @@ startBooking();
 						if (type === 'done') {
 							completed = true;
 							zusammenfassung = typeof payload.zusammenfassung === 'string' ? payload.zusammenfassung : '';
-							if (typeof payload.text === 'string' && payload.text.trim()) reply = payload.text.trim();
+							if (typeof payload.text === 'string' && payload.text.trim()) {
+								const finalReply = payload.text.trim();
+								if (!reply.trim()) enqueueSpeech(finalReply);
+								else if (finalReply.startsWith(reply.trim())) enqueueSpeech(finalReply.slice(reply.trim().length));
+								reply = finalReply;
+							}
 							break;
 						}
 					}
@@ -1255,8 +1333,10 @@ startBooking();
 			renderConversation(question, reply.trim(), { choices: true });
 			choiceReady = true;
 			if (zusammenfassung) zeigeZusammenfassung(zusammenfassung);
+			closeSpeech();
 			try {
-				await speak(plainMarkdown(reply), turnId);
+				if (!speechTask) speechTask = speak(plainMarkdown(reply), turnId);
+				await speechTask;
 			} catch (e) {
 				if (turnId !== chatTurn) return;
 				const speechError = document.createElement('p');
@@ -1269,6 +1349,9 @@ startBooking();
 				mic.disabled = !canRecord;
 			}
 		} catch (e) {
+			closeSpeech();
+			if (activeSpeech?.turnId === turnId) stopSpeech();
+			await speechTask?.catch(() => { });
 			if (turnId !== chatTurn) return;
 			history.pop();
 			state = 'idle';
