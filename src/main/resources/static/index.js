@@ -352,6 +352,7 @@ startBooking();
 	let state = 'idle'; // idle | listening | thinking | speaking
 	let recorder = null;
 	let chatTurn = 0;
+	let activeTurn = null;
 	let sprueche = [];
 	let spruecheLaden = null;
 	const verwendeteSprueche = new Set();
@@ -829,8 +830,8 @@ startBooking();
 			console.warn('Three.js-Animation nicht verfügbar; die einfache Sprachvisualisierung wird verwendet.', err);
 		});
 
-	async function csrfToken() {
-		await fetch('/ai-expert/api/csrf', { credentials: 'same-origin' });
+	async function csrfToken(signal) {
+		await fetch('/ai-expert/api/csrf', { credentials: 'same-origin', signal });
 		return decodeURIComponent((document.cookie.match(/(?:^|; )XSRF-TOKEN=([^;]*)/) || [])[1] || '');
 	}
 
@@ -838,13 +839,24 @@ startBooking();
 		if (!activeSpeech) return;
 		activeSpeech.cancelled = true;
 		activeSpeech.controller.abort();
+		activeSpeech.closeInput?.();
 		activeSpeech.finish?.();
 		activeSpeech.player?.pause();
 	}
 
+	function stopTurn() {
+		++chatTurn;
+		activeTurn?.controller.abort();
+		activeTurn?.closeSpeech();
+		const userIndex = history.indexOf(activeTurn?.userMessage);
+		if (userIndex !== -1) history.splice(userIndex, 1);
+		activeTurn = null;
+		stopSpeech();
+	}
+
 	/** Spielt kurze Textabschnitte direkt ab und lädt den jeweils nächsten Abschnitt parallel vor. */
-	async function speak(reply, turnId = null) {
-		const playback = { controller: new AbortController(), player: null, finish: null, cancelled: false, turnId };
+	async function speak(reply, turnId = null, closeInput = null) {
+		const playback = { controller: new AbortController(), player: null, finish: null, cancelled: false, turnId, closeInput };
 		activeSpeech = playback;
 		const urls = [];
 		let source = null;
@@ -882,7 +894,8 @@ startBooking();
 			if (lastChunk) yield lastChunk;
 		}
 		const fetchChunk = async (input) => {
-			const token = await csrfToken();
+			const token = await csrfToken(playback.controller.signal);
+			playback.controller.signal.throwIfAborted();
 			const res = await fetch('/ai-expert/api/ki/audio/speech', {
 				method: 'POST',
 				credentials: 'same-origin',
@@ -894,7 +907,9 @@ startBooking();
 			const mimeType = res.headers.get('Content-Type')?.split(';')[0] || 'audio/mpeg';
 			const MediaSourceType = window.MediaSource;
 			if (!res.body || !MediaSourceType?.isTypeSupported(mimeType)) {
-				const url = URL.createObjectURL(await res.blob());
+				const blob = await res.blob();
+				playback.controller.signal.throwIfAborted();
+				const url = URL.createObjectURL(blob);
 				urls.push(url);
 				return { player: new Audio(url), streamDone: Promise.resolve() };
 			}
@@ -904,9 +919,21 @@ startBooking();
 			urls.push(url);
 			const player = new Audio(url);
 			await new Promise((resolve, reject) => {
-				mediaSource.addEventListener('sourceopen', resolve, { once: true });
-				mediaSource.addEventListener('error', () => reject(new Error('Audio stream unavailable')), { once: true });
+				const signal = playback.controller.signal;
+				const cleanup = () => {
+					mediaSource.removeEventListener('sourceopen', onOpen);
+					mediaSource.removeEventListener('error', onError);
+					signal.removeEventListener('abort', onAbort);
+				};
+				const onOpen = () => { cleanup(); resolve(); };
+				const onError = () => { cleanup(); reject(new Error('Audio stream unavailable')); };
+				const onAbort = () => { cleanup(); reject(signal.reason); };
+				mediaSource.addEventListener('sourceopen', onOpen);
+				mediaSource.addEventListener('error', onError);
+				signal.addEventListener('abort', onAbort, { once: true });
+				if (signal.aborted) onAbort();
 			});
+			playback.controller.signal.throwIfAborted();
 			const sourceBuffer = mediaSource.addSourceBuffer(mimeType);
 			const reader = res.body.getReader();
 			let resolveReady;
@@ -963,7 +990,7 @@ startBooking();
 		const chunks = speechChunks(reply)[Symbol.asyncIterator]();
 		const nextLoad = async () => {
 			const { value, done } = await chunks.next();
-			if (done) return null;
+			if (done || playback.cancelled) return null;
 			const promise = fetchChunk(value);
 			promise.catch(() => { });
 			return { promise };
@@ -974,6 +1001,7 @@ startBooking();
 				try {
 					audioContext ||= new AudioContextType();
 					if (audioContext.state === 'suspended') await audioContext.resume();
+					if (playback.cancelled) return;
 					playbackAnalyser = audioContext.createAnalyser();
 					playbackAnalyser.fftSize = 2048;
 					playbackAnalyser.smoothingTimeConstant = .3;
@@ -983,10 +1011,12 @@ startBooking();
 					audioFrequencies = new Uint8Array(playbackAnalyser.frequencyBinCount);
 				} catch (error) {
 					playbackAnalyser?.disconnect();
+					if (playbackAnalyser && audioAnalyser === playbackAnalyser) {
+						audioAnalyser = null;
+						audioSamples = null;
+						audioFrequencies = null;
+					}
 					playbackAnalyser = null;
-					audioAnalyser = null;
-					audioSamples = null;
-					audioFrequencies = null;
 					console.warn('Audioanalyse nicht verfügbar:', error);
 				}
 			}
@@ -1013,7 +1043,12 @@ startBooking();
 					if (!playback.cancelled && (turnId === null || turnId === chatTurn)) state = 'speaking';
 				}, { once: true });
 				await player.play();
+				if (playback.cancelled) {
+					player.pause();
+					break;
+				}
 				const followingLoad = nextLoad();
+				followingLoad.catch(() => { });
 				await Promise.all([finished, streamDone]);
 				playback.finish = null;
 				source?.disconnect();
@@ -1032,8 +1067,10 @@ startBooking();
 				audioSamples = null;
 				audioFrequencies = null;
 			}
-			if (activeSpeech === playback) activeSpeech = null;
-			if (state === 'speaking' && (turnId === null || turnId === chatTurn)) state = 'idle';
+			if (activeSpeech === playback) {
+				activeSpeech = null;
+				if (state === 'speaking' && (turnId === null || turnId === chatTurn)) state = 'idle';
+			}
 			urls.forEach((url) => URL.revokeObjectURL(url));
 			requestDraw();
 		}
@@ -1051,6 +1088,7 @@ startBooking();
 	}
 
 	async function playWelcome() {
+		const turnId = chatTurn;
 		start.disabled = true;
 		let welcome;
 		try {
@@ -1068,14 +1106,15 @@ startBooking();
 		renderWelcome(welcome);
 		choiceReady = true;
 		try {
-			await speak(plainMarkdown(welcome));
+			await speak(plainMarkdown(welcome), turnId);
 		} catch (e) {
+			if (turnId !== chatTurn) return;
 			const speechError = document.createElement('p');
 			speechError.className = 'chat-status';
 			speechError.textContent = 'Die Sprachausgabe ist fehlgeschlagen.';
 			text.querySelector('.chat-assistant')?.append(speechError);
 		} finally {
-			mic.disabled = !canRecord;
+			if (turnId === chatTurn) mic.disabled = !canRecord;
 		}
 	}
 
@@ -1138,7 +1177,7 @@ startBooking();
 		const value = String(answer).trim();
 		const ausMultipleChoice = Boolean(text.querySelector('.chat-choices'));
 		choiceReady = false;
-		stopSpeech();
+		stopTurn();
 		ask(value, auswahl, ausMultipleChoice);
 	}
 
@@ -1215,6 +1254,7 @@ startBooking();
 
 	async function ask(question, auswahl = null, ausMultipleChoice = false) {
 		const turnId = ++chatTurn;
+		const controller = new AbortController();
 		choiceReady = false;
 		state = 'thinking';
 		const speechItems = [];
@@ -1223,7 +1263,9 @@ startBooking();
 		let speechTask = null;
 		async function* speechStream() {
 			while (true) {
-				if (speechItems.length) {
+				if (speechClosed && controller.signal.aborted) {
+					return;
+				} else if (speechItems.length) {
 					yield speechItems.shift();
 				} else if (speechClosed) {
 					return;
@@ -1238,8 +1280,9 @@ startBooking();
 			wake?.();
 		}
 		function enqueueSpeech(chunk) {
+			if (controller.signal.aborted) return;
 			speechItems.push(chunk);
-			if (!speechTask) speechTask = speak(speechStream(), turnId);
+			if (!speechTask) speechTask = speak(speechStream(), turnId, discardSpeech);
 			speechTask.catch(() => closeSpeech());
 			wakeSpeech();
 		}
@@ -1247,6 +1290,12 @@ startBooking();
 			speechClosed = true;
 			wakeSpeech();
 		}
+		function discardSpeech() {
+			speechItems.length = 0;
+			closeSpeech();
+		}
+		const turn = { controller, closeSpeech: discardSpeech, userMessage: null };
+		activeTurn = turn;
 		if (ausMultipleChoice) {
 			renderConversation(question, '');
 		} else {
@@ -1255,7 +1304,9 @@ startBooking();
 			if (turnId !== chatTurn) return;
 			renderConversation(question, '', { thinking: true, thinkingQuote: naechsterSpruch() });
 		}
-		history.push({ role: 'user', content: question });
+		const userMessage = { role: 'user', content: question };
+		turn.userMessage = userMessage;
+		history.push(userMessage);
 		let reply = '';
 
 		function renderReply() {
@@ -1269,7 +1320,8 @@ startBooking();
 		}
 
 		try {
-			const token = await csrfToken();
+			const token = await csrfToken(controller.signal);
+			controller.signal.throwIfAborted();
 			const requestBody = JSON.stringify(auswahl?.length
 				? { messages: history.slice(-10), gespraechId, auswahl }
 				: { messages: history.slice(-10), gespraechId });
@@ -1279,12 +1331,14 @@ startBooking();
 					method: 'POST',
 					credentials: 'same-origin',
 					headers: { 'Content-Type': 'application/json', 'X-XSRF-TOKEN': token },
-					body: requestBody
+					body: requestBody,
+					signal: controller.signal
 				});
 				if (res.status !== 429) break;
 				const wartezeitMs = Number(res.headers.get('Retry-After') || 1) * 1000;
 				if (attempt === 3 || wartezeitMs > 5000) break;
 				await new Promise((resolve) => setTimeout(resolve, wartezeitMs));
+				controller.signal.throwIfAborted();
 			}
 			if (!res.ok) throw new Error(res.status);
 			gespraechId = res.headers.get('X-Chat-Id') || gespraechId;
@@ -1297,6 +1351,7 @@ startBooking();
 			try {
 				while (!completed) {
 					const { value, done } = await reader.read();
+					controller.signal.throwIfAborted();
 					buffer += decoder.decode(value, { stream: !done });
 					let boundary;
 					while ((boundary = buffer.indexOf('\n\n')) !== -1) {
@@ -1329,11 +1384,13 @@ startBooking();
 				reader.releaseLock();
 			}
 			if (!reply.trim()) throw new Error('Die KI hat keine Antwort geliefert.');
+			controller.signal.throwIfAborted();
 			history.push({ role: 'assistant', content: reply.trim() });
 			renderConversation(question, reply.trim(), { choices: true });
 			choiceReady = true;
 			if (zusammenfassung) zeigeZusammenfassung(zusammenfassung);
 			closeSpeech();
+			if (activeTurn?.controller === controller) activeTurn = null;
 			try {
 				if (!speechTask) speechTask = speak(plainMarkdown(reply), turnId);
 				await speechTask;
@@ -1351,9 +1408,11 @@ startBooking();
 		} catch (e) {
 			closeSpeech();
 			if (activeSpeech?.turnId === turnId) stopSpeech();
+			const userIndex = history.indexOf(userMessage);
+			if (userIndex !== -1) history.splice(userIndex, 1);
+			if (activeTurn?.controller === controller) activeTurn = null;
 			await speechTask?.catch(() => { });
 			if (turnId !== chatTurn) return;
-			history.pop();
 			state = 'idle';
 			mic.disabled = !canRecord;
 			console.error('KI-Antwort fehlgeschlagen:', e);
@@ -1368,6 +1427,8 @@ startBooking();
 			recorder.stop();
 			return;
 		}
+		choiceReady = false;
+		stopTurn();
 		try {
 			const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
 			const mimeType = ['audio/webm;codecs=opus', 'audio/mp4', 'audio/ogg;codecs=opus']
