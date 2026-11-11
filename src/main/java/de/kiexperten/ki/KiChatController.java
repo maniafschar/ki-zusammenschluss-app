@@ -140,7 +140,7 @@ public class KiChatController {
 			@Value("${app.ki.transcription-model:ohr-datei}") final String transcriptionModel,
 			@Value("${app.ki.speech-model:stimme}") final String speechModel,
 			@Value("${app.ki.speech-voice:1930}") final String speechVoice,
-			@Value("${app.ki.speech-format:pcm}") final String speechFormat,
+			@Value("${app.ki.speech-format:wav}") final String speechFormat,
 			@Value("${app.ki.trust-all-tls:false}") final boolean trustAll) throws Exception {
 		this.baseUrl = baseUrl;
 		this.completionsPath = completionsPath;
