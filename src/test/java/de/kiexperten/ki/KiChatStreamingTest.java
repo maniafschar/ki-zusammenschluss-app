@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.BufferedReader;
+import java.io.IOException;
 import java.io.InputStreamReader;
 import java.net.InetSocketAddress;
 import java.net.URI;
@@ -40,6 +41,8 @@ import de.kiexperten.Zeit;
 class KiChatStreamingTest {
 	private static final HttpServer upstream;
 	private static volatile CountDownLatch continueStream = new CountDownLatch(1);
+	private static volatile CountDownLatch continueSpeech = new CountDownLatch(1);
+	private static volatile CountDownLatch speechWritten = new CountDownLatch(1);
 
 	static {
 		try {
@@ -95,16 +98,29 @@ class KiChatStreamingTest {
 			upstream.createContext("/audio/speech", exchange -> {
 				final String request = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
 				if (!request.contains("\"model\":\"stimme\"") || !request.contains("\"voice\":\"1930\"")
-						|| !request.contains("\"response_format\":\"wav\"")) {
+						|| !request.contains("\"response_format\":\"mp3\"")
+						|| !request.contains("\"stream_format\":\"audio\"")) {
 					exchange.sendResponseHeaders(400, -1);
 					exchange.close();
 					return;
 				}
-				final byte[] body = { 'R', 'I', 'F', 'F', 1, 2, 3, 4 };
-				exchange.getResponseHeaders().set("Content-Type", "audio/wav");
-				exchange.sendResponseHeaders(200, body.length);
+				exchange.getResponseHeaders().set("Content-Type", "audio/mpeg");
+				exchange.sendResponseHeaders(200, 0);
 				try (var out = exchange.getResponseBody()) {
-					out.write(body);
+					final byte[] firstChunk = new byte[16384];
+					firstChunk[0] = 'I';
+					firstChunk[1] = 'D';
+					firstChunk[2] = '3';
+					out.write(firstChunk);
+					out.flush();
+					if (!continueSpeech.await(5, TimeUnit.SECONDS))
+						throw new IllegalStateException("Speech stream test timeout");
+					out.write(new byte[] { 2, 3, 4 });
+					out.flush();
+					speechWritten.countDown();
+				} catch (final InterruptedException e) {
+					Thread.currentThread().interrupt();
+					throw new IOException(e);
 				}
 			});
 			upstream.start();
@@ -280,15 +296,30 @@ class KiChatStreamingTest {
 		assertEquals(200, transcription.statusCode());
 		assertEquals("{\"text\":\"Erkannter Satz\"}", transcription.body());
 
-		final var speech = HttpClient.newHttpClient().send(HttpRequest.newBuilder(
+		final var speechRequest = HttpRequest.newBuilder(
 				URI.create("http://127.0.0.1:" + this.port + "/api/ki/audio/speech"))
 				.header("Authorization", "Basic " + auth).header("X-API-Client", "test")
 				.header("Content-Type", "application/json")
-				.POST(HttpRequest.BodyPublishers.ofString("{\"input\":\"Hallo\"}")).build(),
-				HttpResponse.BodyHandlers.ofByteArray());
-		assertEquals(200, speech.statusCode());
-		assertEquals("audio/wav", speech.headers().firstValue("Content-Type").orElseThrow());
-		assertEquals("RIFF", new String(speech.body(), 0, 4, StandardCharsets.UTF_8));
+				.POST(HttpRequest.BodyPublishers.ofString("{\"input\":\"Hallo\"}")).build();
+		continueSpeech = new CountDownLatch(1);
+		speechWritten = new CountDownLatch(1);
+		final var speechFuture = HttpClient.newHttpClient().sendAsync(speechRequest,
+				HttpResponse.BodyHandlers.ofInputStream());
+		final HttpResponse<java.io.InputStream> speech;
+		try {
+			speech = speechFuture.get(2, TimeUnit.SECONDS);
+			assertEquals(200, speech.statusCode());
+			assertEquals("audio/mpeg", speech.headers().firstValue("Content-Type").orElseThrow());
+			assertEquals('I', speech.body().read());
+			assertEquals(1, continueSpeech.getCount(), "Der erste Chunk muss vor Ende der Synthese ankommen");
+		} finally {
+			continueSpeech.countDown();
+		}
+		assertTrue(speechWritten.await(2, TimeUnit.SECONDS), "Der Upstream muss den Stream vollständig liefern");
+		final byte[] remainingAudio = speech.body().readAllBytes();
+		assertEquals(16386, remainingAudio.length);
+		assertEquals(3, remainingAudio[remainingAudio.length - 2]);
+		assertEquals(4, remainingAudio[remainingAudio.length - 1]);
 	}
 
 	@Test

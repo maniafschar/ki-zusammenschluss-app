@@ -859,9 +859,74 @@ startBooking();
 				signal: playback.controller.signal
 			});
 			if (!res.ok) throw new Error(res.status);
-			const url = URL.createObjectURL(await res.blob());
+			const mimeType = res.headers.get('Content-Type')?.split(';')[0] || 'audio/mpeg';
+			const MediaSourceType = window.MediaSource;
+			if (!res.body || !MediaSourceType?.isTypeSupported(mimeType)) {
+				const url = URL.createObjectURL(await res.blob());
+				urls.push(url);
+				return { player: new Audio(url), streamDone: Promise.resolve() };
+			}
+
+			const mediaSource = new MediaSourceType();
+			const url = URL.createObjectURL(mediaSource);
 			urls.push(url);
-			return url;
+			const player = new Audio(url);
+			await new Promise((resolve, reject) => {
+				mediaSource.addEventListener('sourceopen', resolve, { once: true });
+				mediaSource.addEventListener('error', () => reject(new Error('Audio stream unavailable')), { once: true });
+			});
+			const sourceBuffer = mediaSource.addSourceBuffer(mimeType);
+			const reader = res.body.getReader();
+			let resolveReady;
+			let rejectReady;
+			let firstChunk = true;
+			const ready = new Promise((resolve, reject) => {
+				resolveReady = resolve;
+				rejectReady = reject;
+			});
+			const streamDone = (async () => {
+				try {
+					while (true) {
+						const { value, done } = await reader.read();
+						if (done || playback.cancelled) break;
+						await new Promise((resolve, reject) => {
+							const onUpdateEnd = () => {
+								sourceBuffer.removeEventListener('error', onError);
+								resolve();
+							};
+							const onError = () => {
+								sourceBuffer.removeEventListener('updateend', onUpdateEnd);
+								reject(new Error('Audio stream could not be decoded'));
+							};
+							sourceBuffer.addEventListener('updateend', onUpdateEnd, { once: true });
+							sourceBuffer.addEventListener('error', onError, { once: true });
+							try {
+								sourceBuffer.appendBuffer(value);
+							} catch (error) {
+								sourceBuffer.removeEventListener('updateend', onUpdateEnd);
+								sourceBuffer.removeEventListener('error', onError);
+								reject(error);
+							}
+						});
+						if (firstChunk) {
+							firstChunk = false;
+							resolveReady();
+						}
+					}
+					if (firstChunk && playback.cancelled) {
+						firstChunk = false;
+						resolveReady();
+					}
+					if (firstChunk && !playback.cancelled) throw new Error('Empty audio stream');
+					if (mediaSource.readyState === 'open' && !sourceBuffer.updating) mediaSource.endOfStream();
+				} catch (error) {
+					if (firstChunk) rejectReady(error);
+					throw error;
+				}
+			})();
+			streamDone.catch(() => { });
+			await ready;
+			return { player, streamDone };
 		};
 		const loads = [fetchChunk(reply)];
 		loads[0].catch(() => { });
@@ -888,9 +953,8 @@ startBooking();
 				}
 			}
 			for (let index = 0; index < loads.length && !playback.cancelled; index++) {
-				const audioUrl = await loads[index];
+				const { player, streamDone } = await loads[index];
 				if (playback.cancelled) break;
-				const player = new Audio(audioUrl);
 				playback.player = player;
 				if (playbackAnalyser) {
 					try {
@@ -910,7 +974,7 @@ startBooking();
 					if (!playback.cancelled && (turnId === null || turnId === chatTurn)) state = 'speaking';
 				}, { once: true });
 				await player.play();
-				await finished;
+				await Promise.all([finished, streamDone]);
 				playback.finish = null;
 				source?.disconnect();
 				source = null;

@@ -140,7 +140,7 @@ public class KiChatController {
 			@Value("${app.ki.transcription-model:ohr-datei}") final String transcriptionModel,
 			@Value("${app.ki.speech-model:stimme}") final String speechModel,
 			@Value("${app.ki.speech-voice:1930}") final String speechVoice,
-			@Value("${app.ki.speech-format:wav}") final String speechFormat,
+			@Value("${app.ki.speech-format:mp3}") final String speechFormat,
 			@Value("${app.ki.trust-all-tls:false}") final boolean trustAll) throws Exception {
 		this.baseUrl = baseUrl;
 		this.completionsPath = completionsPath;
@@ -228,7 +228,7 @@ public class KiChatController {
 	}
 
 	@PostMapping(value = "/api/ki/audio/speech", produces = { "audio/mpeg", "audio/wav", "audio/ogg" })
-	public ResponseEntity<byte[]> synthesize(@RequestBody @Valid final SpeechRequest request,
+	public ResponseEntity<StreamingResponseBody> synthesize(@RequestBody @Valid final SpeechRequest request,
 			final HttpServletRequest http) throws IOException, InterruptedException {
 		if (this.apiKey.isBlank())
 			throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE);
@@ -238,18 +238,56 @@ public class KiChatController {
 		body.put("input", request.input());
 		body.put("voice", this.speechVoice);
 		body.put("response_format", this.speechFormat);
+		body.put("stream_format", "audio");
 		final HttpRequest upstream = HttpRequest.newBuilder(URI.create(this.baseUrl + this.speechPath))
 				.timeout(Duration.ofSeconds(120))
 				.header("Authorization", "Bearer " + this.apiKey)
 				.header("Content-Type", MediaType.APPLICATION_JSON_VALUE)
 				.POST(HttpRequest.BodyPublishers.ofString(this.mapper.writeValueAsString(body))).build();
-		final HttpResponse<byte[]> response = this.client.send(upstream, HttpResponse.BodyHandlers.ofByteArray());
-		if (response.statusCode() != 200 || response.body().length == 0) {
+		final HttpResponse<InputStream> response = this.client.send(upstream, HttpResponse.BodyHandlers.ofInputStream());
+		if (response.statusCode() != 200) {
+			response.body().close();
 			log.warn("KI-Sprachausgabe antwortete mit HTTP {}", response.statusCode());
 			throw new ResponseStatusException(HttpStatus.BAD_GATEWAY);
 		}
+		final InputStream audio = response.body();
+		final int firstByte;
+		try {
+			firstByte = audio.read();
+		} catch (final IOException e) {
+			audio.close();
+			throw e;
+		}
+		if (firstByte < 0) {
+			audio.close();
+			log.warn("KI-Sprachausgabe lieferte einen leeren Audiostream");
+			throw new ResponseStatusException(HttpStatus.BAD_GATEWAY);
+		}
+		final StreamingResponseBody stream = output -> {
+			try (audio) {
+				output.write(firstByte);
+				output.flush();
+				final byte[] buffer = new byte[8192];
+				while (true) {
+					final int available = audio.available();
+					final int size;
+					if (available > 0) {
+						size = audio.read(buffer, 0, Math.min(buffer.length, available));
+						if (size < 0)
+							break;
+						output.write(buffer, 0, size);
+					} else {
+						final int value = audio.read();
+						if (value < 0)
+							break;
+						output.write(value);
+					}
+					output.flush();
+				}
+			}
+		};
 		return ResponseEntity.ok().contentType(this.speechMediaType()).header(HttpHeaders.CACHE_CONTROL, "no-store")
-				.body(response.body());
+				.header("X-Accel-Buffering", "no").body(stream);
 	}
 
 	private byte[] transcriptionPayload(final MultipartFile audio, final String boundary) throws IOException {
