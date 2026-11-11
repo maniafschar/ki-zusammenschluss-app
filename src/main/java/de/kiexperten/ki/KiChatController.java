@@ -245,8 +245,14 @@ public class KiChatController {
 				.POST(HttpRequest.BodyPublishers.ofString(this.mapper.writeValueAsString(body))).build();
 		final HttpResponse<InputStream> response = this.client.send(upstream, HttpResponse.BodyHandlers.ofInputStream());
 		if (response.statusCode() != 200) {
-			response.body().close();
-			log.warn("KI-Sprachausgabe antwortete mit HTTP {}", response.statusCode());
+			final String error;
+			try (InputStream errorBody = response.body()) {
+				error = this.readUpstreamError(errorBody, request.input());
+			}
+			if (error.isBlank())
+				log.warn("KI-Sprachausgabe antwortete mit HTTP {}", response.statusCode());
+			else
+				log.warn("KI-Sprachausgabe antwortete mit HTTP {}: {}", response.statusCode(), error);
 			throw new ResponseStatusException(HttpStatus.BAD_GATEWAY);
 		}
 		final InputStream audio = response.body();
@@ -321,6 +327,17 @@ public class KiChatController {
 			case "opus", "ogg" -> MediaType.parseMediaType("audio/ogg");
 			default -> MediaType.parseMediaType("audio/mpeg");
 		};
+	}
+
+	private String readUpstreamError(final InputStream errorBody, final String input) throws IOException {
+		final int maxBytes = 1024;
+		final byte[] bytes = errorBody.readNBytes(maxBytes + 1);
+		final boolean truncated = bytes.length > maxBytes;
+		String error = new String(bytes, 0, Math.min(bytes.length, maxBytes), StandardCharsets.UTF_8);
+		if (!input.isBlank())
+			error = error.replace(input, "[redacted input]");
+		error = error.replaceAll("[\\p{Cntrl}]", " ");
+		return error + (truncated ? "…" : "");
 	}
 
 	public record WelcomeResponse(String gespraechId, String text) {
