@@ -238,7 +238,6 @@ public class KiChatController {
 		body.put("input", request.input());
 		body.put("voice", this.speechVoice);
 		body.put("response_format", this.speechFormat);
-		body.put("stream_format", "audio");
 		final HttpRequest upstream = HttpRequest.newBuilder(URI.create(this.baseUrl + this.speechPath))
 				.timeout(Duration.ofSeconds(120))
 				.header("Authorization", "Bearer " + this.apiKey)
