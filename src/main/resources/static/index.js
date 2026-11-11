@@ -210,6 +210,12 @@ function startBooking() {
 					bookingForm.hidden = true;
 					renderCalendar();
 					renderSlots();
+					if (window.matchMedia('(max-width: 760px)').matches) {
+						el('slots-title').scrollIntoView({
+							behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth',
+							block: 'start'
+						});
+					}
 				});
 			}
 			grid.appendChild(btn);
