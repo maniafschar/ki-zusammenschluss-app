@@ -99,7 +99,7 @@ class KiChatStreamingTest {
 				final String request = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
 				if (!request.contains("\"model\":\"stimme\"") || !request.contains("\"voice\":\"1930\"")
 						|| !request.contains("\"response_format\":\"mp3\"")
-						|| !request.contains("\"stream_format\":\"audio\"")) {
+						|| request.contains("\"stream_format\"")) {
 					exchange.sendResponseHeaders(400, -1);
 					exchange.close();
 					return;
