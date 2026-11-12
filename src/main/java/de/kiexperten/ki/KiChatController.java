@@ -37,6 +37,7 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestPart;
@@ -354,7 +355,21 @@ public class KiChatController {
 		this.limit(http.getRemoteAddr());
 		final String id = UUID.randomUUID().toString();
 		final String frage = this.umfrageZustand(id).path("markdown").asText("");
-		return new WelcomeResponse(id, WELCOME_INTRO + "\n\n" + frage);
+		final String text = WELCOME_INTRO + "\n\n" + frage;
+		this.protokolle.speichereBegruessung(id, text);
+		return new WelcomeResponse(id, text);
+	}
+
+	/**
+	 * Verlauf eines bestätigten Gesprächs, damit der Chat aus dem Bestätigungslink
+	 * an gleicher Stelle fortgesetzt werden kann.
+	 */
+	@GetMapping("/api/ki/gespraech/{id}/verlauf")
+	public List<ChatMessage> verlauf(@PathVariable("id") final String id, final HttpServletRequest http) {
+		this.limit(http.getRemoteAddr());
+		if (this.termine.findByGespraechIdAndStatus(id, "BESTAETIGT").isEmpty())
+			throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+		return this.protokolle.verlauf(id);
 	}
 
 	private ObjectNode umfrageZustand(final String id) throws IOException {

@@ -1,5 +1,7 @@
 package de.kiexperten.booking;
 
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
@@ -41,8 +43,9 @@ public class BestaetigungsMailService {
 	}
 
 	public void send(final String to, final String name, final Instant start, final ZoneId zone,
-			final String token, final int minutesValid) {
-		final String link = this.publicUrl + "?type=termine/bestaetigen&token=" + token;
+			final String token, final int minutesValid, final String gespraechId) {
+		final String link = this.publicUrl + "?type=termine/bestaetigen&token=" + token
+				+ (gespraechId == null ? "" : "&gespraech=" + URLEncoder.encode(gespraechId, StandardCharsets.UTF_8));
 		final JavaMailSender sender = this.mailSender.getIfAvailable();
 		if (sender == null) {
 			LOG.warn("Kein SMTP-Server konfiguriert (spring.mail.host). Bestätigungslink für {}: {}", to, link);

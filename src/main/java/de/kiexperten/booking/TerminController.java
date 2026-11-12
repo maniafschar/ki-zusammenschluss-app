@@ -1,5 +1,7 @@
 package de.kiexperten.booking;
 
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.security.SecureRandom;
 import java.time.DayOfWeek;
 import java.time.Instant;
@@ -82,6 +84,11 @@ public class TerminController {
 		return "ANGEFRAGT".equals(t.getStatus()) && t.getGebuchtAm().plusMinutes(CONFIRM_MINUTES).isBefore(now);
 	}
 
+	private static String gespraechParam(final Termin t) {
+		return t.getGespraechId() == null ? ""
+				: "&gespraech=" + URLEncoder.encode(t.getGespraechId(), StandardCharsets.UTF_8);
+	}
+
 	private static String newToken() {
 		final byte[] bytes = new byte[32];
 		RANDOM.nextBytes(bytes);
@@ -152,7 +159,7 @@ public class TerminController {
 		}
 		try {
 			this.mail.send(termin.getEmail(), termin.getName(), startInstant, zone(request.zeitzone()),
-					termin.getBestaetigungsToken(), CONFIRM_MINUTES);
+					termin.getBestaetigungsToken(), CONFIRM_MINUTES, termin.getGespraechId());
 		} catch (final RuntimeException e) {
 			this.termine.delete(termin);
 			log.error("Email Termin", e);
@@ -180,7 +187,8 @@ public class TerminController {
 			}
 		}
 		final String ziel = "bestaetigt".equals(result)
-				? "/?termin=bestaetigt&start=" + Zeit.instant(found.get().getStartZeit()) + "#kontakt"
+				? "/?termin=bestaetigt&start=" + Zeit.instant(found.get().getStartZeit()) + gespraechParam(found.get())
+						+ "#kontakt"
 				: "/?termin=" + result + "#kontakt";
 		return ResponseEntity.status(HttpStatus.SEE_OTHER).header("Location", ziel).build();
 	}

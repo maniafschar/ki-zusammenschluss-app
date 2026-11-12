@@ -1,6 +1,8 @@
 package de.kiexperten.ki;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 
 import org.slf4j.Logger;
@@ -18,6 +20,32 @@ public class ChatProtokollService {
 
 	public ChatProtokollService(final ChatProtokollRepository repository) {
 		this.repository = repository;
+	}
+
+	void speichereBegruessung(final String gespraechId, final String text) {
+		final var protokoll = new ChatProtokoll();
+		protokoll.setGespraechId(gespraechId);
+		protokoll.setZeitpunkt(Zeit.nowUtc());
+		protokoll.setRolle("assistant");
+		protokoll.setNachricht(text);
+		protokoll.setStatus("ABGESCHLOSSEN");
+		this.repository.saveAndFlush(protokoll);
+	}
+
+	List<KiChatController.ChatMessage> verlauf(final String gespraechId) {
+		final List<KiChatController.ChatMessage> verlauf = new ArrayList<>();
+		for (final ChatProtokoll zeile : this.repository.findByGespraechIdOrderByIdAsc(gespraechId)) {
+			if (!"ABGESCHLOSSEN".equals(zeile.getStatus()))
+				continue;
+			if ("assistant".equals(zeile.getRolle())) {
+				verlauf.add(new KiChatController.ChatMessage("assistant", zeile.getNachricht()));
+				continue;
+			}
+			verlauf.add(new KiChatController.ChatMessage("user", zeile.getNachricht()));
+			if (zeile.getAntwort() != null && !zeile.getAntwort().isBlank())
+				verlauf.add(new KiChatController.ChatMessage("assistant", zeile.getAntwort()));
+		}
+		return verlauf;
 	}
 
 	ChatProtokoll beginne(final KiChatController.ChatRequest request) {
