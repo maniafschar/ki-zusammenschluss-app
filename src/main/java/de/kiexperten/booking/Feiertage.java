@@ -24,8 +24,10 @@ final class Feiertage {
 		days.put(LocalDate.of(year, 11, 1), "Allerheiligen");
 		days.put(LocalDate.of(year, 11, 23).with(TemporalAdjusters.previous(DayOfWeek.WEDNESDAY)),
 				"Buß- und Bettag");
+		days.put(LocalDate.of(year, 12, 24), "Weihnachten");
 		days.put(LocalDate.of(year, 12, 25), "1. Weihnachtstag");
 		days.put(LocalDate.of(year, 12, 26), "2. Weihnachtstag");
+		days.put(LocalDate.of(year, 12, 31), "Silvester");
 
 		final LocalDate easter = ostersonntag(year);
 		days.put(easter.minusDays(2), "Karfreitag");
