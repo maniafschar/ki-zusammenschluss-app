@@ -546,6 +546,10 @@ public class KiChatController {
 				zusammenfassung = this.zusammenfassungAus(status);
 			} else
 				aktuellerSchritt = status.path("step");
+			// Ein bestätigter Termin setzt eine abgeschlossene Umfrage voraus. Der
+			// MCP-Fortschritt ist nur im Speicher; nach einem Neustart fehlt er.
+			if (!umfrageFertig && this.hatBestaetigtenTermin(conversationId))
+				umfrageFertig = true;
 		}
 		if (umfrageFertig)
 			this.nachUmfrage(body, zusammenfassung, conversationId);
@@ -616,6 +620,11 @@ public class KiChatController {
 				+ this.kennenlernterminHinweis(conversationId));
 		body.set("tools", this.mapper.createArrayNode().add(this.wissenWerkzeug()));
 		body.put("tool_choice", "auto");
+	}
+
+	private boolean hatBestaetigtenTermin(final String conversationId) {
+		return conversationId != null
+				&& !this.termine.findByGespraechIdAndStatus(conversationId, "BESTAETIGT").isEmpty();
 	}
 
 	/**
