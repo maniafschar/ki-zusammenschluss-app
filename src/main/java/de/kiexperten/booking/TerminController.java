@@ -179,8 +179,10 @@ public class TerminController {
 				result = "bestaetigt";
 			}
 		}
-		return ResponseEntity.status(HttpStatus.SEE_OTHER).header("Location", "/?termin=" + result + "#kontakt")
-				.build();
+		final String ziel = "bestaetigt".equals(result)
+				? "/?termin=bestaetigt&start=" + Zeit.instant(found.get().getStartZeit()) + "#kontakt"
+				: "/?termin=" + result + "#kontakt";
+		return ResponseEntity.status(HttpStatus.SEE_OTHER).header("Location", ziel).build();
 	}
 
 	@GetMapping("/api/admin/termine")

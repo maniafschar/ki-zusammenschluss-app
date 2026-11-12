@@ -304,10 +304,13 @@ function startBooking() {
 
 	const confirmation = confirmToken
 		? fetch('/ai-expert/api/termine/bestaetigen?token=' + encodeURIComponent(confirmToken))
-			.then(response => new URL(response.url).searchParams.get('termin'))
-			.catch(() => 'ungueltig')
-		: Promise.resolve(new URLSearchParams(window.location.search).get('termin'));
-	Promise.all([loadSlots(), confirmation]).then(([, result]) => {
+			.then(response => {
+				const params = new URL(response.url).searchParams;
+				return { termin: params.get('termin'), start: params.get('start') };
+			})
+			.catch(() => ({ termin: 'ungueltig', start: null }))
+		: Promise.resolve({ termin: new URLSearchParams(window.location.search).get('termin'), start: null });
+	Promise.all([loadSlots(), confirmation]).then(([, { termin: result, start }]) => {
 		const texts = {
 			bestaetigt: ['Vielen Dank! Dein Termin ist bestätigt.', 'ok'],
 			abgelaufen: ['Der Bestätigungslink ist abgelaufen. Bitte buche erneut.', 'error'],
@@ -317,7 +320,7 @@ function startBooking() {
 			el('slots-title').textContent = texts[result][0];
 			el('slots-title').className = 'booking-hint ' + texts[result][1];
 		}
-		if (result === 'bestaetigt') window.dispatchEvent(new CustomEvent('termin-bestaetigt'));
+		if (result === 'bestaetigt') window.dispatchEvent(new CustomEvent('termin-bestaetigt', { detail: { start } }));
 	});
 }
 
@@ -1137,10 +1140,34 @@ startBooking();
 
 	start.addEventListener('click', playWelcome);
 
-	window.addEventListener('termin-bestaetigt', () => {
+	window.addEventListener('termin-bestaetigt', async (event) => {
 		if (state !== 'idle') return;
+		const terminStart = event.detail?.start;
+		const zeit = terminStart ? new Date(terminStart).toLocaleString('de-DE', {
+			timeZone: 'Europe/Berlin', weekday: 'long', day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit'
+		}) : '';
+		const nachricht = zeit
+			? `Super, dein Termin am ${zeit} Uhr ist bestätigt. Ich freue mich schon auf unser Gespräch!`
+			: 'Super, dein Termin ist bestätigt. Ich freue mich schon auf unser Gespräch!';
 		document.getElementById('home')?.scrollIntoView({ behavior: reducedMotion.matches ? 'auto' : 'smooth' });
-		ask('Mein Termin ist gerade bestätigt. Sag mir dazu bitte einen kurzen, netten Spruch.');
+		choiceReady = false;
+		start.hidden = true;
+		text.replaceChildren();
+		const assistant = document.createElement('div');
+		assistant.className = 'chat-turn chat-assistant';
+		const label = document.createElement('strong');
+		label.textContent = 'KI';
+		const message = document.createElement('p');
+		message.textContent = nachricht;
+		assistant.append(label, message);
+		text.append(assistant);
+		mic.hidden = false;
+		mic.disabled = !canRecord;
+		try {
+			await speak(nachricht, chatTurn);
+		} catch (e) {
+			console.error('Sprachausgabe fehlgeschlagen:', e);
+		}
 	});
 
 	function closePrivacyPopup() {
