@@ -417,8 +417,10 @@ public class KiChatController {
 		if (fehler == null || fehler.message() == null || fehler.message().isBlank())
 			return ResponseEntity.badRequest().build();
 		final String message = fehler.message().strip().replaceAll("\\s+", " ");
-		final String quelle = fehler.quelle() == null || fehler.quelle().isBlank() ? "unbekannt" : fehler.quelle().strip();
-		final String note = "Fehler Client: " + StringUtils.truncate(message, 500) + " [" + StringUtils.truncate(quelle, 200)
+		final String quelle = fehler.quelle() == null || fehler.quelle().isBlank() ? "unbekannt"
+				: fehler.quelle().strip();
+		final String note = "Fehler Client: " + StringUtils.truncate(message, 500) + " ["
+				+ StringUtils.truncate(quelle, 200)
 				+ ", " + (fehler.mobil() ? "mobil" : "Desktop") + "]";
 		if (!this.dashboard.todoExistsSimilar("Fehler Client:", note))
 			this.dashboard.addTodo(note, null, null);

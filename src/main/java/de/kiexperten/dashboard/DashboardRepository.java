@@ -106,7 +106,10 @@ public class DashboardRepository {
 				.anyMatch(existing -> key.equals(normalizeNote(existing)));
 	}
 
-	/** Replaces IDs, dates, times and numbers so that variants of the same message match. */
+	/**
+	 * Replaces IDs, dates, times and numbers so that variants of the same message
+	 * match.
+	 */
 	static String normalizeNote(final String text) {
 		return text.toLowerCase(Locale.ROOT)
 				.replaceAll("[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}", "<id>")
