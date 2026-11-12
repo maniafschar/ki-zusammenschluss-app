@@ -856,6 +856,22 @@ startBooking();
 		return decodeURIComponent((document.cookie.match(/(?:^|; )XSRF-TOKEN=([^;]*)/) || [])[1] || '');
 	}
 
+	const gemeldeFehler = new Set();
+	function meldeClientFehler(fehler, quelle) {
+		const message = String(fehler?.message || fehler || 'Unbekannter Fehler').slice(0, 500);
+		const key = quelle + ': ' + message;
+		if (gemeldeFehler.has(key)) return;
+		gemeldeFehler.add(key);
+		csrfToken().then((token) => fetch('/ai-expert/api/ki/client-fehler', {
+			method: 'POST',
+			credentials: 'same-origin',
+			headers: { 'Content-Type': 'application/json', 'X-XSRF-TOKEN': token },
+			body: JSON.stringify({ message, quelle, mobil: /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent) })
+		})).catch(() => { });
+	}
+	window.addEventListener('error', (event) => meldeClientFehler(event.error || event.message, 'window.error'));
+	window.addEventListener('unhandledrejection', (event) => meldeClientFehler(event.reason, 'unhandledrejection'));
+
 	function stopSpeech() {
 		if (!activeSpeech) return;
 		activeSpeech.cancelled = true;

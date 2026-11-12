@@ -3,6 +3,7 @@ package de.kiexperten.dashboard;
 import java.math.BigInteger;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Locale;
 
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
@@ -96,6 +97,23 @@ public class DashboardRepository {
 
 	public List<Todo> todos() {
 		return this.em.createQuery("from Todo order by dueDate asc nulls last, id", Todo.class).getResultList();
+	}
+
+	public boolean todoExistsSimilar(final String prefix, final String note) {
+		final String key = normalizeNote(note);
+		return this.em.createQuery("select t.note from Todo t where t.note like :prefix", String.class)
+				.setParameter("prefix", prefix + "%").getResultList().stream()
+				.anyMatch(existing -> key.equals(normalizeNote(existing)));
+	}
+
+	/** Replaces IDs, dates, times and numbers so that variants of the same message match. */
+	static String normalizeNote(final String text) {
+		return text.toLowerCase(Locale.ROOT)
+				.replaceAll("[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}", "<id>")
+				.replaceAll("\\d{1,4}[.\\-/]\\d{1,2}[.\\-/]\\d{1,4}([ t]\\d{1,2}:\\d{2}(:\\d{2})?)?", "<datum>")
+				.replaceAll("\\d{1,2}:\\d{2}(:\\d{2})?", "<zeit>")
+				.replaceAll("[0-9a-f]{8,}", "<id>")
+				.replaceAll("\\d+", "<zahl>");
 	}
 
 	public Todo addTodo(final String note, final Long expertId, final LocalDate dueDate) {

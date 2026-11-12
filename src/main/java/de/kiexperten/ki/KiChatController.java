@@ -35,6 +35,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -406,6 +407,22 @@ public class KiChatController {
 			markdown.append("\n\nMehrfachauswahl möglich (max. ").append(step.path("maxSelections").asInt(1))
 					.append(" Antworten).");
 		return markdown.toString();
+	}
+
+	record ClientFehler(String message, String quelle, boolean mobil) {
+	}
+
+	@PostMapping("/api/ki/client-fehler")
+	ResponseEntity<Void> clientFehler(@RequestBody final ClientFehler fehler) {
+		if (fehler == null || fehler.message() == null || fehler.message().isBlank())
+			return ResponseEntity.badRequest().build();
+		final String message = fehler.message().strip().replaceAll("\\s+", " ");
+		final String quelle = fehler.quelle() == null || fehler.quelle().isBlank() ? "unbekannt" : fehler.quelle().strip();
+		final String note = "Fehler Client: " + StringUtils.truncate(message, 500) + " [" + StringUtils.truncate(quelle, 200)
+				+ ", " + (fehler.mobil() ? "mobil" : "Desktop") + "]";
+		if (!this.dashboard.todoExistsSimilar("Fehler Client:", note))
+			this.dashboard.addTodo(note, null, null);
+		return ResponseEntity.noContent().build();
 	}
 
 	// for internal use
