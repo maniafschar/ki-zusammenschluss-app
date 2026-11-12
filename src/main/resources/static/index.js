@@ -856,6 +856,7 @@ startBooking();
 		return decodeURIComponent((document.cookie.match(/(?:^|; )XSRF-TOKEN=([^;]*)/) || [])[1] || '');
 	}
 
+	const istMobil = /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
 	const gemeldeFehler = new Set();
 	function meldeClientFehler(fehler, quelle) {
 		const message = String(fehler?.message || fehler || 'Unbekannter Fehler').slice(0, 500);
@@ -866,7 +867,7 @@ startBooking();
 			method: 'POST',
 			credentials: 'same-origin',
 			headers: { 'Content-Type': 'application/json', 'X-XSRF-TOKEN': token },
-			body: JSON.stringify({ message, quelle, mobil: /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent) })
+			body: JSON.stringify({ message, quelle, mobil: istMobil })
 		})).catch(() => { });
 	}
 	window.addEventListener('error', (event) => meldeClientFehler(event.error || event.message, 'window.error'));
@@ -943,7 +944,8 @@ startBooking();
 			if (!res.ok) throw new Error(res.status);
 			const mimeType = res.headers.get('Content-Type')?.split(';')[0] || 'audio/mpeg';
 			const MediaSourceType = window.MediaSource;
-			if (!res.body || !MediaSourceType?.isTypeSupported(mimeType)) {
+			// Mobile Browser spielen gestreamte WAV-Daten über MediaSource nicht zuverlässig ab.
+			if (istMobil || !res.body || !MediaSourceType?.isTypeSupported(mimeType)) {
 				const blob = await res.blob();
 				playback.controller.signal.throwIfAborted();
 				const url = URL.createObjectURL(blob);
