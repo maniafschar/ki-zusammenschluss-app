@@ -1,6 +1,7 @@
 const confirmParams = new URLSearchParams(window.location.search);
-if (confirmParams.get('type') === 'termine/bestaetigen' && confirmParams.get('token')) {
-	window.location.replace('/ai/api/termine/bestaetigen?token=' + encodeURIComponent(confirmParams.get('token')));
+const confirmToken = confirmParams.get('type') === 'termine/bestaetigen' ? confirmParams.get('token') : null;
+if (confirmToken) {
+	history.replaceState(null, '', window.location.pathname);
 }
 
 (function spiderToggle() {
@@ -301,8 +302,12 @@ function startBooking() {
 		}
 	});
 
-	loadSlots().then(() => {
-		const result = new URLSearchParams(window.location.search).get('termin');
+	const confirmation = confirmToken
+		? fetch('/ai/api/termine/bestaetigen?token=' + encodeURIComponent(confirmToken))
+			.then(response => new URL(response.url).searchParams.get('termin'))
+			.catch(() => 'ungueltig')
+		: Promise.resolve(new URLSearchParams(window.location.search).get('termin'));
+	Promise.all([loadSlots(), confirmation]).then(([, result]) => {
 		const texts = {
 			bestaetigt: ['Vielen Dank! Dein Termin ist bestätigt.', 'ok'],
 			abgelaufen: ['Der Bestätigungslink ist abgelaufen. Bitte buche erneut.', 'error'],

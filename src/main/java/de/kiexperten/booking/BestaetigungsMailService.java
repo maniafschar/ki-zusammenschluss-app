@@ -18,7 +18,9 @@ import org.springframework.web.util.HtmlUtils;
 import jakarta.mail.MessagingException;
 import jakarta.mail.internet.MimeMessage;
 
-/** Sends the confirmation link; without SMTP settings the link is only logged. */
+/**
+ * Sends the confirmation link; without SMTP settings the link is only logged.
+ */
 @Service
 public class BestaetigungsMailService {
 
@@ -66,7 +68,8 @@ public class BestaetigungsMailService {
 		}
 	}
 
-	// Inline styles and tables only: most mail clients ignore <style> blocks and modern layout.
+	// Inline styles and tables only: most mail clients ignore <style> blocks and
+	// modern layout.
 	private static String html(final String name, final String when, final String link, final int minutes) {
 		final String n = HtmlUtils.htmlEscape(name);
 		final String w = HtmlUtils.htmlEscape(when);
@@ -89,6 +92,7 @@ public class BestaetigungsMailService {
 				<p style="margin:0 0 8px;font-size:14px;color:#5b6b7d;">Funktioniert der Button nicht? Kopiere diesen Link in Deinen Browser:<br><a href="%s" style="color:#0f9d7a;word-break:break-all;">%s</a></p>
 				<p style="margin:16px 0 0;font-size:13px;color:#5b6b7d;">Wenn Du den Termin nicht angefragt hast, ignoriere diese Nachricht einfach.</p>
 				</td></tr></table></td></tr></table></body></html>
-				""".formatted(n, w, l, minutes, l, l);
+				"""
+				.formatted(n, w, l, minutes, l, l);
 	}
 }
