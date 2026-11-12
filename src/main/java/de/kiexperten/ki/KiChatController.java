@@ -45,6 +45,7 @@ import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
@@ -243,7 +244,8 @@ public class KiChatController {
 				.header("Authorization", "Bearer " + this.apiKey)
 				.header("Content-Type", MediaType.APPLICATION_JSON_VALUE)
 				.POST(HttpRequest.BodyPublishers.ofString(this.mapper.writeValueAsString(body))).build();
-		final HttpResponse<InputStream> response = this.client.send(upstream, HttpResponse.BodyHandlers.ofInputStream());
+		final HttpResponse<InputStream> response = this.client.send(upstream,
+				HttpResponse.BodyHandlers.ofInputStream());
 		if (response.statusCode() != 200) {
 			final String error;
 			try (InputStream errorBody = response.body()) {
@@ -387,6 +389,7 @@ public class KiChatController {
 		return markdown.toString();
 	}
 
+	// for internal use
 	@PostMapping("/api/ki/chat")
 	public ChatResponse chat(@RequestBody @Valid final ChatRequest request, final HttpServletRequest http)
 			throws Exception {
@@ -494,6 +497,11 @@ public class KiChatController {
 		if (this.requirementsMcp != null) {
 			body.set("tools", this.requirementsMcp.toolDefinitions());
 			body.put("tool_choice", "auto");
+		}
+		try {
+			log.info(this.mapper.writeValueAsString(body));
+		} catch (final JsonProcessingException e) {
+			// log info, no more
 		}
 		return body;
 	}
