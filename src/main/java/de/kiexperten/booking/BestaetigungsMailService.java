@@ -40,7 +40,7 @@ public class BestaetigungsMailService {
 
 	public void send(final String to, final String name, final Instant start, final ZoneId zone,
 			final String token, final int minutesValid) {
-		final String link = this.publicUrl + "/api/termine/bestaetigen?token=" + token;
+		final String link = this.publicUrl + "?type=termine/bestaetigen&token=" + token;
 		final JavaMailSender sender = this.mailSender.getIfAvailable();
 		if (sender == null) {
 			LOG.warn("Kein SMTP-Server konfiguriert (spring.mail.host). Bestätigungslink für {}: {}", to, link);

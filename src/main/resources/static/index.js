@@ -1,3 +1,8 @@
+const confirmParams = new URLSearchParams(window.location.search);
+if (confirmParams.get('type') === 'termine/bestaetigen' && confirmParams.get('token')) {
+	window.location.replace('/ai/api/termine/bestaetigen?token=' + encodeURIComponent(confirmParams.get('token')));
+}
+
 (function spiderToggle() {
 	const spider = document.getElementById('spider');
 	const core = document.getElementById('spider-core');
