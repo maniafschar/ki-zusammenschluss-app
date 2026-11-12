@@ -16,6 +16,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import java.util.UUID;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -147,7 +148,8 @@ public class TerminController {
 		termin.setEmail(request.email().trim());
 		termin.setTelefon(request.telefon() == null || request.telefon().isBlank() ? null : request.telefon().trim());
 		termin.setNachricht(request.nachricht() == null ? null : request.nachricht().trim());
-		termin.setGespraechId(request.gespraechId() == null || request.gespraechId().isBlank() ? null
+		termin.setGespraechId(request.gespraechId() == null || request.gespraechId().isBlank()
+				? UUID.randomUUID().toString()
 				: request.gespraechId().trim());
 		termin.setGebuchtAm(now);
 		termin.setStatus("ANGEFRAGT");

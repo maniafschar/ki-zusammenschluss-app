@@ -40,6 +40,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
@@ -351,9 +352,12 @@ public class KiChatController {
 	 * KI die Umfrage im Chat.
 	 */
 	@GetMapping("/api/ki/welcome")
-	public WelcomeResponse welcome(final HttpServletRequest http) throws IOException {
+	public WelcomeResponse welcome(@RequestParam(value = "gespraechId", required = false) final String gespraechId,
+			final HttpServletRequest http) throws IOException {
 		this.limit(http.getRemoteAddr());
-		final String id = UUID.randomUUID().toString();
+		final boolean bestaetigt = gespraechId != null
+				&& !this.termine.findByGespraechIdAndStatus(gespraechId, "BESTAETIGT").isEmpty();
+		final String id = bestaetigt ? gespraechId : UUID.randomUUID().toString();
 		final String frage = this.umfrageZustand(id).path("markdown").asText("");
 		final String text = WELCOME_INTRO + "\n\n" + frage;
 		this.protokolle.speichereBegruessung(id, text);

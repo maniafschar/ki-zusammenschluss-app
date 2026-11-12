@@ -1113,7 +1113,8 @@ startBooking();
 		start.disabled = true;
 		let welcome;
 		try {
-			const res = await fetch('/ai-expert/api/ki/welcome', { credentials: 'same-origin' });
+			const params = gespraechId ? '?gespraechId=' + encodeURIComponent(gespraechId) : '';
+			const res = await fetch('/ai-expert/api/ki/welcome' + params, { credentials: 'same-origin' });
 			if (!res.ok) throw new Error(res.status);
 			({ gespraechId, text: welcome } = await res.json());
 			if (document.getElementById('booking-form')) document.getElementById('booking-form').dataset.gespraechId = gespraechId;
