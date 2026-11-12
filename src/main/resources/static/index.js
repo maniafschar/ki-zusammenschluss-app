@@ -1116,6 +1116,7 @@ startBooking();
 			const res = await fetch('/ai-expert/api/ki/welcome', { credentials: 'same-origin' });
 			if (!res.ok) throw new Error(res.status);
 			({ gespraechId, text: welcome } = await res.json());
+			if (document.getElementById('booking-form')) document.getElementById('booking-form').dataset.gespraechId = gespraechId;
 		} catch (e) {
 			console.error('Begrüßung konnte nicht geladen werden:', e);
 			text.textContent = 'Die Begrüßung konnte gerade nicht geladen werden. Bitte versuche es erneut.';
@@ -1430,6 +1431,7 @@ startBooking();
 			}
 			if (!res.ok) throw new Error(res.status);
 			gespraechId = res.headers.get('X-Chat-Id') || gespraechId;
+			if (document.getElementById('booking-form')) document.getElementById('booking-form').dataset.gespraechId = gespraechId || '';
 			if (!res.body) throw new Error('Streaming wird nicht unterstützt');
 			const reader = res.body.getReader();
 			const decoder = new TextDecoder();
