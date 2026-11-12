@@ -8,14 +8,36 @@ class Element {
 	constructor() {
 		this.listeners = {};
 		this.dataset = {};
+		this.attributes = {};
 		this.classList = { add() {}, remove() {}, contains() { return false; } };
 		this.children = [];
 	}
 	addEventListener(type, listener) { this.listeners[type] = listener; }
 	append(...children) { this.children.push(...children); }
 	replaceChildren(...children) { this.children = children; }
-	setAttribute() {}
-	querySelector() { return null; }
+	setAttribute(name, value) { this.attributes[name] = value; }
+	getAttribute(name) { return this.attributes[name] ?? null; }
+	get textContent() {
+		return this._textContent ?? this.children.map((child) => child.textContent || '').join('');
+	}
+	set textContent(value) { this._textContent = String(value); }
+	querySelector(selector) {
+		const matches = (node) => {
+			if (selector.includes('[data-chat-choice]') && !node.dataset?.chatChoice) return false;
+			if (selector.includes('[data-chat-submit-multiple]') && !Object.hasOwn(node.dataset || {}, 'chatSubmitMultiple')) return false;
+			if (selector.includes('[aria-pressed="true"]') && node.getAttribute?.('aria-pressed') !== 'true') return false;
+			return true;
+		};
+		const find = (node) => {
+			for (const child of node.children || []) {
+				if (matches(child)) return child;
+				const match = find(child);
+				if (match) return match;
+			}
+			return null;
+		};
+		return find(this);
+	}
 	scrollTo() {}
 	getContext() { return null; }
 }
@@ -40,7 +62,8 @@ function setup(fetch) {
 	}
 	const window = {
 		MediaRecorder: class {},
-		matchMedia: () => ({ matches: true, addEventListener() {} })
+		matchMedia: () => ({ matches: true, addEventListener() {} }),
+		addEventListener() {}
 	};
 	const navigator = { mediaDevices: { getUserMedia: () => new Promise(() => {}) } };
 	let source = fs.readFileSync(path.join(__dirname, '../../main/resources/static/index.js'), 'utf8');
@@ -48,7 +71,7 @@ function setup(fetch) {
 	const importStart = source.indexOf("\timport('https://");
 	const importEnd = source.indexOf('\n\tasync function csrfToken', importStart);
 	source = source.slice(0, importStart) + source.slice(importEnd);
-	source = source.replace(/\n\}\)\(\);\s*$/, '\n globalThis.chat = { ask, stopTurn, submitChatAnswer };\n})();');
+	source = source.replace(/\n\}\)\(\);\s*$/, '\n globalThis.chat = { ask, stopTurn, submitChatAnswer, showPreviousQuestion, steps, history, get currentStepIndex() { return currentStepIndex; }, set currentStepIndex(value) { currentStepIndex = value; } };\n})();');
 	const context = {
 		window, document, navigator, fetch, Audio, AbortController, TextDecoder, Uint8Array,
 		URL: { createObjectURL: () => 'blob:test', revokeObjectURL() {} },
@@ -189,4 +212,55 @@ test('a new question excludes an interrupted turn even while its reader is still
 	assert.deepEqual(requests[1].messages, [{ role: 'user', content: 'Neue Frage' }]);
 	firstStream.close();
 	await first;
+});
+
+test('going back restores the previous choices without replaying speech', () => {
+	let requests = 0;
+	const { chat, elements } = setup(async () => { requests++; throw new Error('Unexpected request'); });
+	chat.steps.push({
+		question: 'Bisherige Antwort',
+		reply: 'Mehrfachauswahl\n- Alpha\n- Beta',
+		choices: true,
+		selectedOptions: ['Beta'],
+		answerValue: 'Beta',
+		historyLengthBeforeAnswer: 1
+	}, {
+		question: 'Beta',
+		reply: 'Nächste Frage:\n- Ja\n- Nein',
+		choices: true,
+		selectedOptions: [],
+		answerValue: '',
+		historyLengthBeforeAnswer: 1
+	});
+	chat.currentStepIndex = 1;
+	chat.history.push(
+		{ role: 'assistant', content: 'Begrüßung' },
+		{ role: 'user', content: 'Beta' },
+		{ role: 'assistant', content: 'Nächste Frage' }
+	);
+
+	chat.showPreviousQuestion();
+
+	assert.equal(chat.currentStepIndex, 0);
+	assert.equal(chat.history.length, 1);
+	assert.equal(chat.history[0].content, 'Begrüßung');
+	const find = (node, predicate) => {
+		if (predicate(node)) return node;
+		for (const child of node.children || []) {
+			const match = find(child, predicate);
+			if (match) return match;
+		}
+		return null;
+	};
+	const findChoice = (node) => {
+		if (node.dataset?.chatChoice === 'Beta') return node;
+		for (const child of node.children || []) {
+			const match = findChoice(child);
+			if (match) return match;
+		}
+		return null;
+	};
+	assert.equal(findChoice(elements.get('voice-text')).getAttribute('aria-pressed'), 'true');
+	assert.equal(find(elements.get('voice-text'), (node) => Object.hasOwn(node.dataset || {}, 'chatSubmitMultiple')).disabled, false);
+	assert.equal(requests, 0);
 });

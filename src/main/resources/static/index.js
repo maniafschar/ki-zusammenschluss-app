@@ -390,6 +390,8 @@ startBooking();
 		mic.title = 'Audioaufnahme wird von diesem Browser nicht unterstützt';
 	}
 	const history = [];
+	const steps = [];
+	let currentStepIndex = -1;
 	let gespraechId = null;
 	let state = 'idle'; // idle | listening | thinking | speaking
 	let recorder = null;
@@ -476,9 +478,10 @@ startBooking();
 			.replace(/\*\*|__|\*|_|`/g, '').trim();
 	}
 
-	function renderMarkdown(parent, markdown, choices = false) {
+	function renderMarkdown(parent, markdown, choices = false, { selectedOptions = [], answerValue = '' } = {}) {
 		const source = String(markdown ?? '');
 		const multiple = choices && /Mehrfachauswahl/i.test(source);
+		const selected = new Set(selectedOptions);
 		const maxMatch = source.match(/max(?:imal)?\.?\s*(\d+)\s*Antworten?/i);
 		const maxSelections = maxMatch ? Number(maxMatch[1]) : 0;
 		let list = null;
@@ -492,7 +495,7 @@ startBooking();
 				submit.className = 'chat-multiselect-submit';
 				submit.dataset.chatSubmitMultiple = '';
 				submit.textContent = 'Auswahl übernehmen';
-				submit.disabled = true;
+				submit.disabled = !choiceGroup.querySelector('[data-chat-choice][aria-pressed="true"]');
 				choiceGroup.append(submit);
 			}
 			list = null;
@@ -512,6 +515,7 @@ startBooking();
 				input.maxLength = 2000;
 				input.required = true;
 				input.placeholder = freeText[1].replace(/\*+$/g, '').trim();
+				input.value = answerValue;
 				input.setAttribute('aria-label', 'Deine Antwort');
 				const submit = document.createElement('button');
 				submit.type = 'submit';
@@ -552,7 +556,7 @@ startBooking();
 					button.className = 'voice-choice';
 					appendInlineMarkdown(button, label);
 					button.dataset.chatChoice = button.textContent.trim();
-					if (multiple) button.setAttribute('aria-pressed', 'false');
+					button.setAttribute('aria-pressed', String(selected.has(button.dataset.chatChoice)));
 					entry.append(button);
 				} else {
 					appendInlineMarkdown(entry, label);
@@ -571,7 +575,8 @@ startBooking();
 	}
 
 	function renderConversation(question, reply, {
-		choices = false, status = '', thinking = false, thinkingQuote = ''
+		choices = false, status = '', thinking = false, thinkingQuote = '',
+		selectedOptions = [], answerValue = '', showBack = false
 	} = {}) {
 		text.replaceChildren();
 		const user = document.createElement('div');
@@ -587,7 +592,7 @@ startBooking();
 		const assistantLabel = document.createElement('strong');
 		assistantLabel.textContent = 'KI';
 		assistant.append(assistantLabel);
-		if (reply) renderMarkdown(assistant, reply, choices);
+		if (reply) renderMarkdown(assistant, reply, choices, { selectedOptions, answerValue });
 		if (thinking) {
 			const indicator = document.createElement('div');
 			indicator.className = 'chat-thinking';
@@ -617,8 +622,19 @@ startBooking();
 			detail.textContent = status;
 			assistant.append(detail);
 		}
+		if (showBack) appendBackButton(assistant);
 		if (reply || status || thinking) text.append(assistant);
 		text.scrollTo({ top: 0, behavior: reducedMotion.matches ? 'auto' : 'smooth' });
+	}
+
+	function appendBackButton(parent) {
+		const button = document.createElement('button');
+		button.type = 'button';
+		button.className = 'chat-back';
+		button.dataset.chatBack = '';
+		button.textContent = 'Zurück';
+		button.setAttribute('aria-label', 'Zurück zur vorherigen Frage');
+		parent.append(button);
 	}
 
 	function draw(t) {
@@ -1137,14 +1153,17 @@ startBooking();
 		}
 	}
 
-	function renderWelcome(markdown) {
+	function renderWelcome(markdown, {
+		selectedOptions = [], answerValue = '', showBack = false
+	} = {}) {
 		text.replaceChildren();
 		const assistant = document.createElement('div');
 		assistant.className = 'chat-turn chat-assistant';
 		const label = document.createElement('strong');
 		label.textContent = 'KI';
 		assistant.append(label);
-		renderMarkdown(assistant, markdown, true);
+		renderMarkdown(assistant, markdown, true, { selectedOptions, answerValue });
+		if (showBack) appendBackButton(assistant);
 		text.append(assistant);
 	}
 
@@ -1165,6 +1184,15 @@ startBooking();
 			return;
 		}
 		history.push({ role: 'assistant', content: welcome });
+		steps.splice(0, steps.length, {
+			question: '',
+			reply: welcome,
+			choices: true,
+			selectedOptions: [],
+			answerValue: '',
+			historyLengthBeforeAnswer: history.length
+		});
+		currentStepIndex = 0;
 		start.hidden = true;
 		renderWelcome(welcome);
 		choiceReady = true;
@@ -1306,12 +1334,48 @@ startBooking();
 		if (!choiceReady || state === 'listening' || !String(answer).trim()) return;
 		const value = String(answer).trim();
 		const ausMultipleChoice = Boolean(text.querySelector('.chat-choices'));
+		const step = steps[currentStepIndex];
+		if (step) {
+			step.selectedOptions = auswahl || [];
+			step.answerValue = value;
+			steps.splice(currentStepIndex + 1);
+		}
 		choiceReady = false;
 		stopTurn();
 		ask(value, auswahl, ausMultipleChoice);
 	}
 
+	function showPreviousQuestion() {
+		if (currentStepIndex <= 0) return;
+		stopTurn();
+		currentStepIndex--;
+		const step = steps[currentStepIndex];
+		history.splice(step.historyLengthBeforeAnswer);
+		if (step.question) {
+			renderConversation(step.question, step.reply, {
+				choices: step.choices,
+				selectedOptions: step.selectedOptions,
+				answerValue: step.answerValue,
+				showBack: currentStepIndex > 0
+			});
+		} else {
+			renderWelcome(step.reply, {
+				selectedOptions: step.selectedOptions,
+				answerValue: step.answerValue,
+				showBack: currentStepIndex > 0
+			});
+		}
+		choiceReady = true;
+		state = 'idle';
+		mic.disabled = !canRecord;
+	}
+
 	text.addEventListener('click', (event) => {
+		const back = event.target.closest('[data-chat-back]');
+		if (back && currentStepIndex > 0) {
+			showPreviousQuestion();
+			return;
+		}
 		const button = event.target.closest('[data-chat-choice]');
 		if (button && !button.disabled && choiceReady && state !== 'listening') {
 			const group = button.closest('.chat-choices');
@@ -1383,6 +1447,8 @@ startBooking();
 	}
 
 	async function ask(question, auswahl = null, ausMultipleChoice = false) {
+		const previousStep = steps[currentStepIndex];
+		const historyLengthBeforeAnswer = previousStep?.historyLengthBeforeAnswer ?? history.length;
 		const turnId = ++chatTurn;
 		const controller = new AbortController();
 		choiceReady = false;
@@ -1517,7 +1583,20 @@ startBooking();
 			if (!reply.trim()) throw new Error('Die KI hat keine Antwort geliefert.');
 			controller.signal.throwIfAborted();
 			history.push({ role: 'assistant', content: reply.trim() });
-			renderConversation(question, reply.trim(), { choices: !terminBestaetigt });
+			steps.splice(currentStepIndex + 1);
+			steps.push({
+				question,
+				reply: reply.trim(),
+				choices: !terminBestaetigt,
+				selectedOptions: [],
+				answerValue: '',
+				historyLengthBeforeAnswer
+			});
+			currentStepIndex = steps.length - 1;
+			renderConversation(question, reply.trim(), {
+				choices: !terminBestaetigt,
+				showBack: currentStepIndex > 0
+			});
 			choiceReady = !terminBestaetigt;
 			if (zusammenfassung) zeigeZusammenfassung(zusammenfassung);
 			closeSpeech();
