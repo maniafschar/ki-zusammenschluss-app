@@ -1190,7 +1190,7 @@ startBooking();
 			choices: true,
 			selectedOptions: [],
 			answerValue: '',
-			historyLengthBeforeAnswer: history.length
+			historyLength: history.length
 		});
 		currentStepIndex = 0;
 		start.hidden = true;
@@ -1350,7 +1350,7 @@ startBooking();
 		stopTurn();
 		currentStepIndex--;
 		const step = steps[currentStepIndex];
-		history.splice(step.historyLengthBeforeAnswer);
+		history.splice(step.historyLength);
 		if (step.question) {
 			renderConversation(step.question, step.reply, {
 				choices: step.choices,
@@ -1447,8 +1447,6 @@ startBooking();
 	}
 
 	async function ask(question, auswahl = null, ausMultipleChoice = false) {
-		const previousStep = steps[currentStepIndex];
-		const historyLengthBeforeAnswer = previousStep?.historyLengthBeforeAnswer ?? history.length;
 		const turnId = ++chatTurn;
 		const controller = new AbortController();
 		choiceReady = false;
@@ -1590,7 +1588,7 @@ startBooking();
 				choices: !terminBestaetigt,
 				selectedOptions: [],
 				answerValue: '',
-				historyLengthBeforeAnswer
+				historyLength: history.length
 			});
 			currentStepIndex = steps.length - 1;
 			renderConversation(question, reply.trim(), {

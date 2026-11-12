@@ -23,6 +23,7 @@ class Element {
 	set textContent(value) { this._textContent = String(value); }
 	querySelector(selector) {
 		const matches = (node) => {
+			if (selector === '.chat-choices' && !node.className?.split(' ').includes('chat-choices')) return false;
 			if (selector.includes('[data-chat-choice]') && !node.dataset?.chatChoice) return false;
 			if (selector.includes('[data-chat-submit-multiple]') && !Object.hasOwn(node.dataset || {}, 'chatSubmitMultiple')) return false;
 			if (selector.includes('[aria-pressed="true"]') && node.getAttribute?.('aria-pressed') !== 'true') return false;
@@ -214,36 +215,46 @@ test('a new question excludes an interrupted turn even while its reader is still
 	await first;
 });
 
-test('going back restores the previous choices without replaying speech', () => {
+test('answering again after going back preserves prior messages without replaying speech', async () => {
 	let requests = 0;
-	const { chat, elements } = setup(async () => { requests++; throw new Error('Unexpected request'); });
+	const bodies = [];
+	const { chat, elements } = setup(async (url, options) => {
+		if (url.endsWith('/csrf')) return ok;
+		if (url.endsWith('/chat/stream')) {
+			requests++;
+			bodies.push(JSON.parse(options.body));
+			return new Promise(() => {});
+		}
+		throw new Error(`Unexpected request: ${url}`);
+	});
 	chat.steps.push({
-		question: 'Bisherige Antwort',
+		question: 'Beta',
 		reply: 'Mehrfachauswahl\n- Alpha\n- Beta',
 		choices: true,
 		selectedOptions: ['Beta'],
 		answerValue: 'Beta',
-		historyLengthBeforeAnswer: 1
+		historyLength: 3
 	}, {
-		question: 'Beta',
+		question: 'Gamma',
 		reply: 'Nächste Frage:\n- Ja\n- Nein',
 		choices: true,
 		selectedOptions: [],
 		answerValue: '',
-		historyLengthBeforeAnswer: 1
+		historyLength: 5
 	});
 	chat.currentStepIndex = 1;
 	chat.history.push(
 		{ role: 'assistant', content: 'Begrüßung' },
 		{ role: 'user', content: 'Beta' },
+		{ role: 'assistant', content: 'Mehrfachauswahl\n- Alpha\n- Beta' },
+		{ role: 'user', content: 'Gamma' },
 		{ role: 'assistant', content: 'Nächste Frage' }
 	);
 
 	chat.showPreviousQuestion();
 
 	assert.equal(chat.currentStepIndex, 0);
-	assert.equal(chat.history.length, 1);
-	assert.equal(chat.history[0].content, 'Begrüßung');
+	assert.equal(chat.history.length, 3);
 	const find = (node, predicate) => {
 		if (predicate(node)) return node;
 		for (const child of node.children || []) {
@@ -262,5 +273,13 @@ test('going back restores the previous choices without replaying speech', () => 
 	};
 	assert.equal(findChoice(elements.get('voice-text')).getAttribute('aria-pressed'), 'true');
 	assert.equal(find(elements.get('voice-text'), (node) => Object.hasOwn(node.dataset || {}, 'chatSubmitMultiple')).disabled, false);
-	assert.equal(requests, 0);
+	chat.submitChatAnswer('Alpha', ['Alpha']);
+	await until(() => requests === 1);
+	assert.deepEqual(bodies[0].messages, [
+		{ role: 'assistant', content: 'Begrüßung' },
+		{ role: 'user', content: 'Beta' },
+		{ role: 'assistant', content: 'Mehrfachauswahl\n- Alpha\n- Beta' },
+		{ role: 'user', content: 'Alpha' }
+	]);
+	assert.equal(requests, 1);
 });
