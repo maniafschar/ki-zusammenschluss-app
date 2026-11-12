@@ -317,6 +317,7 @@ function startBooking() {
 			el('slots-title').textContent = texts[result][0];
 			el('slots-title').className = 'booking-hint ' + texts[result][1];
 		}
+		if (result === 'bestaetigt') window.dispatchEvent(new CustomEvent('termin-bestaetigt'));
 	});
 }
 
@@ -1135,6 +1136,12 @@ startBooking();
 	}
 
 	start.addEventListener('click', playWelcome);
+
+	window.addEventListener('termin-bestaetigt', () => {
+		if (state !== 'idle') return;
+		document.getElementById('home')?.scrollIntoView({ behavior: reducedMotion.matches ? 'auto' : 'smooth' });
+		ask('Mein Termin ist gerade bestätigt. Sag mir dazu bitte einen kurzen, netten Spruch.');
+	});
 
 	function closePrivacyPopup() {
 		if (privacyPopup.hidden) return;
