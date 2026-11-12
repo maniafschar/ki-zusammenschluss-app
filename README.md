@@ -187,6 +187,10 @@ sequenceDiagram
 2. Buchung wird angelegt; Bestätigungslink per E-Mail (ohne `spring.mail.host` nur im Log).
 3. Bestätigung über den Link schließt die Buchung ab.
 
+Gesetzliche Feiertage aller Bundesländer einschließlich örtlicher Feiertage sind in Berliner Zeit
+ausgeschlossen. Ein Klick auf den Feiertag im Kalender zeigt seinen Namen an; auch die Buchungs-API
+lehnt diese Tage ab.
+
 ### 6.3 Admin-Bereich
 
 Anmeldung per HTTP Basic (`ADMIN_USER`, `ADMIN_PASSWORD`). Änderungen laufen über die Dashboard-API; Lesezugriffe liefern verschlüsselte Payloads.
