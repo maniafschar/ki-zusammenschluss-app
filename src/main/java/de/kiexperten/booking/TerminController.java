@@ -15,6 +15,8 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -37,6 +39,7 @@ import jakarta.validation.constraints.Size;
 
 @RestController
 public class TerminController {
+	private static final Logger log = LoggerFactory.getLogger(TerminController.class);
 
 	static final ZoneId ZONE = ZoneId.of("Europe/Berlin");
 	static final LocalTime FIRST_SLOT = LocalTime.of(10, 0);
@@ -152,6 +155,7 @@ public class TerminController {
 					termin.getBestaetigungsToken(), CONFIRM_MINUTES);
 		} catch (final RuntimeException e) {
 			this.termine.delete(termin);
+			log.error("Email Termin", e);
 			throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "E-Mail konnte nicht gesendet werden");
 		}
 		return ResponseEntity.status(HttpStatus.CREATED).body(new BuchungAntwort(startInstant));
