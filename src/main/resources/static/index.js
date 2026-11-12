@@ -145,13 +145,17 @@ function startBooking() {
 	const dateKey = (y, m, d) => `${y}-${pad(m + 1)}-${pad(d)}`;
 
 	let slotsByDay = {};
+	let holidays = {};
 	let firstMonth = null;
 	let lastMonth = null;
 	let view = null;
 	let selectedDay = null;
 	let selectedSlot = null;
 
-	const timeOf = (iso) => new Date(iso).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+	const timeOf = (iso) => new Date(iso).toLocaleTimeString('de-DE',
+		{ timeZone: 'Europe/Berlin', hour: '2-digit', minute: '2-digit' });
+	const berlinDateParts = new Intl.DateTimeFormat('en-CA',
+		{ timeZone: 'Europe/Berlin', year: 'numeric', month: '2-digit', day: '2-digit' });
 	const monthIndex = (key) => Number(key.slice(0, 4)) * 12 + Number(key.slice(5, 7)) - 1;
 
 	function setMessage(text, kind = '') {
@@ -162,14 +166,18 @@ function startBooking() {
 
 	async function loadSlots() {
 		try {
-			const slots = await fetch('/ai-expert/api/termine').then((r) => {
-				if (!r.ok) throw new Error('HTTP ' + r.status);
-				return r.json();
-			});
+			const [slots, holidayDays] = await Promise.all(
+				['/ai-expert/api/termine', '/ai-expert/api/termine/feiertage'].map((url) =>
+					fetch(url).then((r) => {
+						if (!r.ok) throw new Error('HTTP ' + r.status);
+						return r.json();
+					})));
+			holidays = holidayDays;
 			slotsByDay = {};
 			slots.forEach((s) => {
-				const d = new Date(s.start);
-				(slotsByDay[dateKey(d.getFullYear(), d.getMonth(), d.getDate())] ||= []).push(s);
+				const parts = berlinDateParts.formatToParts(new Date(s.start));
+				const part = (type) => parts.find((p) => p.type === type).value;
+				(slotsByDay[`${part('year')}-${part('month')}-${part('day')}`] ||= []).push(s);
 			});
 			const days = Object.keys(slotsByDay).sort();
 			if (!days.length) {
@@ -202,14 +210,28 @@ function startBooking() {
 		const daysInMonth = new Date(year, month + 1, 0).getDate();
 		for (let d = 1; d <= daysInMonth; d += 1) {
 			const key = dateKey(year, month, d);
-			const free = (slotsByDay[key] || []).some((s) => s.frei);
+			const holiday = holidays[key];
+			const free = !holiday && (slotsByDay[key] || []).some((s) => s.frei);
 			const btn = document.createElement('button');
 			btn.type = 'button';
 			btn.textContent = d;
-			btn.className = 'cal-day' + (free ? ' available' : '') + (key === selectedDay ? ' selected' : '');
-			btn.disabled = !free;
-			if (free) {
+			btn.className = 'cal-day' + (free ? ' available' : '') + (holiday ? ' holiday' : '')
+				+ (key === selectedDay ? ' selected' : '');
+			btn.disabled = !free && !holiday;
+			if (holiday) {
+				btn.setAttribute('aria-label', `${d}. ${MONTHS[month]}: ${holiday}, keine Termine`);
 				btn.addEventListener('click', () => {
+					selectedDay = null;
+					selectedSlot = null;
+					bookingForm.hidden = true;
+					el('slots').innerHTML = '';
+					el('slots-title').textContent = `${holiday} – keine Termine verfügbar.`;
+					el('cal-status').textContent = `${holiday} – keine Termine verfügbar.`;
+					renderCalendar();
+				});
+			} else if (free) {
+				btn.addEventListener('click', () => {
+					el('cal-status').textContent = '';
 					el('slots').classList.add('slots');
 					selectedDay = key;
 					selectedSlot = null;

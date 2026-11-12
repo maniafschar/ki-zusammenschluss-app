@@ -14,6 +14,7 @@ import java.util.ArrayList;
 import java.util.Base64;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -104,6 +105,7 @@ public class TerminController {
 		// are UTC.
 		final LocalDate firstDay = LocalDate.now(ZONE);
 		final LocalDate lastDay = firstDay.plusDays(DAYS_AHEAD);
+		final Map<LocalDate, String> feiertage = feiertage(firstDay);
 		final Set<Instant> booked = new HashSet<>();
 		this.termine.findByAktiverStartZeitGreaterThanEqualAndAktiverStartZeitLessThan(
 				Zeit.utc(firstDay.atStartOfDay(ZONE).toInstant()),
@@ -112,7 +114,7 @@ public class TerminController {
 
 		final List<Slot> result = new ArrayList<>();
 		for (LocalDate day = firstDay; !day.isAfter(lastDay); day = day.plusDays(1)) {
-			if (!isWorkday(day)) {
+			if (!isWorkday(day) || feiertage.containsKey(day)) {
 				continue;
 			}
 			for (LocalTime time = FIRST_SLOT; !time.isAfter(LAST_SLOT); time = time.plusMinutes(SLOT_MINUTES)) {
@@ -123,6 +125,20 @@ public class TerminController {
 			}
 		}
 		return result;
+	}
+
+	@GetMapping("/api/termine/feiertage")
+	Map<LocalDate, String> feiertage() {
+		return feiertage(LocalDate.now(ZONE));
+	}
+
+	private static Map<LocalDate, String> feiertage(final LocalDate firstDay) {
+		final Map<LocalDate, String> days = Feiertage.imJahr(firstDay.getYear());
+		final int lastYear = firstDay.plusDays(DAYS_AHEAD).getYear();
+		if (lastYear != firstDay.getYear()) {
+			days.putAll(Feiertage.imJahr(lastYear));
+		}
+		return days;
 	}
 
 	@PostMapping("/api/termine")
@@ -229,9 +245,10 @@ public class TerminController {
 		}
 	}
 
-	private static boolean isValidSlot(final ZonedDateTime start) {
+	static boolean isValidSlot(final ZonedDateTime start) {
 		final LocalTime time = start.toLocalTime();
 		return isWorkday(start.toLocalDate())
+				&& !Feiertage.imJahr(start.getYear()).containsKey(start.toLocalDate())
 				&& start.getSecond() == 0 && start.getNano() == 0
 				&& start.getMinute() % SLOT_MINUTES == 0
 				&& !time.isBefore(FIRST_SLOT) && !time.isAfter(LAST_SLOT);
