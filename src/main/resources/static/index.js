@@ -303,7 +303,7 @@ function startBooking() {
 	});
 
 	const confirmation = confirmToken
-		? fetch('/ai/api/termine/bestaetigen?token=' + encodeURIComponent(confirmToken))
+		? fetch('/ai-expert/api/termine/bestaetigen?token=' + encodeURIComponent(confirmToken))
 			.then(response => new URL(response.url).searchParams.get('termin'))
 			.catch(() => 'ungueltig')
 		: Promise.resolve(new URLSearchParams(window.location.search).get('termin'));
