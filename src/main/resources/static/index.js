@@ -1264,6 +1264,7 @@ startBooking();
 		choiceReady = false;
 		terminBestaetigt = true;
 		start.hidden = true;
+		text.textContent = '';
 		const assistant = document.createElement('div');
 		assistant.className = 'chat-turn chat-assistant';
 		const label = document.createElement('strong');

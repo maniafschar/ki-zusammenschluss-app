@@ -88,14 +88,14 @@ public class BestaetigungsMailService {
 				<table role="presentation" width="100%%" cellpadding="0" cellspacing="0" style="background:#f7fbf9;padding:24px 12px;">
 				<tr><td align="center">
 				<table role="presentation" width="560" cellpadding="0" cellspacing="0" style="max-width:560px;width:100%%;background:#ffffff;border-radius:14px;overflow:hidden;font-family:-apple-system,'Segoe UI',Helvetica,Arial,sans-serif;color:#1d2b3a;">
-				<tr><td style="background:#050f23;padding:24px 32px;color:#ffffff;font-size:20px;font-weight:700;">KI-Experten Zusammenschluss</td></tr>
+				<tr><td style="background:#162A5A;padding:24px 32px;color:#ffffff;font-size:20px;font-weight:700;">KI-Experten Zusammenschluss</td></tr>
 				<tr><td style="padding:32px;">
 				<h1 style="margin:0 0 16px;font-size:22px;">Hallo %s,</h1>
 				<p style="margin:0 0 20px;font-size:16px;line-height:1.6;">Vielen Dank für Deine Terminanfrage. Bitte bestätige Deine E-Mail-Adresse, damit wir den Termin für Dich reservieren.</p>
 				<table role="presentation" width="100%%" cellpadding="0" cellspacing="0" style="background:#e3f7f0;border-radius:10px;margin:0 0 24px;">
 				<tr><td style="padding:16px 20px;font-size:16px;"><strong>Dein Wunschtermin</strong><br>%s<br><span style="color:#5b6b7d;font-size:14px;">Dauer: 30 Minuten</span></td></tr></table>
 				%s
-				<table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 0 24px;"><tr><td style="background:#050f23;border-radius:8px;">
+				<table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 0 24px;"><tr><td style="background:#162A5A;border-radius:8px;">
 				<a href="%s" style="display:inline-block;padding:14px 28px;color:#ffffff;font-size:16px;font-weight:600;text-decoration:none;">Termin bestätigen</a></td></tr></table>
 				<p style="margin:0 0 8px;font-size:14px;color:#5b6b7d;">Der Link ist %d Minuten gültig. Danach wird der Zeitslot wieder freigegeben.</p>
 				<p style="margin:0 0 8px;font-size:14px;color:#5b6b7d;">Funktioniert der Button nicht? Kopiere diesen Link in Deinen Browser:<br><a href="%s" style="color:#0f9d7a;word-break:break-all;">%s</a></p>
