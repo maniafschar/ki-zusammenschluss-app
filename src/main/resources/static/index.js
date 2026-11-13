@@ -1246,26 +1246,6 @@ startBooking();
 		}
 	}
 
-	function renderVerlauf(messages) {
-		text.replaceChildren();
-		for (const message of messages) {
-			const turn = document.createElement('div');
-			const isUser = message.role === 'user';
-			turn.className = 'chat-turn ' + (isUser ? 'chat-user' : 'chat-assistant');
-			const label = document.createElement('strong');
-			label.textContent = isUser ? 'Du' : 'KI';
-			turn.append(label);
-			if (isUser) {
-				const userText = document.createElement('p');
-				userText.textContent = message.content;
-				turn.append(userText);
-			} else {
-				renderMarkdown(turn, message.content, false);
-			}
-			text.append(turn);
-		}
-	}
-
 	window.addEventListener('termin-bestaetigt', async (event) => {
 		if (state !== 'idle') return;
 		const terminStart = event.detail?.start;
@@ -1284,7 +1264,6 @@ startBooking();
 		choiceReady = false;
 		terminBestaetigt = true;
 		start.hidden = true;
-		renderVerlauf(history);
 		const assistant = document.createElement('div');
 		assistant.className = 'chat-turn chat-assistant';
 		const label = document.createElement('strong');

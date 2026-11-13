@@ -43,7 +43,7 @@ public class BestaetigungsMailService {
 	}
 
 	public void send(final String to, final String name, final Instant start, final ZoneId zone,
-			final String token, final int minutesValid, final String gespraechId) {
+			final String token, final int minutesValid, final String gespraechId, final String nachricht) {
 		final String link = this.publicUrl + "?type=termine/bestaetigen&token=" + token
 				+ (gespraechId == null ? "" : "&gespraech=" + URLEncoder.encode(gespraechId, StandardCharsets.UTF_8));
 		final JavaMailSender sender = this.mailSender.getIfAvailable();
@@ -54,6 +54,7 @@ public class BestaetigungsMailService {
 		final String when = FORMAT.format(start.atZone(zone));
 		final String text = "Hallo " + name + ",\n\n"
 				+ "Du hast einen Termin (30 Minuten) für " + when + " angefragt.\n"
+				+ (nachricht == null || nachricht.isBlank() ? "" : "Deine Nachricht:\n" + nachricht.strip() + "\n\n")
 				+ "Bitte bestätige Deine E-Mail-Adresse innerhalb von " + minutesValid + " Minuten:\n\n"
 				+ link + "\n\n"
 				+ "Wenn Du den Termin nicht angefragt hast, ignoriere diese Nachricht einfach.\n";
@@ -64,7 +65,7 @@ public class BestaetigungsMailService {
 			helper.setFrom(this.from);
 			helper.setTo(to);
 			helper.setSubject("Bitte bestätige Deinen Termin");
-			helper.setText(text, html(name, when, link, minutesValid));
+			helper.setText(text, html(name, when, link, minutesValid, nachricht));
 			sender.send(mail);
 		} catch (final MessagingException e) {
 			throw new MailPreparationException(e);
@@ -73,10 +74,14 @@ public class BestaetigungsMailService {
 
 	// Inline styles and tables only: most mail clients ignore <style> blocks and
 	// modern layout.
-	private static String html(final String name, final String when, final String link, final int minutes) {
+	private static String html(final String name, final String when, final String link, final int minutes,
+			final String nachricht) {
 		final String n = HtmlUtils.htmlEscape(name);
 		final String w = HtmlUtils.htmlEscape(when);
 		final String l = HtmlUtils.htmlEscape(link);
+		final String nachrichtHtml = nachricht == null || nachricht.isBlank() ? ""
+				: "<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"background:#eef6fb;border-left:4px solid #1f527c;border-radius:8px;margin:0 0 24px;\"><tr><td style=\"padding:16px 20px;font-size:15px;line-height:1.6;color:#1d2b3a;\"><strong style=\"display:block;margin:0 0 6px;font-size:13px;color:#1f527c;text-transform:uppercase;letter-spacing:.04em;\">Deine Nachricht</strong>"
+						+ HtmlUtils.htmlEscape(nachricht.strip()).replace("\n", "<br>") + "</td></tr></table>";
 		return """
 				<!DOCTYPE html>
 				<html lang="de"><body style="margin:0;padding:0;background:#f7fbf9;">
@@ -89,6 +94,7 @@ public class BestaetigungsMailService {
 				<p style="margin:0 0 20px;font-size:16px;line-height:1.6;">Vielen Dank für Deine Terminanfrage. Bitte bestätige Deine E-Mail-Adresse, damit wir den Termin für Dich reservieren.</p>
 				<table role="presentation" width="100%%" cellpadding="0" cellspacing="0" style="background:#e3f7f0;border-radius:10px;margin:0 0 24px;">
 				<tr><td style="padding:16px 20px;font-size:16px;"><strong>Dein Wunschtermin</strong><br>%s<br><span style="color:#5b6b7d;font-size:14px;">Dauer: 30 Minuten</span></td></tr></table>
+				%s
 				<table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 0 24px;"><tr><td style="background:#0f9d7a;border-radius:8px;">
 				<a href="%s" style="display:inline-block;padding:14px 28px;color:#ffffff;font-size:16px;font-weight:600;text-decoration:none;">Termin bestätigen</a></td></tr></table>
 				<p style="margin:0 0 8px;font-size:14px;color:#5b6b7d;">Der Link ist %d Minuten gültig. Danach wird der Zeitslot wieder freigegeben.</p>
@@ -96,6 +102,6 @@ public class BestaetigungsMailService {
 				<p style="margin:16px 0 0;font-size:13px;color:#5b6b7d;">Wenn Du den Termin nicht angefragt hast, ignoriere diese Nachricht einfach.</p>
 				</td></tr></table></td></tr></table></body></html>
 				"""
-				.formatted(n, w, l, minutes, l, l);
+				.formatted(n, w, nachrichtHtml, l, minutes, l, l);
 	}
 }

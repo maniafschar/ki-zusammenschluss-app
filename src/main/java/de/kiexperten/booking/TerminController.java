@@ -177,7 +177,7 @@ public class TerminController {
 		}
 		try {
 			this.mail.send(termin.getEmail(), termin.getName(), startInstant, zone(request.zeitzone()),
-					termin.getBestaetigungsToken(), CONFIRM_MINUTES, termin.getGespraechId());
+					termin.getBestaetigungsToken(), CONFIRM_MINUTES, termin.getGespraechId(), termin.getNachricht());
 		} catch (final RuntimeException e) {
 			this.termine.delete(termin);
 			log.error("Email Termin", e);
