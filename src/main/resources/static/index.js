@@ -1176,7 +1176,7 @@ startBooking();
 	}
 
 	function renderWelcome(markdown, {
-		selectedOptions = [], answerValue = '', showBack = false
+		selectedOptions = [], answerValue = '', showBack = false, choices = true
 	} = {}) {
 		text.replaceChildren();
 		const assistant = document.createElement('div');
@@ -1184,7 +1184,7 @@ startBooking();
 		const label = document.createElement('strong');
 		label.textContent = 'KI';
 		assistant.append(label);
-		renderMarkdown(assistant, markdown, true, { selectedOptions, answerValue });
+		renderMarkdown(assistant, markdown, choices, { selectedOptions, answerValue });
 		if (showBack) appendBackButton(assistant);
 		text.append(assistant);
 	}
@@ -1193,11 +1193,13 @@ startBooking();
 		const turnId = chatTurn;
 		start.disabled = true;
 		let welcome;
+		let bestaetigt = false;
 		try {
 			const params = gespraechId ? '?gespraechId=' + encodeURIComponent(gespraechId) : '';
 			const res = await fetch('/ai-expert/api/ki/welcome' + params, { credentials: 'same-origin' });
 			if (!res.ok) throw new Error(res.status);
-			({ gespraechId, text: welcome } = await res.json());
+			({ gespraechId, text: welcome, bestaetigt } = await res.json());
+			if (bestaetigt) terminBestaetigt = true;
 			if (document.getElementById('booking-form')) document.getElementById('booking-form').dataset.gespraechId = gespraechId;
 		} catch (e) {
 			console.error('Begrüßung konnte nicht geladen werden:', e);
@@ -1209,15 +1211,15 @@ startBooking();
 		steps.splice(0, steps.length, {
 			question: '',
 			reply: welcome,
-			choices: true,
+			choices: !bestaetigt,
 			selectedOptions: [],
 			answerValue: '',
 			historyLength: history.length
 		});
 		currentStepIndex = 0;
 		start.hidden = true;
-		renderWelcome(welcome);
-		choiceReady = true;
+		renderWelcome(welcome, { choices: !bestaetigt });
+		choiceReady = !bestaetigt;
 		try {
 			await speak(plainMarkdown(welcome), turnId);
 		} catch (e) {

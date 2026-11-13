@@ -107,6 +107,7 @@ public class KiChatController {
 			+ "Bei Fragen zu euren Leistungen, Argumenten oder Unterscheidungsmerkmalen rufe zuerst das Werkzeug suche_wissen auf und stütze deine Antwort nur auf die Treffer. Findet es nichts, sag das ehrlich, statt zu raten. "
 			+ "Antworte knapp (höchstens 4 Sätze). Beziehe dich auf das Umfrageergebnis, wenn es passt. "
 			+ "Fragen, die nichts mit Unternehmen oder der Einführung von KI zu tun haben, lehnst du höflich ab, gern mit einem kleinen Augenzwinkern, und führst das Gespräch zurück zum Thema KI im Unternehmen.";
+	private static final String BESTAETIGT_BEGRUESSUNG = "Schön, dass du wieder da bist. Stell gern deine Fragen hier im Chat.";
 	private static final String WELCOME_INTRO = "Dann lass uns zuerst ein paar kurze Fragen gemeinsam beantworten, so dass ich einen ersten Überblick bekomme und konkret auf Deine Bedürfnisse antworten kann. Los geht's...";
 	private static final ZoneId BERLIN = ZoneId.of("Europe/Berlin");
 	private static final DateTimeFormatter TERMIN_FORMAT = DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm");
@@ -350,7 +351,7 @@ public class KiChatController {
 		return error + (truncated ? "…" : "");
 	}
 
-	public record WelcomeResponse(String gespraechId, String text) {
+	public record WelcomeResponse(String gespraechId, String text, boolean bestaetigt) {
 	}
 
 	/**
@@ -364,10 +365,10 @@ public class KiChatController {
 		final boolean bestaetigt = gespraechId != null
 				&& !this.termine.findByGespraechIdAndStatus(gespraechId, "BESTAETIGT").isEmpty();
 		final String id = bestaetigt ? gespraechId : UUID.randomUUID().toString();
-		final String frage = this.umfrageZustand(id).path("markdown").asText("");
-		final String text = WELCOME_INTRO + "\n\n" + frage;
+		final String text = bestaetigt ? BESTAETIGT_BEGRUESSUNG
+				: WELCOME_INTRO + "\n\n" + this.umfrageZustand(id).path("markdown").asText("");
 		this.protokolle.speichereBegruessung(id, text);
-		return new WelcomeResponse(id, text);
+		return new WelcomeResponse(id, text, bestaetigt);
 	}
 
 	/**
