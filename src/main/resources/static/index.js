@@ -953,8 +953,8 @@ startBooking();
 					const sentenceEnd = /[.!?…](?:["'”’)\]]*)\s+/g;
 					let match;
 					let cut = 0;
-					const minimum = gesendet ? 50 : 20;
-					const maximum = gesendet ? 100 : 40;
+					const minimum = gesendet ? 80 : 20;
+					const maximum = gesendet ? 150 : 40;
 					while ((match = sentenceEnd.exec(buffer))) {
 						const end = match.index + match[0].trimEnd().length;
 						if (end >= minimum) {
@@ -1110,7 +1110,16 @@ startBooking();
 					console.warn('Audioanalyse nicht verfügbar:', error);
 				}
 			}
-			let load = await nextLoad();
+			const ahead = [];
+			const fill = () => {
+				while (ahead.length < 2) {
+					const pending = nextLoad();
+					pending.catch(() => { });
+					ahead.push(pending);
+				}
+			};
+			fill();
+			let load = await ahead.shift();
 			while (load && !playback.cancelled) {
 				const { player, streamDone } = await load.promise;
 				if (playback.cancelled) break;
@@ -1137,13 +1146,13 @@ startBooking();
 					player.pause();
 					break;
 				}
-				const followingLoad = nextLoad();
-				followingLoad.catch(() => { });
+				fill();
 				await Promise.all([finished, streamDone]);
 				playback.finish = null;
 				source?.disconnect();
 				source = null;
-				load = await followingLoad;
+				const following = ahead.shift();
+				load = following ? await following : null;
 			}
 		} catch (error) {
 			if (!playback.cancelled && error.name !== 'AbortError') throw error;
