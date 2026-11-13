@@ -271,7 +271,8 @@ public class KiChatController {
 			audio.close();
 			throw e;
 		}
-		log.info("KI-Sprachausgabe erstes Byte nach {} ms ({} Zeichen)", (System.nanoTime() - startedAt) / 1_000_000, request.input().length());
+		log.info("KI-Sprachausgabe erstes Byte nach {} ms ({} Zeichen)", (System.nanoTime() - startedAt) / 1_000_000,
+				request.input().length());
 		if (firstByte < 0) {
 			audio.close();
 			log.warn("KI-Sprachausgabe lieferte einen leeren Audiostream");
