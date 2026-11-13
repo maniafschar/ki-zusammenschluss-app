@@ -76,10 +76,13 @@ public class TerminController {
 
 	private final TerminRepository termine;
 	private final BestaetigungsMailService mail;
+	private final GoogleMeetService googleMeet;
 
-	public TerminController(final TerminRepository termine, final BestaetigungsMailService mail) {
+	public TerminController(final TerminRepository termine, final BestaetigungsMailService mail,
+			final GoogleMeetService googleMeet) {
 		this.termine = termine;
 		this.mail = mail;
+		this.googleMeet = googleMeet;
 	}
 
 	private static boolean isExpired(final Termin t, final LocalDateTime now) {
@@ -164,6 +167,7 @@ public class TerminController {
 		termin.setEmail(request.email().trim());
 		termin.setTelefon(request.telefon() == null || request.telefon().isBlank() ? null : request.telefon().trim());
 		termin.setNachricht(request.nachricht() == null ? null : request.nachricht().trim());
+		termin.setZeitzone(zone(request.zeitzone()).getId());
 		termin.setGespraechId(request.gespraechId() == null || request.gespraechId().isBlank()
 				? UUID.randomUUID().toString()
 				: request.gespraechId().trim());
@@ -194,14 +198,12 @@ public class TerminController {
 		if (found.isPresent()) {
 			final Termin t = found.get();
 			if ("BESTAETIGT".equals(t.getStatus())) {
-				result = "bestaetigt";
+				result = bestaetige(t);
 			} else if (isExpired(t, now)) {
 				this.termine.delete(t);
 				result = "abgelaufen";
 			} else {
-				t.setStatus("BESTAETIGT");
-				this.termine.save(t);
-				result = "bestaetigt";
+				result = bestaetige(t);
 			}
 		}
 		final String ziel = "bestaetigt".equals(result)
@@ -209,6 +211,26 @@ public class TerminController {
 						+ "#kontakt"
 				: "/?termin=" + result + "#kontakt";
 		return ResponseEntity.status(HttpStatus.SEE_OTHER).header("Location", ziel).build();
+	}
+
+	private String bestaetige(final Termin termin) {
+		try {
+			if (termin.getMeetLink() == null || termin.getMeetLink().isBlank()) {
+				termin.setMeetLink(this.googleMeet.createMeetLink(termin, zone(termin.getZeitzone())));
+			}
+			termin.setStatus("BESTAETIGT");
+			this.termine.save(termin);
+			if (!termin.isBestaetigungsMailGesendet()) {
+				this.mail.sendBestaetigt(termin.getEmail(), termin.getName(), Zeit.instant(termin.getStartZeit()),
+						zone(termin.getZeitzone()), termin.getNachricht(), termin.getMeetLink());
+				termin.setBestaetigungsMailGesendet(true);
+				this.termine.save(termin);
+			}
+			return "bestaetigt";
+		} catch (final RuntimeException e) {
+			log.error("Terminbestätigung für Termin {} fehlgeschlagen", termin.getId(), e);
+			throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Termin konnte nicht bestätigt werden", e);
+		}
 	}
 
 	@GetMapping("/api/admin/termine")

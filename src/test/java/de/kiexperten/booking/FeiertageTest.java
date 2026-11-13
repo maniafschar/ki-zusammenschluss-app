@@ -44,7 +44,7 @@ class FeiertageTest {
 		final BestaetigungsMailService mail = mock(BestaetigungsMailService.class);
 		when(repository.findByAktiverStartZeitGreaterThanEqualAndAktiverStartZeitLessThan(any(), any()))
 				.thenReturn(List.of());
-		final TerminController controller = new TerminController(repository, mail);
+		final TerminController controller = new TerminController(repository, mail, mock(GoogleMeetService.class));
 		final var holidays = controller.feiertage();
 		controller.slots().forEach(slot -> assertFalse(
 				holidays.containsKey(slot.start().atZone(TerminController.ZONE).toLocalDate())));

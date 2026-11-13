@@ -21,7 +21,7 @@ import jakarta.mail.MessagingException;
 import jakarta.mail.internet.MimeMessage;
 
 /**
- * Sends the confirmation link; without SMTP settings the link is only logged.
+ * Sends booking confirmation emails; without SMTP settings the details are only logged.
  */
 @Service
 public class BestaetigungsMailService {
@@ -72,6 +72,32 @@ public class BestaetigungsMailService {
 		}
 	}
 
+	public void sendBestaetigt(final String to, final String name, final Instant start, final ZoneId zone,
+			final String nachricht, final String meetLink) {
+		final String when = FORMAT.format(start.atZone(zone));
+		final String text = "Hallo " + name + ",\n\n"
+				+ "Dein Termin (30 Minuten) am " + when + " ist bestätigt.\n"
+				+ (nachricht == null || nachricht.isBlank() ? "" : "Deine Nachricht:\n" + nachricht.strip() + "\n\n")
+				+ "Google Meet: " + meetLink + "\n";
+		final JavaMailSender sender = this.mailSender.getIfAvailable();
+		if (sender == null) {
+			LOG.warn("Kein SMTP-Server konfiguriert (spring.mail.host). Terminbestätigung für {}: {}", to, text);
+			return;
+		}
+		try {
+			final MimeMessage mail = sender.createMimeMessage();
+			final MimeMessageHelper helper = new MimeMessageHelper(mail, MimeMessageHelper.MULTIPART_MODE_MIXED_RELATED,
+					"UTF-8");
+			helper.setFrom(this.from);
+			helper.setTo(to);
+			helper.setSubject("Dein Termin ist bestätigt");
+			helper.setText(text, bestaetigtHtml(name, when, nachricht, meetLink));
+			sender.send(mail);
+		} catch (final MessagingException e) {
+			throw new MailPreparationException(e);
+		}
+	}
+
 	// Inline styles and tables only: most mail clients ignore <style> blocks and
 	// modern layout.
 	private static String html(final String name, final String when, final String link, final int minutes,
@@ -103,5 +129,34 @@ public class BestaetigungsMailService {
 				</td></tr></table></td></tr></table></body></html>
 				"""
 				.formatted(n, w, nachrichtHtml, l, minutes, l, l);
+	}
+
+	private static String bestaetigtHtml(final String name, final String when, final String nachricht,
+			final String meetLink) {
+		final String n = HtmlUtils.htmlEscape(name);
+		final String w = HtmlUtils.htmlEscape(when);
+		final String link = HtmlUtils.htmlEscape(meetLink);
+		final String nachrichtHtml = nachricht == null || nachricht.isBlank() ? ""
+				: "<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"background:#eef6fb;border-left:4px solid #1f527c;border-radius:8px;margin:0 0 24px;\"><tr><td style=\"padding:16px 20px;font-size:15px;line-height:1.6;color:#1d2b3a;\"><strong style=\"display:block;margin:0 0 6px;font-size:13px;color:#1f527c;text-transform:uppercase;letter-spacing:.04em;\">Deine Nachricht</strong>"
+						+ HtmlUtils.htmlEscape(nachricht.strip()).replace("\n", "<br>") + "</td></tr></table>";
+		return """
+				<!DOCTYPE html>
+				<html lang="de"><body style="margin:0;padding:0;background:#f7fbf9;">
+				<table role="presentation" width="100%%" cellpadding="0" cellspacing="0" style="background:#f7fbf9;padding:24px 12px;">
+				<tr><td align="center">
+				<table role="presentation" width="560" cellpadding="0" cellspacing="0" style="max-width:560px;width:100%%;background:#ffffff;border-radius:14px;overflow:hidden;font-family:-apple-system,'Segoe UI',Helvetica,Arial,sans-serif;color:#1d2b3a;">
+				<tr><td style="background:#162A5A;padding:24px 32px;color:#ffffff;font-size:20px;font-weight:700;">KI-Experten Zusammenschluss</td></tr>
+				<tr><td style="padding:32px;">
+				<h1 style="margin:0 0 16px;font-size:22px;">Hallo %s,</h1>
+				<p style="margin:0 0 20px;font-size:16px;line-height:1.6;">Dein Termin ist bestätigt. Wir freuen uns auf das Gespräch!</p>
+				<table role="presentation" width="100%%" cellpadding="0" cellspacing="0" style="background:#e3f7f0;border-radius:10px;margin:0 0 24px;">
+				<tr><td style="padding:16px 20px;font-size:16px;"><strong>Dein Termin</strong><br>%s<br><span style="color:#5b6b7d;font-size:14px;">Dauer: 30 Minuten</span></td></tr></table>
+				%s
+				<table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 0 24px;"><tr><td style="background:#162A5A;border-radius:8px;">
+				<a href="%s" style="display:inline-block;padding:14px 28px;color:#ffffff;font-size:16px;font-weight:600;text-decoration:none;">Google Meet öffnen</a></td></tr></table>
+				<p style="margin:0;font-size:14px;color:#5b6b7d;">Funktioniert der Button nicht? Kopiere diesen Link in Deinen Browser:<br><a href="%s" style="color:#0f9d7a;word-break:break-all;">%s</a></p>
+				</td></tr></table></td></tr></table></body></html>
+				"""
+				.formatted(n, w, nachrichtHtml, link, link, link);
 	}
 }
