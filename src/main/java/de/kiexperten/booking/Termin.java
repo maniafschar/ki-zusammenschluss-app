@@ -73,6 +73,9 @@ public class Termin extends Auditable {
 	@Column(nullable = false)
 	private boolean bestaetigungsMailGesendet;
 
+	@Column(nullable = false, columnDefinition = "boolean default false")
+	private boolean erinnerungsMailGesendet;
+
 	@PrePersist
 	@PreUpdate
 	private void synchronisiereAktivenStart() {

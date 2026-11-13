@@ -18,4 +18,7 @@ public interface TerminRepository extends JpaRepository<Termin, Long> {
 	Optional<Termin> findByBestaetigungsToken(String token);
 
 	List<Termin> findByGespraechIdAndStatus(String gespraechId, String status);
+
+	List<Termin> findByStatusAndErinnerungsMailGesendetFalseAndStartZeitGreaterThanAndStartZeitLessThanEqual(
+			String status, LocalDateTime now, LocalDateTime reminderDeadline);
 }
