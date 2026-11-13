@@ -889,9 +889,13 @@ startBooking();
 			console.warn('Three.js-Animation nicht verfügbar; die einfache Sprachvisualisierung wird verwendet.', err);
 		});
 
+	function xsrfCookie() {
+		return decodeURIComponent((document.cookie.match(/(?:^|; )XSRF-TOKEN=([^;]*)/) || [])[1] || '');
+	}
+
 	async function csrfToken(signal) {
 		await fetch('/ai-expert/api/csrf', { credentials: 'same-origin', signal });
-		return decodeURIComponent((document.cookie.match(/(?:^|; )XSRF-TOKEN=([^;]*)/) || [])[1] || '');
+		return xsrfCookie();
 	}
 
 	const istMobil = /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
@@ -942,43 +946,51 @@ startBooking();
 				? (async function* () { yield input; })()
 				: input;
 			let buffer = '';
+			let gesendet = false;
 			for await (const textChunk of sourceText) {
 				buffer += textChunk;
 				while (true) {
 					const sentenceEnd = /[.!?…](?:["'”’)\]]*)\s+/g;
 					let match;
 					let cut = 0;
+					const minimum = gesendet ? 50 : 20;
+					const maximum = gesendet ? 100 : 40;
 					while ((match = sentenceEnd.exec(buffer))) {
 						const end = match.index + match[0].trimEnd().length;
-						if (end >= 50) {
+						if (end >= minimum) {
 							cut = end;
 							break;
 						}
 					}
-					if (!cut && buffer.length >= 100) {
-						cut = buffer.lastIndexOf(' ', 100);
-						if (cut < 50) cut = buffer.indexOf(' ', 100);
-						if (cut < 0) cut = Math.min(buffer.length, 100);
+					if (!cut && buffer.length >= maximum) {
+						cut = buffer.lastIndexOf(' ', maximum);
+						if (cut < minimum) cut = buffer.indexOf(' ', maximum);
+						if (cut < 0) cut = Math.min(buffer.length, maximum);
 					}
 					if (!cut) break;
 					const chunk = plainMarkdown(buffer.slice(0, cut));
 					buffer = buffer.slice(cut);
-					if (chunk) yield chunk;
+					if (chunk) {
+						gesendet = true;
+						yield chunk;
+					}
 				}
 			}
 			const lastChunk = plainMarkdown(buffer);
 			if (lastChunk) yield lastChunk;
 		}
 		const fetchChunk = async (input) => {
-			const token = await csrfToken(playback.controller.signal);
-			playback.controller.signal.throwIfAborted();
-			const res = await fetch('/ai-expert/api/ki/audio/speech', {
+			const signal = playback.controller.signal;
+			const sende = (token) => fetch('/ai-expert/api/ki/audio/speech', {
 				method: 'POST',
 				credentials: 'same-origin',
 				headers: { 'Content-Type': 'application/json', 'X-XSRF-TOKEN': token },
 				body: JSON.stringify({ input }),
-				signal: playback.controller.signal
+				signal
 			});
+			let res = await sende(xsrfCookie() || await csrfToken(signal));
+			if (res.status === 403) res = await sende(await csrfToken(signal));
+			signal.throwIfAborted();
 			if (!res.ok) throw new Error(res.status);
 			const mimeType = res.headers.get('Content-Type')?.split(';')[0] || 'audio/mpeg';
 			const MediaSourceType = window.MediaSource;
