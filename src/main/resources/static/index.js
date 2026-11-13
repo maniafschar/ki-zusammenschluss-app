@@ -1345,11 +1345,26 @@ startBooking();
 		ask(value, auswahl, ausMultipleChoice);
 	}
 
+	let umfrageZurueckgesetzt = Promise.resolve();
+	function umfrageAufSchrittZuruecksetzen(reply) {
+		const schritt = Number(String(reply).match(/Schritt (\d+) von/)?.[1]);
+		if (!schritt || !gespraechId) return;
+		umfrageZurueckgesetzt = umfrageZurueckgesetzt.then(() => csrfToken()).then((token) => fetch('/ai-expert/api/ki/umfrage/zurueck', {
+			method: 'POST',
+			credentials: 'same-origin',
+			headers: { 'Content-Type': 'application/json', 'X-XSRF-TOKEN': token },
+			body: JSON.stringify({ gespraechId, schritt })
+		})).then((res) => {
+			if (!res.ok) throw new Error(res.status);
+		}).catch((e) => console.warn('Umfrage konnte nicht zurückgesetzt werden:', e));
+	}
+
 	function showPreviousQuestion() {
 		if (currentStepIndex <= 0) return;
 		stopTurn();
 		currentStepIndex--;
 		const step = steps[currentStepIndex];
+		umfrageAufSchrittZuruecksetzen(step.reply);
 		history.splice(step.historyLength);
 		if (step.question) {
 			renderConversation(step.question, step.reply, {
@@ -1516,6 +1531,7 @@ startBooking();
 		try {
 			const token = await csrfToken(controller.signal);
 			controller.signal.throwIfAborted();
+			await umfrageZurueckgesetzt;
 			const requestBody = JSON.stringify(auswahl?.length
 				? { messages: history.slice(-10), gespraechId, auswahl }
 				: { messages: history.slice(-10), gespraechId });

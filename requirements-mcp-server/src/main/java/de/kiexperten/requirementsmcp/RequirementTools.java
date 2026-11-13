@@ -21,6 +21,13 @@ public class RequirementTools {
 		return this.flow.nextStep(conversationId);
 	}
 
+	@McpTool(name = "rewind_requirement_step", description = "Setzt den Anforderungsdialog auf einen früheren Schritt zurück und verwirft dessen sowie die folgenden Antworten.")
+	public Map<String, Object> rewindStep(
+			@McpToolParam(description = "Eindeutige Gesprächs-ID", required = true) final String conversationId,
+			@McpToolParam(description = "Nummer des Schritts, ab 1", required = true) final int stepNumber) {
+		return this.flow.rewind(conversationId, stepNumber);
+	}
+
 	@McpTool(name = "record_requirement_answer", description = "Speichert die KI-Bewertung für die Antwortliste des aktuellen Schritts. Mehrfachauswahl muss aus den vorgegebenen Optionen bestehen und deren Auswahlmaximum einhalten.")
 	public Map<String, Object> recordAnswer(
 			@McpToolParam(description = "Eindeutige Gesprächs-ID", required = true) final String conversationId,

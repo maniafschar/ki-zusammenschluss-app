@@ -68,6 +68,22 @@ public class RequirementFlowService {
 		}
 	}
 
+	public Map<String, Object> rewind(final String conversationId, final int stepNumber) {
+		if (stepNumber < 1 || stepNumber > STEPS.size())
+			throw new IllegalArgumentException("stepNumber muss zwischen 1 und " + STEPS.size() + " liegen.");
+		final Progress progress = this.progressByConversation.computeIfAbsent(this.requireId(conversationId),
+				ignored -> new Progress());
+		synchronized (progress) {
+			progress.lastUpdated = Instant.now();
+			final int index = stepNumber - 1;
+			if (index < progress.nextStepIndex) {
+				STEPS.subList(index, STEPS.size()).forEach(step -> progress.answers.remove(step.id()));
+				progress.nextStepIndex = index;
+			}
+		}
+		return this.nextStep(conversationId);
+	}
+
 	public Map<String, Object> recordAnswer(final String conversationId, final String stepId,
 			final List<String> answers,
 			final boolean sufficient, final String clarificationQuestion) {

@@ -33,6 +33,8 @@ public class RequirementsMcpGateway {
 	ArrayNode toolDefinitions() {
 		final ArrayNode definitions = this.mapper.createArrayNode();
 		for (final McpSchema.Tool tool : this.client.listTools().tools()) {
+			if ("rewind_requirement_step".equals(tool.name()))
+				continue;
 			final ObjectNode function = this.mapper.createObjectNode();
 			function.put("name", tool.name());
 			function.put("description", tool.description());

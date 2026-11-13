@@ -61,6 +61,8 @@ import de.kiexperten.dashboard.DashboardRepository;
 import de.kiexperten.dashboard.WissensSuche;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
@@ -424,6 +426,24 @@ public class KiChatController {
 				+ ", " + (fehler.mobil() ? "mobil" : "Desktop") + "]";
 		if (!this.dashboard.todoExistsSimilar("Fehler Client:", note))
 			this.dashboard.addTodo(note, null, null);
+		return ResponseEntity.noContent().build();
+	}
+
+	record UmfrageZurueckRequest(@NotBlank @Size(max = 100) String gespraechId, @Min(1) @Max(6) int schritt) {
+	}
+
+	/**
+	 * Setzt die Umfrage auf einen früheren Schritt zurück, damit eine erneute
+	 * Antwort dort gespeichert wird.
+	 */
+	@PostMapping("/api/ki/umfrage/zurueck")
+	ResponseEntity<Void> umfrageZurueck(@RequestBody @Valid final UmfrageZurueckRequest request,
+			final HttpServletRequest http) throws IOException {
+		this.limit(http.getRemoteAddr());
+		if (this.hatBestaetigtenTermin(request.gespraechId()))
+			throw new ResponseStatusException(HttpStatus.CONFLICT);
+		this.mcp().call("rewind_requirement_step", this.mapper.createObjectNode()
+				.put("conversationId", request.gespraechId()).put("stepNumber", request.schritt()));
 		return ResponseEntity.noContent().build();
 	}
 
