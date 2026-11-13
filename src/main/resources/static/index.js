@@ -1615,7 +1615,7 @@ startBooking();
 				showBack: currentStepIndex > 0
 			});
 			choiceReady = !terminBestaetigt;
-			if (zusammenfassung) zeigeZusammenfassung(zusammenfassung);
+			if (zusammenfassung && !terminBestaetigt) zeigeZusammenfassung(zusammenfassung);
 			closeSpeech();
 			if (activeTurn?.controller === controller) activeTurn = null;
 			try {
