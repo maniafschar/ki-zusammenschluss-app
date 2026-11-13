@@ -962,6 +962,7 @@ startBooking();
 							break;
 						}
 					}
+					if (cut > maximum) cut = 0;
 					if (!cut && buffer.length >= maximum) {
 						cut = buffer.lastIndexOf(' ', maximum);
 						if (cut < minimum) cut = buffer.indexOf(' ', maximum);
