@@ -259,7 +259,7 @@ public class TerminController {
 	}
 
 	// Unknown or missing zone ids fall back to the business time zone.
-	private static ZoneId zone(final String id) {
+	static ZoneId zone(final String id) {
 		try {
 			return id == null || id.isBlank() ? ZONE : ZoneId.of(id);
 		} catch (final java.time.DateTimeException e) {
