@@ -249,6 +249,7 @@ public class KiChatController {
 				.header("Authorization", "Bearer " + this.apiKey)
 				.header("Content-Type", MediaType.APPLICATION_JSON_VALUE)
 				.POST(HttpRequest.BodyPublishers.ofString(this.mapper.writeValueAsString(body))).build();
+		final long startedAt = System.nanoTime();
 		final HttpResponse<InputStream> response = this.client.send(upstream,
 				HttpResponse.BodyHandlers.ofInputStream());
 		if (response.statusCode() != 200) {
@@ -270,6 +271,7 @@ public class KiChatController {
 			audio.close();
 			throw e;
 		}
+		log.info("KI-Sprachausgabe erstes Byte nach {} ms ({} Zeichen)", (System.nanoTime() - startedAt) / 1_000_000, request.input().length());
 		if (firstByte < 0) {
 			audio.close();
 			log.warn("KI-Sprachausgabe lieferte einen leeren Audiostream");
