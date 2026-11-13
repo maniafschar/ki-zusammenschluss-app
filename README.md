@@ -185,7 +185,14 @@ sequenceDiagram
 
 1. Besucher wählt einen freien Slot (`/api/termine`).
 2. Buchung wird angelegt; Bestätigungslink per E-Mail (ohne `spring.mail.host` nur im Log).
-3. Bestätigung über den Link schließt die Buchung ab.
+3. Bestätigung über den Link erstellt einen Termin im Google-Kalender und eine individuelle Google-Meet-Konferenz.
+4. Die Buchenden erhalten eine Bestätigungs-E-Mail mit Terminzeit, Dauer, optionaler Nachricht und Meet-Link.
+
+Für den Kalenderzugriff müssen `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` und `GOOGLE_REFRESH_TOKEN` als
+Umgebungsvariablen gesetzt werden. Das autorisierte Google-Konto braucht einen Refresh-Token mit dem OAuth-Scope
+`https://www.googleapis.com/auth/calendar.events`; `GOOGLE_CALENDAR_ID` ist optional und verwendet standardmäßig
+`primary`. Ohne diese Konfiguration kann ein Termin nicht bestätigt werden; nach einem API- oder Mailfehler kann
+derselbe Bestätigungslink erneut aufgerufen werden.
 
 Gesetzliche Feiertage aller Bundesländer einschließlich örtlicher Feiertage sind in Berliner Zeit
 ausgeschlossen. Ein Klick auf den Feiertag im Kalender zeigt seinen Namen an; auch die Buchungs-API

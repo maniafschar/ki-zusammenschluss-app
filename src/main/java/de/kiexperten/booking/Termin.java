@@ -64,6 +64,15 @@ public class Termin extends Auditable {
 	@Column(length = 36)
 	private String gespraechId;
 
+	@Column(length = 64)
+	private String zeitzone;
+
+	@Column(length = 512)
+	private String meetLink;
+
+	@Column(nullable = false)
+	private boolean bestaetigungsMailGesendet;
+
 	@PrePersist
 	@PreUpdate
 	private void synchronisiereAktivenStart() {
