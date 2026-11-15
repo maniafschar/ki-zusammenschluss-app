@@ -1,8 +1,6 @@
 package de.kiexperten.booking;
 
-import java.time.DayOfWeek;
 import java.time.LocalDate;
-import java.time.temporal.TemporalAdjusters;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
@@ -22,8 +20,16 @@ final class Feiertage {
 		days.put(LocalDate.of(year, 10, 3), "Tag der Deutschen Einheit");
 		days.put(LocalDate.of(year, 10, 31), "Reformationstag");
 		days.put(LocalDate.of(year, 11, 1), "Allerheiligen");
-		days.put(LocalDate.of(year, 11, 23).with(TemporalAdjusters.previous(DayOfWeek.WEDNESDAY)),
-				"Buß- und Bettag");
+		final LocalDate weihnachten = LocalDate.of(year, 12, 25);
+		final LocalDate advent4 = weihnachten.minusDays(weihnachten.getDayOfWeek().getValue());
+		final LocalDate advent3 = advent4.minusWeeks(1);
+		final LocalDate advent2 = advent4.minusWeeks(2);
+		final LocalDate advent1 = advent4.minusWeeks(3);
+		days.put(advent1, "1. Advent");
+		days.put(advent2, "2. Advent");
+		days.put(advent3, "3. Advent");
+		days.put(advent4, "4. Advent");
+		days.put(advent1.minusDays(11), "Buß- und Bettag");
 		days.put(LocalDate.of(year, 12, 24), "Weihnachten");
 		days.put(LocalDate.of(year, 12, 25), "1. Weihnachtstag");
 		days.put(LocalDate.of(year, 12, 26), "2. Weihnachtstag");

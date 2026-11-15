@@ -39,6 +39,17 @@ class FeiertageTest {
 	}
 
 	@Test
+	void adventssonntageUndBussUndBettagWeihnachtenWochentagUnabhaengig() {
+		final var days2026 = Feiertage.imJahr(2026);
+		assertEquals("1. Advent", days2026.get(LocalDate.of(2026, 11, 29)));
+		assertEquals("4. Advent", days2026.get(LocalDate.of(2026, 12, 20)));
+		// 25.12. ist Sonntag: 4. Advent ist dann der 18.12.
+		final var days2022 = Feiertage.imJahr(2022);
+		assertEquals("4. Advent", days2022.get(LocalDate.of(2022, 12, 18)));
+		assertEquals("Buß- und Bettag", days2022.get(LocalDate.of(2022, 11, 16)));
+	}
+
+	@Test
 	void slotsUndBuchungenSchliessenFeiertageAus() {
 		final TerminRepository repository = mock(TerminRepository.class);
 		final BestaetigungsMailService mail = mock(BestaetigungsMailService.class);
