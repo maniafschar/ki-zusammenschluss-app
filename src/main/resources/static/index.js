@@ -576,7 +576,7 @@ startBooking();
 
 	function renderConversation(question, reply, {
 		choices = false, status = '', thinking = false, thinkingQuote = '',
-		selectedOptions = [], answerValue = '', showBack = false
+		selectedOptions = [], answerValue = '', showBack = false, onRetry = null
 	} = {}) {
 		text.replaceChildren();
 		const user = document.createElement('div');
@@ -622,9 +622,22 @@ startBooking();
 			detail.textContent = status;
 			assistant.append(detail);
 		}
+		if (onRetry) appendRetryButton(assistant, onRetry);
 		if (showBack) appendBackButton(assistant);
 		if (reply || status || thinking) text.append(assistant);
 		text.scrollTo({ top: 0, behavior: reducedMotion.matches ? 'auto' : 'smooth' });
+	}
+
+	function appendRetryButton(parent, onRetry) {
+		const aktionen = document.createElement('div');
+		aktionen.className = 'chat-actions';
+		const button = document.createElement('button');
+		button.type = 'button';
+		button.className = 'btn-text';
+		button.textContent = 'Erneut senden';
+		button.addEventListener('click', onRetry);
+		aktionen.append(button);
+		parent.append(aktionen);
 	}
 
 	function appendBackButton(parent) {
@@ -1645,7 +1658,10 @@ startBooking();
 			mic.disabled = !canRecord;
 			console.error('KI-Antwort fehlgeschlagen:', e);
 			const message = e.message === '429' ? 'Bitte einen Moment warten und erneut versuchen.' : 'Die KI-Antwort konnte nicht vollständig geladen werden.';
-			renderConversation(question, reply, { status: message });
+			renderConversation(question, reply, {
+				status: message,
+				onRetry: () => ask(question, auswahl, ausMultipleChoice)
+			});
 		}
 	}
 
