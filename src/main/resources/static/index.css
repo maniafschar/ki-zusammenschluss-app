@@ -376,6 +376,9 @@ h2 {
 	padding: .625rem 0;
 	list-style: none;
 }
+.spider-benefits button:hover {
+	background: initial;
+}
 
 .spider-lines {
 	position: absolute;
