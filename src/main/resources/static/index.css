@@ -820,6 +820,7 @@ h2 {
 	cursor: pointer;
 	line-height: 0;
 	padding: 0;
+	color: var(--text);
 }
 
 .cal-head button:disabled {
@@ -894,6 +895,7 @@ h2 {
 	padding: 0.625rem 0;
 	font: inherit;
 	cursor: pointer;
+	color: var(--text);
 }
 
 .slot:hover:not(:disabled) {
