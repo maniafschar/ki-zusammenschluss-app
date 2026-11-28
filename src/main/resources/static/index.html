@@ -141,55 +141,31 @@
 							"name": "Was bedeutet KI inhouse?",
 							"acceptedAnswer": {
 								"@type": "Answer",
-								"text": "KI inhouse bedeutet, dass die künstliche Intelligenz direkt auf Ihrer eigenen Infrastruktur (Servern) betrieben wird. Ihre Daten verlassen dabei nie Ihr Unternehmen. Im Gegensatz zu Cloud-Lösungen behalten Sie die volle Kontrolle über Modelle, Daten und Kosten."
+								"text": "Die KI läuft auf Deiner eigenen Infrastruktur. So bestimmst Du, wo Deine Daten verarbeitet werden und wer darauf zugreifen kann."
 							}
 						},
 						{
 							"@type": "Question",
-							"name": "Warum ist Inhouse-KI besonders für KMU geeignet?",
+							"name": "Was brauche ich für eine eigene KI-Lösung?",
 							"acceptedAnswer": {
 								"@type": "Answer",
-								"text": "Kleine und mittlere Unternehmen profitieren besonders von planbaren Kosten, hoher Datensicherheit und Unabhängigkeit von großen Cloud-Anbietern. Die Lösung wird individuell an Ihre bestehenden Abläufe angepasst und läuft zuverlässig in Ihrer eigenen Umgebung."
+								"text": "Welche Hardware und Software sinnvoll sind, hängt von Deinen Aufgaben und Deiner vorhandenen Infrastruktur ab. Gemeinsam schauen wir, was Du benötigst."
 							}
 						},
 						{
 							"@type": "Question",
-							"name": "Bleiben meine Unternehmensdaten wirklich bei mir?",
+							"name": "Was kostet eine Inhouse-KI?",
 							"acceptedAnswer": {
 								"@type": "Answer",
-								"text": "Ja. Bei einer Inhouse-Lösung werden Dokumente, Kundendaten und Anfragen ausschließlich auf Ihren eigenen Servern verarbeitet. Es findet keine Übertragung an externe Cloud-Dienste statt."
-						}
-						},
-						{
-							"@type": "Question",
-							"name": "Was sind die wichtigsten Vorteile von Inhouse-KI gegenüber Cloud-Lösungen?",
-							"acceptedAnswer": {
-								"@type": "Answer",
-								"text": "Die wichtigsten Vorteile sind: Ihre Daten bleiben im Unternehmen, planbare und feste Kosten statt nutzungsabhängiger Gebühren, volle Kontrolle darüber, wer Zugriff hat, Unabhängigkeit von Cloud-Anbietern sowie eine maßgeschneiderte Lösung für Ihre internen Prozesse."
+								"text": "Die Kosten hängen unter anderem von Hardware, Einsatzgebiet und Umfang ab. Nach dem Kennenlernen erhältst Du einen transparenten Plan und ein Festpreis-Angebot."
 							}
 						},
 						{
 							"@type": "Question",
-							"name": "Wie läuft die Zusammenarbeit mit euch ab?",
+							"name": "Wie läuft die Zusammenarbeit ab?",
 							"acceptedAnswer": {
 								"@type": "Answer",
-								"text": "Der Prozess besteht aus vier klaren Schritten: 1. Kennenlernen – wir besprechen Ihre Ziele. 2. Klarer Plan – Sie erhalten ein transparentes Festpreis-Angebot. 3. Umsetzung – wir bauen die Lösung auf und schulen Ihr Team. 4. Rundum betreut – wir kümmern uns um Wartung, Updates und Support."
-							}
-						},
-						{
-							"@type": "Question",
-							"name": "Bietet ihr ein kostenloses Erstgespräch an?",
-							"acceptedAnswer": {
-								"@type": "Answer",
-								"text": "Ja. Sie können ein kostenloses 30-minütiges Kennenlerngespräch buchen. Dieses findet montags bis freitags zwischen 10 und 16 Uhr (Berliner Zeit) statt."
-							}
-						},
-						{
-							"@type": "Question",
-							"name": "Welche Leistungen umfasst eure Inhouse-KI-Lösung?",
-							"acceptedAnswer": {
-								"@type": "Answer",
-								"text": "Wir unterstützen Sie bei der Auswahl passender Hardware, der Installation offener KI-Modelle auf Ihren Servern, dem Aufbau eines internen Wissenssystems (Fragen an Ihre eigenen Dokumente stellen) sowie der Automatisierung wiederkehrender Aufgaben in Ihrem Unternehmen."
+								"text": "Wir besprechen zuerst Deine Ziele, erstellen einen Plan und setzen die Lösung um. Anschließend unterstützen wir Dich bei Wartung, Updates und Fragen."
 							}
 						}
 					]
@@ -206,50 +182,55 @@
 		<button class="nav-toggle" type="button" aria-label="Menü öffnen" aria-controls="main-nav-links"
 			aria-expanded="false" hidden><span></span><span></span><span></span></button>
 		<div id="main-nav-links" class="nav-links">
-			<a href="#inhouse">Inhouse</a>
+			<a href="#experten">Über uns</a>
 			<a href="#leistungen">Leistungen</a>
 			<a href="#produkte" hidden>Produkte</a>
-			<a href="#experten">Experten</a>
+			<a href="#inhouse">Inhouse</a>
+			<a href="#ablauf">Ablauf</a>
+			<a href="#faq">FAQ</a>
 			<a href="#kontakt">Kontakt</a>
 		</div>
 	</nav>
 
-	<section id="home" class="voice welcome">
-		<canvas id="voice-canvas" width="840" height="320" role="img" aria-label="Animation der KI-Stimme"></canvas>
-		<canvas id="voice-webgl" role="img" aria-label="Animation der KI-Stimme" hidden></canvas>
-		<button id="voice-mic" class="mic" type="button" aria-label="Sprechen" title="Frage stellen" hidden>
-			<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.8"
-				stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-				<rect x="9" y="3" width="6" height="10" rx="3" />
-				<path d="M6 11.5a6 6 0 0 0 12 0M12 17.5v3M9 20.5h6" />
-			</svg>
-		</button>
-		<div class="voice-text" id="voice-text" role="log" aria-live="polite" aria-label="Gesprächsverlauf"
-			tabindex="0">Möchtest Du erfahren, wie wir KI inhouse in Unternehmen aufbauen?
-			<br /><br />
-			<button id="welcome-start" class="start" type="button">Ja</button>
+	<section id="home" class="hero" aria-labelledby="home-title">
+		<div class="hero-content">
+			<p class="hero-eyebrow">KI-Experten Zusammenschluss · Für KMU</p>
+			<h1 id="home-title">KI für Dein Unternehmen – auf Deiner eigenen Infrastruktur</h1>
+			<p class="hero-lead">Wir helfen Dir, KI sinnvoll einzusetzen: von der passenden Infrastruktur bis zur
+				fertigen Anwendung für Deine Abläufe.</p>
+			<div class="hero-actions">
+				<a class="btn" href="#leistungen">Unsere Leistungen</a>
+				<a class="btn btn-outline" href="#dialog">Frage stellen</a>
+			</div>
 		</div>
-		<button id="voice-privacy" class="privacy-toggle" type="button" aria-label="Datenschutzhinweise anzeigen"
-			title="Datenschutzhinweise" aria-controls="voice-privacy-popup" aria-expanded="false">
-			<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-				stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-				<path d="M12 22s8-4 8-11V5l-8-3-8 3v6c0 7 8 11 8 11Z" />
-				<path d="m9 12 2 2 4-4" />
-			</svg>
-		</button>
-		<div id="voice-privacy-popup" class="voice-privacy-popup" role="dialog" aria-modal="false"
-			aria-labelledby="voice-privacy-title" tabindex="-1" hidden>
-			<h2 id="voice-privacy-title">Datenschutzhinweise</h2>
-			<p>Der Chat wird zur Weiterentwicklung 7 Tage gespeichert. Audiodaten werden zur Transkription an unser
-				KI-System übertragen, aber nicht gespeichert. Teile keine vertraulichen Daten.</p>
-		</div>
+		<div class="hero-orb" aria-hidden="true"></div>
+	</section>
+
+	<section id="experten" class="alt" aria-labelledby="experten-title">
+		<p class="section-eyebrow">Über uns</p>
+		<h2 id="experten-title">Freiberufliche Experten. Ein gemeinsames Ziel.</h2>
+		<p class="section-intro">Wir sind ein Zusammenschluss freiberuflicher KI-Experten und unterstützen
+			Unternehmen dabei, eigene KI-Lösungen aufzubauen – verständlich und passend zu ihren Abläufen.</p>
+		<div class="pillars" id="experten-liste"></div>
+	</section>
+
+	<section id="leistungen">
+		<p class="section-eyebrow">Unsere Leistungen</p>
+		<h2>Was wir für Dich tun</h2>
+		<div class="pillars" id="leistungen-liste"></div>
+	</section>
+
+	<section id="produkte" hidden>
+		<h2>Unsere eigenen KI-Produkte</h2>
+		<div class="pillars" id="produkte-liste"></div>
 	</section>
 
 	<section id="inhouse" class="inhouse" aria-labelledby="inhouse-title">
 		<div class="inhouse-inner">
-			<p class="inhouse-eyebrow">Wir sind freiberufliche KI-Experten. Aus Überzeugung.</p>
-			<h1 id="inhouse-title">KI inhouse für KMU – sicher, planbar und unabhängig</h1>
-			<h2>Warum es die beste Lösung für KMU Unternehmen ist:</h2>
+			<p class="inhouse-eyebrow">KI inhouse für KMU</p>
+			<h2 id="inhouse-title">Warum Inhouse-KI?</h2>
+			<p class="section-intro">Datenkontrolle, planbare Kosten und Unabhängigkeit: Entdecke, welche
+				Vorteile eine eigene KI-Infrastruktur für Dein Unternehmen bieten kann.</p>
 			<div id="spider" class="spider">
 				<div class="spider-stage">
 					<button id="spider-core" class="spider-core" type="button" aria-expanded="false"
@@ -385,23 +366,9 @@
 		</div>
 	</section>
 
-	<section id="leistungen">
-		<h2>Was wir für Dich tun</h2>
-		<div class="pillars" id="leistungen-liste"></div>
-	</section>
-
-	<section id="produkte" hidden>
-		<h2>Unsere eigenen KI-Produkte</h2>
-		<div class="pillars" id="produkte-liste"></div>
-	</section>
-
-	<section id="experten" class="alt" hidden>
-		<h2>Unsere Experten</h2>
-		<div class="pillars" id="experten-liste"></div>
-	</section>
-
-	<section id="kontakt" class="contact">
-		<h2>Lass uns über Deine Ideen sprechen</h2>
+	<section id="ablauf" class="alt">
+		<p class="section-eyebrow">Zusammenarbeit</p>
+		<h2>So arbeiten wir zusammen</h2>
 		<ol class="steps">
 			<li><strong>Kennenlernen:</strong> Wir hören zu und besprechen Deine Ziele.</li>
 			<li><strong>Klarer Plan:</strong> Du erhältst ein transparentes
@@ -411,6 +378,72 @@
 			<li><strong>Rundum betreut:</strong> Wir kümmern uns um Wartung, Updates und
 				Deine Fragen.</li>
 		</ol>
+	</section>
+
+	<section id="faq" aria-labelledby="faq-title">
+		<p class="section-eyebrow">Gut zu wissen</p>
+		<h2 id="faq-title">Häufige Fragen</h2>
+		<div class="faq-list">
+			<details>
+				<summary>Was bedeutet KI inhouse?</summary>
+				<p>Die KI läuft auf Deiner eigenen Infrastruktur. So bestimmst Du, wo Deine Daten verarbeitet
+					werden und wer darauf zugreifen kann.</p>
+			</details>
+			<details>
+				<summary>Was brauche ich für eine eigene KI-Lösung?</summary>
+				<p>Welche Hardware und Software sinnvoll sind, hängt von Deinen Aufgaben und Deiner vorhandenen
+					Infrastruktur ab. Gemeinsam schauen wir, was Du benötigst.</p>
+			</details>
+			<details>
+				<summary>Was kostet eine Inhouse-KI?</summary>
+				<p>Die Kosten hängen unter anderem von Hardware, Einsatzgebiet und Umfang ab. Nach dem
+					Kennenlernen erhältst Du einen transparenten Plan und ein Festpreis-Angebot.</p>
+			</details>
+			<details>
+				<summary>Wie läuft die Zusammenarbeit ab?</summary>
+				<p>Wir besprechen zuerst Deine Ziele, erstellen einen Plan und setzen die Lösung um.
+					Anschließend unterstützen wir Dich bei Wartung, Updates und Fragen.</p>
+			</details>
+		</div>
+	</section>
+
+	<section id="dialog" class="voice welcome" aria-labelledby="dialog-title">
+		<h2 id="dialog-title">Noch Fragen?</h2>
+		<p class="dialog-intro">Starte den KI-Dialog für eine geführte Bedarfsanalyse. Fragen zu unserem Angebot
+			kannst Du anschließend stellen.</p>
+		<p class="dialog-privacy">Der Chat wird zur Weiterentwicklung 7 Tage gespeichert. Audiodaten werden zur
+			Transkription an unser KI-System übertragen, aber nicht gespeichert. Teile keine vertraulichen Daten.</p>
+		<canvas id="voice-canvas" width="840" height="320" role="img" aria-label="Animation der KI-Stimme"></canvas>
+		<canvas id="voice-webgl" role="img" aria-label="Animation der KI-Stimme" hidden></canvas>
+		<button id="voice-mic" class="mic" type="button" aria-label="Sprechen" title="Frage stellen" hidden>
+			<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.8"
+				stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+				<rect x="9" y="3" width="6" height="10" rx="3" />
+				<path d="M6 11.5a6 6 0 0 0 12 0M12 17.5v3M9 20.5h6" />
+			</svg>
+		</button>
+		<div class="voice-text" id="voice-text" role="log" aria-live="polite" aria-label="Gesprächsverlauf"
+			tabindex="0"></div>
+		<button id="welcome-start" class="start" type="button">KI-Dialog starten</button>
+		<a class="dialog-booking" href="#kontakt">Oder direkt ein Kennenlerngespräch buchen</a>
+		<button id="voice-privacy" class="privacy-toggle" type="button" aria-label="Datenschutzhinweise anzeigen"
+			title="Datenschutzhinweise" aria-controls="voice-privacy-popup" aria-expanded="false">
+			<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+				stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+				<path d="M12 22s8-4 8-11V5l-8-3-8 3v6c0 7 8 11 8 11Z" />
+				<path d="m9 12 2 2 4-4" />
+			</svg>
+		</button>
+		<div id="voice-privacy-popup" class="voice-privacy-popup" role="dialog" aria-modal="false"
+			aria-labelledby="voice-privacy-title" tabindex="-1" hidden>
+			<h2 id="voice-privacy-title">Datenschutzhinweise</h2>
+			<p>Der Chat wird zur Weiterentwicklung 7 Tage gespeichert. Audiodaten werden zur Transkription an unser
+				KI-System übertragen, aber nicht gespeichert. Teile keine vertraulichen Daten.</p>
+		</div>
+	</section>
+
+	<section id="kontakt" class="contact">
+		<h2>Lass uns über Deine Ideen sprechen</h2>
 		<p class="booking-intro">Buche ein kostenloses Kennenlerngespräch von 30 Minuten (Mo–Fr, 10–16 Uhr, Berliner Zeit).</p>
 		<div class="booking">
 			<div class="calendar" aria-label="Terminkalender">

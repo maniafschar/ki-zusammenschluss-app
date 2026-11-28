@@ -40,6 +40,7 @@ class Element {
 		return find(this);
 	}
 	scrollTo() {}
+	scrollIntoView(options) { this.scrollOptions = options; }
 	getContext() { return null; }
 }
 
@@ -62,15 +63,16 @@ function setup(fetch) {
 		pause() { this.paused = true; }
 	}
 	const window = {
+		listeners: {},
 		MediaRecorder: class {},
 		matchMedia: () => ({ matches: true, addEventListener() {} }),
-		addEventListener() {}
+		addEventListener(type, listener) { this.listeners[type] = listener; }
 	};
 	const navigator = { mediaDevices: { getUserMedia: () => new Promise(() => {}) } };
 	let source = fs.readFileSync(path.join(__dirname, '../../main/resources/static/index.js'), 'utf8');
 	source = source.slice(source.indexOf('(function voiceChat()'));
 	const importStart = source.indexOf("\timport('https://");
-	const importEnd = source.indexOf('\n\tasync function csrfToken', importStart);
+	const importEnd = source.indexOf('\n\tfunction xsrfCookie', importStart);
 	source = source.slice(0, importStart) + source.slice(importEnd);
 	source = source.replace(/\n\}\)\(\);\s*$/, '\n globalThis.chat = { ask, stopTurn, submitChatAnswer, showPreviousQuestion, steps, history, get currentStepIndex() { return currentStepIndex; }, set currentStepIndex(value) { currentStepIndex = value; } };\n})();');
 	const context = {
@@ -81,7 +83,7 @@ function setup(fetch) {
 		console, setTimeout, clearTimeout
 	};
 	vm.runInNewContext(source, context);
-	return { chat: context.chat, elements, players };
+	return { chat: context.chat, elements, players, window };
 }
 
 const ok = { ok: true, status: 200, headers: new Headers() };
@@ -94,6 +96,34 @@ async function until(predicate) {
 	}
 	assert.fail('Timed out waiting for expected activity');
 }
+
+test('the dialog starts only on request and can be retried after a welcome error', async () => {
+	let welcomeRequests = 0;
+	const { elements } = setup(async (url) => {
+		if (url.includes('/welcome')) {
+			welcomeRequests++;
+			return welcomeRequests === 1
+				? { ok: false, status: 503 }
+				: { ok: true, json: async () => ({ gespraechId: 'test', text: '' }) };
+		}
+		throw new Error(`Unexpected request: ${url}`);
+	});
+	const start = elements.get('welcome-start');
+	assert.equal(welcomeRequests, 0);
+	await start.listeners.click();
+	assert.equal(start.disabled, false);
+	assert.match(elements.get('voice-text').textContent, /Bitte versuche es erneut/);
+	await start.listeners.click();
+	assert.equal(welcomeRequests, 2);
+	assert.equal(start.hidden, true);
+});
+
+test('a direct booking confirmation does not start the dialog', async () => {
+	const { elements, window } = setup(async () => { throw new Error('Unexpected request'); });
+	await window.listeners['termin-bestaetigt']({ detail: { start: '2026-11-11T10:00:00Z' } });
+	assert.notEqual(elements.get('welcome-start').hidden, true);
+	assert.equal(elements.get('kontakt').scrollOptions.behavior, 'auto');
+});
 
 test('a completed answer continues playing its prefetched audio normally', async () => {
 	let stream;

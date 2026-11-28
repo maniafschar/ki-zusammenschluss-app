@@ -145,6 +145,10 @@ flowchart TB
 | `static/admin.html` | Admin-Bereich (Wissensquellen, Interessenten, Protokolle) |
 | `static/user-menu.js` | Benutzermenü |
 
+Die Startseite stellt zunächst den Zusammenschluss, Leistungen, Inhouse-Vorteile, Ablauf und häufige Fragen
+vor. Expertenprofile und Leistungen werden weiterhin im Admin-Bereich gepflegt. Der KI-Dialog startet erst
+auf Wunsch; die Terminbuchung ist auch ohne Dialog erreichbar.
+
 ### 5.4 Wichtige Entities
 
 | Entity | Zweck |
