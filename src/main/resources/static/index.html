@@ -413,6 +413,14 @@
 			kannst Du anschließend stellen.</p>
 		<p class="dialog-privacy">Der Chat wird zur Weiterentwicklung 7 Tage gespeichert. Audiodaten werden zur
 			Transkription an unser KI-System übertragen, aber nicht gespeichert. Teile keine vertraulichen Daten.</p>
+		<button id="speech-toggle" class="speech-toggle" type="button" aria-pressed="false">
+			<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+				stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+				<path d="M11 5 6 9H3v6h3l5 4V5Z" />
+				<path d="M15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13" />
+			</svg>
+			<span class="speech-toggle-label">Vorlesen einschalten</span>
+		</button>
 		<canvas id="voice-canvas" width="840" height="320" role="img" aria-label="Animation der KI-Stimme"></canvas>
 		<canvas id="voice-webgl" role="img" aria-label="Animation der KI-Stimme" hidden></canvas>
 		<button id="voice-mic" class="mic" type="button" aria-label="Sprechen" title="Frage stellen" hidden>

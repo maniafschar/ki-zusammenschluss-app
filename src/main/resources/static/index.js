@@ -392,6 +392,7 @@ startBooking();
 	const mic = document.getElementById('voice-mic');
 	const text = document.getElementById('voice-text');
 	const start = document.getElementById('welcome-start');
+	const speechToggle = document.getElementById('speech-toggle');
 	const privacy = document.getElementById('voice-privacy');
 	const privacyPopup = document.getElementById('voice-privacy-popup');
 	const canvas = document.getElementById('voice-canvas');
@@ -414,6 +415,7 @@ startBooking();
 	let spruecheLaden = null;
 	const verwendeteSprueche = new Set();
 	let activeSpeech = null;
+	let speechEnabled = false;
 	let choiceReady = false;
 	let terminBestaetigt = false;
 	let level = 0;
@@ -950,6 +952,15 @@ startBooking();
 		activeSpeech.player?.pause();
 	}
 
+	speechToggle.addEventListener('click', () => {
+		speechEnabled = !speechEnabled;
+		speechToggle.setAttribute('aria-pressed', String(speechEnabled));
+		speechToggle.querySelector('.speech-toggle-label').textContent = speechEnabled
+			? 'Vorlesen ausschalten'
+			: 'Vorlesen einschalten';
+		if (!speechEnabled) stopSpeech();
+	});
+
 	function stopTurn() {
 		++chatTurn;
 		activeTurn?.controller.abort();
@@ -962,6 +973,7 @@ startBooking();
 
 	/** Spielt kurze Textabschnitte direkt ab und lädt den jeweils nächsten Abschnitt parallel vor. */
 	async function speak(reply, turnId = null, closeInput = null) {
+		if (!speechEnabled) return;
 		const playback = { controller: new AbortController(), player: null, finish: null, cancelled: false, turnId, closeInput };
 		activeSpeech = playback;
 		const urls = [];
@@ -1523,7 +1535,7 @@ startBooking();
 			wake?.();
 		}
 		function enqueueSpeech(chunk) {
-			if (controller.signal.aborted) return;
+			if (controller.signal.aborted || !speechEnabled) return;
 			speechItems.push(chunk);
 			if (!speechTask) speechTask = speak(speechStream(), turnId, discardSpeech);
 			speechTask.catch(() => closeSpeech());

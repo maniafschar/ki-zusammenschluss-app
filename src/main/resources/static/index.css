@@ -21,6 +21,11 @@ section[id] {
 	scroll-margin-top: 5rem;
 }
 
+#home,
+#dialog {
+	scroll-margin-top: 0;
+}
+
 @media (prefers-reduced-motion: reduce) {
 	html {
 		scroll-behavior: auto;
@@ -263,7 +268,8 @@ h2 {
 }
 
 .hero {
-	min-height: min(46rem, 100vh);
+	min-height: 100vh;
+	min-height: 100svh;
 	padding-top: 9rem;
 	display: grid;
 	grid-template-columns: minmax(0, 1fr) minmax(12rem, 24rem);
@@ -341,7 +347,6 @@ h2 {
 
 @media (max-width: 760px) {
 	.hero {
-		min-height: auto;
 		grid-template-columns: 1fr;
 		padding-top: 8rem;
 	}
@@ -1105,7 +1110,8 @@ footer a {
 
 .voice.welcome {
 	position: relative;
-	min-height: 36rem;
+	min-height: 100vh;
+	min-height: 100svh;
 	display: flex;
 	flex-direction: column;
 	align-items: center;
@@ -1152,6 +1158,50 @@ footer a {
 
 .voice button svg {
 	height: 50%;
+}
+
+.voice .speech-toggle {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: .625rem;
+	width: auto;
+	height: auto;
+	margin-top: 1.25rem;
+	padding: .75rem 1.25rem;
+	border: 1px solid rgba(141, 233, 219, .7);
+	border-radius: 999px;
+	background: linear-gradient(135deg, rgba(20, 125, 151, .92), rgba(34, 75, 156, .92));
+	box-shadow: 0 0 1.25rem rgba(63, 193, 224, .2), inset 0 1px rgba(255, 255, 255, .18);
+	font: inherit;
+	font-weight: 700;
+	line-height: 1.4;
+	transition: background .2s ease, box-shadow .2s ease, transform .2s ease;
+}
+
+.voice .speech-toggle svg {
+	width: 1.25rem;
+	height: 1.25rem;
+}
+
+.voice .speech-toggle:hover,
+.voice .speech-toggle:focus-visible {
+	background: linear-gradient(135deg, rgba(25, 153, 170, .98), rgba(50, 95, 183, .98));
+	box-shadow: 0 0 1.5rem rgba(63, 193, 224, .4), inset 0 1px rgba(255, 255, 255, .25);
+}
+
+.voice .speech-toggle:focus-visible {
+	outline: 2px solid #9deaff;
+	outline-offset: 3px;
+}
+
+.voice .speech-toggle[aria-pressed="true"] {
+	border-color: #9deaff;
+	background: linear-gradient(135deg, rgba(16, 113, 127, .95), rgba(41, 63, 139, .95));
+}
+
+.voice .speech-toggle:active {
+	transform: translateY(1px);
 }
 
 .voice .mic.rec {
