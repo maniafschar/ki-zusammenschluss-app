@@ -430,9 +430,7 @@ startBooking();
 	const questionForm = document.getElementById('voice-question-form');
 	const privacy = document.getElementById('voice-privacy');
 	const privacyPopup = document.getElementById('voice-privacy-popup');
-	const canvas = document.getElementById('voice-canvas');
 	const webglCanvas = document.getElementById('voice-webgl');
-	const ctx = canvas.getContext('2d');
 	const canRecord = Boolean(window.MediaRecorder && navigator.mediaDevices?.getUserMedia);
 	if (!canRecord) {
 		mic.disabled = true;
@@ -749,57 +747,8 @@ startBooking();
 			audioLevel *= Math.exp(-delta * 10);
 			for (let i = 0; i < audioBands.length; i++) audioBands[i] *= Math.exp(-delta * 8);
 		}
-		if (visual) {
+		if (visual)
 			visual.draw(t, reducedMotion.matches ? 'idle' : state, reducedMotion.matches, audioLevel, audioPitch, audioBands);
-		} else if (ctx) {
-			const w = canvas.width, h = canvas.height;
-			ctx.clearRect(0, 0, w, h);
-			const target = reducedMotion.matches ? 0 : state === 'speaking' ? audioLevel : 0;
-			level += (target - level) * (1 - Math.exp(-delta * 12));
-			const radius = Math.min(w, h) * 0.39;
-			const time = reducedMotion.matches ? 0 : t / 1000;
-			const hue = 195 + Math.max(0, Math.min(1, (audioPitch - 85) / 335)) * 45;
-			ctx.save();
-			ctx.translate(w / 2, h / 2);
-			const glow = ctx.createRadialGradient(0, 0, radius * 0.1, 0, 0, radius * 1.24);
-			glow.addColorStop(0, `hsla(${hue}, 90%, 65%, ${0.22 + level * 0.15})`);
-			glow.addColorStop(0.65, `hsla(${hue}, 90%, 45%, 0.16)`);
-			glow.addColorStop(1, 'transparent');
-			ctx.fillStyle = glow;
-			ctx.beginPath();
-			ctx.arc(0, 0, radius * 1.24, 0, Math.PI * 2);
-			ctx.fill();
-			for (let ring = 0; ring < 3; ring++) {
-				ctx.beginPath();
-				ctx.strokeStyle = `hsla(${hue + ring * 7}, 90%, ${72 - ring * 8}%, ${0.65 - ring * 0.15})`;
-				ctx.lineWidth = ring === 0 ? 2 : 1;
-				ctx.setLineDash(ring === 1 ? [5, 6] : ring === 2 ? [36, 12] : []);
-				ctx.lineDashOffset = time * (ring === 1 ? -5 : 3);
-				ctx.arc(0, 0, radius * (0.65 + ring * 0.16), 0, Math.PI * 2);
-				ctx.stroke();
-			}
-			ctx.setLineDash([]);
-			for (let i = 0; i < 80; i++) {
-				const angle = i * Math.PI * 2 / 80;
-				const length = i % 5 === 0 ? 9 : 4;
-				ctx.strokeStyle = `hsla(${hue}, 95%, 80%, ${i % 5 === 0 ? 0.7 : 0.3})`;
-				ctx.beginPath();
-				ctx.moveTo(Math.cos(angle) * radius * 0.91, Math.sin(angle) * radius * 0.91);
-				ctx.lineTo(Math.cos(angle) * (radius * 0.91 + length), Math.sin(angle) * (radius * 0.91 + length));
-				ctx.stroke();
-			}
-			ctx.beginPath();
-			ctx.strokeStyle = `hsla(${hue}, 100%, 83%, 0.9)`;
-			ctx.lineWidth = 2;
-			for (let i = 0; i <= 160; i++) {
-				const x = (i / 160 * 2 - 1) * radius * 0.55;
-				const envelope = Math.sin(i / 160 * Math.PI);
-				const y = Math.sin(x * 0.095 - time * 3) * envelope * (3 + level * radius * 0.22);
-				if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
-			}
-			ctx.stroke();
-			ctx.restore();
-		}
 		if (!reducedMotion.matches) frame = requestAnimationFrame(draw);
 	}
 
@@ -934,7 +883,6 @@ startBooking();
 					renderer.render(scene, camera);
 				}
 			};
-			canvas.hidden = true;
 			webglCanvas.hidden = false;
 			const resizeObserver = new ResizeObserver(resize);
 			resizeObserver.observe(webglCanvas);
@@ -943,7 +891,6 @@ startBooking();
 				resizeObserver.disconnect();
 				visual = null;
 				webglCanvas.hidden = true;
-				canvas.hidden = false;
 				geometry.dispose();
 				material.dispose();
 				renderer.dispose();
