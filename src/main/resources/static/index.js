@@ -1551,7 +1551,7 @@ startBooking();
 	function zeigeZusammenfassung(summary) {
 		const bookingForm = document.getElementById('booking-form');
 		const nachricht = bookingForm?.elements.nachricht;
-		if (nachricht) nachricht.value = summary;
+		if (nachricht) nachricht.value = 'Zusammenfassung der Bedarfsanalyse:\n' + summary;
 		if (bookingForm) bookingForm.dataset.gespraechId = gespraechId || '';
 		const bereich = text.querySelector('.chat-assistant');
 		if (!bereich || aktionenAngezeigt) return;
