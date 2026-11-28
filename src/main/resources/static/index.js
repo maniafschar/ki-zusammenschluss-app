@@ -349,13 +349,26 @@ function startBooking() {
 async function loadSection(url, sectionId, listId, render) {
 	const section = document.getElementById(sectionId);
 	const menuLink = sectionId === 'produkte' ? document.querySelector('.nav-links a[href="#produkte"]') : null;
+	const list = document.getElementById(listId);
 	try {
-		const items = await fetch(url).then((r) => r.json());
-		section.hidden = items.length === 0;
+		const items = await fetch(url).then((r) => {
+			if (!r.ok) throw new Error('HTTP ' + r.status);
+			return r.json();
+		});
+		if (sectionId === 'produkte') section.hidden = items.length === 0;
 		if (menuLink) menuLink.hidden = items.length === 0;
-		document.getElementById(listId).innerHTML = items.map(render).join('');
+		list.innerHTML = items.map(render).join('');
+		if (sectionId === 'leistungen' && !items.length) {
+			list.textContent = 'Aktuell sind keine Leistungen hinterlegt.';
+		}
 	} catch (err) {
-		section.hidden = true;
+		if (sectionId !== 'produkte') {
+			list.textContent = sectionId === 'experten'
+				? 'Die Expertenprofile konnten gerade nicht geladen werden.'
+				: 'Die Leistungen konnten gerade nicht geladen werden.';
+		} else {
+			section.hidden = true;
+		}
 		if (menuLink) menuLink.hidden = true;
 		console.error(err);
 	}
@@ -763,7 +776,7 @@ startBooking();
 			lastFrame = 0;
 		}
 	});
-	voiceObserver.observe(document.getElementById('home'));
+	voiceObserver.observe(document.getElementById('dialog'));
 	reducedMotion.addEventListener('change', requestDraw);
 	requestDraw();
 
@@ -1263,6 +1276,10 @@ startBooking();
 		if (state !== 'idle') return;
 		const terminStart = event.detail?.start;
 		const terminGespraechId = event.detail?.gespraechId;
+		if (!terminGespraechId) {
+			document.getElementById('kontakt')?.scrollIntoView({ behavior: reducedMotion.matches ? 'auto' : 'smooth' });
+			return;
+		}
 		if (terminGespraechId) {
 			gespraechId = terminGespraechId;
 			history.splice(0, history.length, ...(await ladeVerlauf(terminGespraechId)));
@@ -1273,7 +1290,7 @@ startBooking();
 		const nachricht = zeit
 			? `Super, dein Termin am ${zeit} Uhr ist bestätigt. Ich freue mich schon auf unser Gespräch!`
 			: 'Super, dein Termin ist bestätigt. Ich freue mich schon auf unser Gespräch!';
-		document.getElementById('home')?.scrollIntoView({ behavior: reducedMotion.matches ? 'auto' : 'smooth' });
+		document.getElementById('dialog')?.scrollIntoView({ behavior: reducedMotion.matches ? 'auto' : 'smooth' });
 		choiceReady = false;
 		terminBestaetigt = true;
 		start.hidden = true;
