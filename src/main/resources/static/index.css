@@ -882,6 +882,10 @@ h2 {
 	font-weight: 700;
 }
 
+.faq-answer {
+	overflow: hidden;
+}
+
 .faq-list p {
 	color: var(--muted);
 	margin-top: .75rem;
@@ -1376,6 +1380,15 @@ footer a {
 	display: flex;
 	gap: 0.5rem;
 	margin: 0.75rem 0;
+}
+
+.voice .voice-question-form {
+	width: 100%;
+	max-width: 40rem;
+}
+
+.voice .voice-question-form[hidden] {
+	display: none;
 }
 
 @media (max-width: 640px) {

@@ -148,6 +148,8 @@ flowchart TB
 Die Startseite stellt zunächst den Zusammenschluss, Leistungen, Inhouse-Vorteile, Ablauf und häufige Fragen
 vor. Expertenprofile und Leistungen werden weiterhin im Admin-Bereich gepflegt. Der KI-Dialog startet erst
 auf Wunsch; die Terminbuchung ist auch ohne Dialog erreichbar.
+Die Sprachausgabe kann während des Dialogs eingeschaltet werden und liest dann die aktuelle KI-Nachricht.
+Nach der Bedarfsanalyse sind Fragen sowohl per Texteingabe als auch per Mikrofon möglich.
 
 ### 5.4 Wichtige Entities
 
