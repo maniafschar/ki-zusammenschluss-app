@@ -386,23 +386,23 @@
 		<div class="faq-list">
 			<details>
 				<summary>Was bedeutet KI inhouse?</summary>
-				<p>Die KI läuft auf Deiner eigenen Infrastruktur. So bestimmst Du, wo Deine Daten verarbeitet
-					werden und wer darauf zugreifen kann.</p>
+				<div class="faq-answer"><p>Die KI läuft auf Deiner eigenen Infrastruktur. So bestimmst Du, wo Deine Daten verarbeitet
+					werden und wer darauf zugreifen kann.</p></div>
 			</details>
 			<details>
 				<summary>Was brauche ich für eine eigene KI-Lösung?</summary>
-				<p>Welche Hardware und Software sinnvoll sind, hängt von Deinen Aufgaben und Deiner vorhandenen
-					Infrastruktur ab. Gemeinsam schauen wir, was Du benötigst.</p>
+				<div class="faq-answer"><p>Welche Hardware und Software sinnvoll sind, hängt von Deinen Aufgaben und Deiner vorhandenen
+					Infrastruktur ab. Gemeinsam schauen wir, was Du benötigst.</p></div>
 			</details>
 			<details>
 				<summary>Was kostet eine Inhouse-KI?</summary>
-				<p>Die Kosten hängen unter anderem von Hardware, Einsatzgebiet und Umfang ab. Nach dem
-					Kennenlernen erhältst Du einen transparenten Plan und ein Festpreis-Angebot.</p>
+				<div class="faq-answer"><p>Die Kosten hängen unter anderem von Hardware, Einsatzgebiet und Umfang ab. Nach dem
+					Kennenlernen erhältst Du einen transparenten Plan und ein Festpreis-Angebot.</p></div>
 			</details>
 			<details>
 				<summary>Wie läuft die Zusammenarbeit ab?</summary>
-				<p>Wir besprechen zuerst Deine Ziele, erstellen einen Plan und setzen die Lösung um.
-					Anschließend unterstützen wir Dich bei Wartung, Updates und Fragen.</p>
+				<div class="faq-answer"><p>Wir besprechen zuerst Deine Ziele, erstellen einen Plan und setzen die Lösung um.
+					Anschließend unterstützen wir Dich bei Wartung, Updates und Fragen.</p></div>
 			</details>
 		</div>
 	</section>
@@ -430,6 +430,11 @@
 		</button>
 		<div class="voice-text" id="voice-text" role="log" aria-live="polite" aria-label="Gesprächsverlauf"
 			tabindex="0"></div>
+		<form id="voice-question-form" class="chat-text-entry voice-question-form" hidden>
+			<input type="text" name="question" maxlength="2000" required aria-label="Deine Frage"
+				placeholder="Deine Frage eingeben">
+			<button class="chat-text-submit" type="submit">Senden</button>
+		</form>
 		<button id="welcome-start" class="start" type="button">KI-Dialog starten</button>
 		<button id="voice-privacy" class="privacy-toggle" type="button" aria-label="Datenschutzhinweise anzeigen"
 			title="Datenschutzhinweise" aria-controls="voice-privacy-popup" aria-expanded="false">

@@ -14,6 +14,7 @@ class Element {
 	}
 	addEventListener(type, listener) { this.listeners[type] = listener; }
 	append(...children) { this.children.push(...children); }
+	remove() {}
 	replaceChildren(...children) { this.children = children; }
 	setAttribute(name, value) { this.attributes[name] = value; }
 	getAttribute(name) { return this.attributes[name] ?? null; }
@@ -24,6 +25,7 @@ class Element {
 	querySelector(selector) {
 		const matches = (node) => {
 			if (selector === '.chat-choices' && !node.className?.split(' ').includes('chat-choices')) return false;
+			if (selector === '.chat-assistant' && !node.className?.split(' ').includes('chat-assistant')) return false;
 			if (selector.includes('[data-chat-choice]') && !node.dataset?.chatChoice) return false;
 			if (selector.includes('[data-chat-submit-multiple]') && !Object.hasOwn(node.dataset || {}, 'chatSubmitMultiple')) return false;
 			if (selector.includes('[aria-pressed="true"]') && node.getAttribute?.('aria-pressed') !== 'true') return false;
@@ -46,6 +48,16 @@ class Element {
 
 function setup(fetch) {
 	const elements = new Map();
+	const speechLabel = new Element();
+	const speechToggle = new Element();
+	speechToggle.querySelector = (selector) => selector === '.speech-toggle-label' ? speechLabel : null;
+	elements.set('speech-toggle', speechToggle);
+	const questionForm = new Element();
+	questionForm.elements = { question: { value: '' } };
+	elements.set('voice-question-form', questionForm);
+	const bookingForm = new Element();
+	bookingForm.elements = {};
+	elements.set('booking-form', bookingForm);
 	const document = {
 		cookie: '',
 		getElementById(id) {
@@ -125,9 +137,172 @@ test('a direct booking confirmation does not start the dialog', async () => {
 	assert.equal(elements.get('kontakt').scrollOptions.behavior, 'auto');
 });
 
+test('a resumed confirmed dialog offers text input without microphone support', async () => {
+	const { elements } = setup(async (url) => {
+		if (url.endsWith('/welcome')) return {
+			...ok, json: async () => ({ gespraechId: 'test', text: 'Wie kann ich helfen?', bestaetigt: true })
+		};
+		throw new Error(`Unexpected request: ${url}`);
+	});
+	await elements.get('welcome-start').listeners.click();
+	assert.equal(elements.get('voice-question-form').hidden, false);
+});
+
+test('FAQ animations can reverse direction and respect reduced motion', () => {
+	const summary = new Element();
+	const animations = [];
+	const answer = {
+		scrollHeight: 100,
+		getBoundingClientRect: () => ({ height: 40 }),
+		animate(frames) {
+			const animation = { frames, cancel() { this.cancelled = true; } };
+			animations.push(animation);
+			return animation;
+		}
+	};
+	const details = {
+		open: false,
+		querySelector: (selector) => selector === 'summary' ? summary : answer
+	};
+	const motion = { matches: false };
+	const source = fs.readFileSync(path.join(__dirname, '../../main/resources/static/index.js'), 'utf8');
+	vm.runInNewContext(source.slice(source.indexOf('(function animateFaq()'), source.indexOf('(function voiceChat()')), {
+		window: { matchMedia: () => motion },
+		document: { querySelectorAll: () => [details] }
+	});
+	const click = () => summary.listeners.click({ preventDefault() {} });
+	click();
+	assert.equal(details.open, true);
+	assert.equal(animations[0].frames[0].height, '0px');
+	assert.equal(animations[0].frames[1].height, '100px');
+	click();
+	assert.equal(animations[0].cancelled, true);
+	assert.equal(animations[1].frames[1].height, '0px');
+	click();
+	assert.equal(animations[1].cancelled, true);
+	assert.equal(animations[2].frames[1].height, '100px');
+	animations[2].onfinish();
+	assert.equal(details.open, true);
+	motion.matches = true;
+	click();
+	assert.equal(details.open, false);
+	assert.equal(animations.length, 3);
+});
+
+test('enabling speech reads the currently displayed question and can be stopped', async () => {
+	const inputs = [];
+	const { elements, players } = setup(async (url, options) => {
+		if (url.endsWith('/welcome')) return { ...ok, json: async () => ({ gespraechId: 'test', text: 'Was ist Dein Ziel?' }) };
+		if (url.endsWith('/csrf')) return ok;
+		if (url.endsWith('/speech')) {
+			inputs.push(JSON.parse(options.body).input);
+			return { ...ok, body: null, blob: async () => new Blob(['audio']) };
+		}
+		throw new Error(`Unexpected request: ${url}`);
+	});
+	await elements.get('welcome-start').listeners.click();
+	elements.get('speech-toggle').listeners.click();
+	await until(() => players[0]?.played);
+	assert.deepEqual(inputs, ['Was ist Dein Ziel?']);
+	elements.get('speech-toggle').listeners.click();
+	assert.equal(players[0].paused, true);
+});
+
+test('enabling speech during streaming reads the existing text and the remainder', async () => {
+	let stream;
+	const inputs = [];
+	const { chat, elements, players } = setup(async (url, options) => {
+		if (url.endsWith('/csrf')) return ok;
+		if (url.endsWith('/speech')) {
+			inputs.push(JSON.parse(options.body).input);
+			return { ...ok, body: null, blob: async () => new Blob(['audio']) };
+		}
+		if (url.endsWith('/chat/stream')) return { ...ok, body: new ReadableStream({ start(c) { stream = c; } }) };
+		throw new Error(`Unexpected request: ${url}`);
+	});
+	const turn = chat.ask('Antwort', ['Antwort'], true);
+	await until(() => stream);
+	const first = 'Dies ist der erste Teil der aktuellen Frage. ';
+	const second = 'Dies ist der zweite Teil der aktuellen Frage.';
+	stream.enqueue(event('delta', { text: first }));
+	await tick();
+	elements.get('speech-toggle').listeners.click();
+	stream.enqueue(event('delta', { text: second }));
+	stream.enqueue(event('done', { text: first + second }));
+	await until(() => players[0]?.played);
+	players[0].listeners.ended();
+	await until(() => players[1]?.played);
+	players[1].listeners.ended();
+	await turn;
+	assert.equal(inputs.join(' '), (first + second).trim());
+});
+
+test('speech can be switched off and back on while an answer is streaming', async () => {
+	let stream;
+	const inputs = [];
+	const { chat, elements, players } = setup(async (url, options) => {
+		if (url.endsWith('/csrf')) return ok;
+		if (url.endsWith('/speech')) {
+			inputs.push(JSON.parse(options.body).input);
+			return { ...ok, body: null, blob: async () => new Blob(['audio']) };
+		}
+		if (url.endsWith('/chat/stream')) return { ...ok, body: new ReadableStream({ start(c) { stream = c; } }) };
+		throw new Error(`Unexpected request: ${url}`);
+	});
+	elements.get('speech-toggle').listeners.click();
+	const turn = chat.ask('Antwort', ['Antwort'], true);
+	await until(() => stream);
+	const reply = 'Welche Ziele hast Du genau? ';
+	stream.enqueue(event('delta', { text: reply }));
+	await until(() => players[0]?.played);
+	elements.get('speech-toggle').listeners.click();
+	elements.get('speech-toggle').listeners.click();
+	stream.enqueue(event('done', { text: reply }));
+	await until(() => players[1]?.played);
+	assert.equal(players[0].paused, true);
+	assert.equal(inputs[0], inputs[1]);
+	players[1].listeners.ended();
+	await turn;
+});
+
+test('the follow-up chat accepts a typed question and keeps the input available', async () => {
+	let stream;
+	const requests = [];
+	const { chat, elements } = setup(async (url, options) => {
+		if (url.endsWith('/csrf')) return ok;
+		if (url.endsWith('/sprueche')) return { ...ok, json: async () => [] };
+		if (url.endsWith('/chat/stream')) {
+			requests.push(JSON.parse(options.body));
+			if (requests.length > 1) return new Promise(() => {});
+			return { ...ok, body: new ReadableStream({ start(c) { stream = c; } }) };
+		}
+		throw new Error(`Unexpected request: ${url}`);
+	});
+	const turn = chat.ask('Antwort', ['Antwort'], true);
+	await until(() => stream);
+	stream.enqueue(event('done', { text: 'Zusammenfassung', zusammenfassung: 'Ergebnis' }));
+	await turn;
+	const find = (node) => {
+		if (node.textContent === 'Mit mir weiterchatten' && node.listeners?.click) return node;
+		for (const child of node.children || []) {
+			const match = find(child);
+			if (match) return match;
+		}
+	};
+	find(elements.get('voice-text')).listeners.click();
+	const form = elements.get('voice-question-form');
+	assert.equal(form.hidden, false);
+	form.elements.question.value = '  Wie geht es weiter?  ';
+	form.listeners.submit({ preventDefault() {} });
+	await until(() => requests.length === 2);
+	assert.equal(requests[1].messages.at(-1).content, 'Wie geht es weiter?');
+	assert.equal(form.elements.question.value, '');
+	assert.equal(form.hidden, false);
+});
+
 test('a completed answer continues playing its prefetched audio normally', async () => {
 	let stream;
-	const { chat, players } = setup(async (url) => {
+	const { chat, elements, players } = setup(async (url) => {
 		if (url.endsWith('/csrf')) return ok;
 		if (url.endsWith('/speech')) return { ...ok, body: null, blob: async () => new Blob(['audio']) };
 		if (url.endsWith('/chat/stream')) {
@@ -135,6 +310,7 @@ test('a completed answer continues playing its prefetched audio normally', async
 		}
 		throw new Error(`Unexpected request: ${url}`);
 	});
+	elements.get('speech-toggle').listeners.click();
 	const turn = chat.ask('Frage', ['Antwort'], true);
 	await until(() => stream);
 	const reply = 'Dies ist ein ausreichend langer erster Satz für die Sprachausgabe. '
@@ -152,7 +328,7 @@ test('switching questions stops playing and discards prefetched audio', async ()
 	let stream;
 	let speechRequests = 0;
 	let chatRequests = 0;
-	const { chat, players } = setup(async (url) => {
+	const { chat, elements, players } = setup(async (url) => {
 		if (url.endsWith('/csrf')) return ok;
 		if (url.endsWith('/sprueche')) return { ...ok, json: async () => [] };
 		if (url.endsWith('/speech')) {
@@ -166,6 +342,7 @@ test('switching questions stops playing and discards prefetched audio', async ()
 		}
 		throw new Error(`Unexpected request: ${url}`);
 	});
+	elements.get('speech-toggle').listeners.click();
 	const first = chat.ask('Erste Frage', ['Antwort'], true);
 	await until(() => stream);
 	const reply = 'Dies ist ein ausreichend langer erster Satz für die Sprachausgabe. '
@@ -174,13 +351,14 @@ test('switching questions stops playing and discards prefetched audio', async ()
 	stream.enqueue(event('delta', { text: reply }));
 	stream.enqueue(event('done', { text: reply }));
 	await until(() => players.length >= 2 && players[0].played);
-	assert.equal(speechRequests, 2);
+	const prefetched = speechRequests;
+	assert.ok(prefetched >= 2);
 	chat.submitChatAnswer('Nächste Antwort');
 	await until(() => chatRequests === 2);
 	await first;
 	assert.equal(players[0].paused, true);
 	assert.equal(players[1].played, undefined);
-	assert.equal(speechRequests, 2);
+	assert.equal(speechRequests, prefetched);
 });
 
 test('starting the microphone aborts the answer stream and prevents delayed speech requests', async () => {
@@ -189,10 +367,11 @@ test('starting the microphone aborts the answer stream and prevents delayed spee
 	let releaseSpeechCsrf;
 	let csrfCalls = 0;
 	let speechRequests = 0;
+	const speechCsrf = new Promise((resolve) => { releaseSpeechCsrf = () => resolve(ok); });
 	const { chat, elements, players } = setup(async (url, options) => {
 		if (url.endsWith('/csrf')) {
 			csrfCalls++;
-			if (csrfCalls === 2) return new Promise((resolve) => { releaseSpeechCsrf = () => resolve(ok); });
+			if (csrfCalls > 1) return speechCsrf;
 			return ok;
 		}
 		if (url.endsWith('/speech')) {
@@ -210,10 +389,11 @@ test('starting the microphone aborts the answer stream and prevents delayed spee
 		}
 		throw new Error(`Unexpected request: ${url}`);
 	});
+	elements.get('speech-toggle').listeners.click();
 	const first = chat.ask('Erste Frage', ['Antwort'], true);
 	await until(() => stream);
 	stream.enqueue(event('delta', { text: 'Dies ist ein ausreichend langer Satz, der gerade vorgelesen werden soll. ' }));
-	await until(() => releaseSpeechCsrf);
+	await until(() => csrfCalls > 1);
 	elements.get('voice-mic').listeners.click();
 	assert.equal(chatSignal.aborted, true);
 	releaseSpeechCsrf();

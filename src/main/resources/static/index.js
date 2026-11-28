@@ -388,11 +388,46 @@ loadSection('/ai-expert/api/experten', 'experten', 'experten-liste', (e) =>
 
 startBooking();
 
+(function animateFaq() {
+	const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+	document.querySelectorAll('.faq-list details').forEach((details) => {
+		const summary = details.querySelector('summary');
+		const answer = details.querySelector('.faq-answer');
+		let animation = null;
+		let closing = false;
+		summary.addEventListener('click', (event) => {
+			if (!answer.animate) return;
+			event.preventDefault();
+			const opening = !details.open || closing;
+			const from = details.open ? answer.getBoundingClientRect().height : 0;
+			animation?.cancel();
+			if (reducedMotion.matches) {
+				details.open = opening;
+				animation = null;
+				closing = false;
+				return;
+			}
+			details.open = true;
+			closing = !opening;
+			animation = answer.animate(
+				[{ height: `${from}px` }, { height: `${opening ? answer.scrollHeight : 0}px` }],
+				{ duration: 250, easing: 'ease' }
+			);
+			animation.onfinish = () => {
+				details.open = opening;
+				closing = false;
+				animation = null;
+			};
+		});
+	});
+})();
+
 (function voiceChat() {
 	const mic = document.getElementById('voice-mic');
 	const text = document.getElementById('voice-text');
 	const start = document.getElementById('welcome-start');
 	const speechToggle = document.getElementById('speech-toggle');
+	const questionForm = document.getElementById('voice-question-form');
 	const privacy = document.getElementById('voice-privacy');
 	const privacyPopup = document.getElementById('voice-privacy-popup');
 	const canvas = document.getElementById('voice-canvas');
@@ -416,6 +451,8 @@ startBooking();
 	const verwendeteSprueche = new Set();
 	let activeSpeech = null;
 	let speechEnabled = false;
+	let currentAssistantText = '';
+	let followupChat = false;
 	let choiceReady = false;
 	let terminBestaetigt = false;
 	let level = 0;
@@ -593,6 +630,7 @@ startBooking();
 		choices = false, status = '', thinking = false, thinkingQuote = '',
 		selectedOptions = [], answerValue = '', showBack = false, onRetry = null
 	} = {}) {
+		currentAssistantText = reply;
 		text.replaceChildren();
 		const user = document.createElement('div');
 		user.className = 'chat-turn chat-user';
@@ -958,7 +996,19 @@ startBooking();
 		speechToggle.querySelector('.speech-toggle-label').textContent = speechEnabled
 			? 'Vorlesen ausschalten'
 			: 'Vorlesen einschalten';
-		if (!speechEnabled) stopSpeech();
+		if (!speechEnabled) {
+			stopSpeech();
+		} else if (activeTurn) {
+			activeTurn.enableSpeech();
+		} else if (currentAssistantText.trim()) {
+			speak(plainMarkdown(currentAssistantText), chatTurn).catch((e) => {
+				console.error('Sprachausgabe fehlgeschlagen:', e);
+				const speechError = document.createElement('p');
+				speechError.className = 'chat-status';
+				speechError.textContent = 'Die Sprachausgabe ist fehlgeschlagen.';
+				text.querySelector('.chat-assistant')?.append(speechError);
+			});
+		}
 	});
 
 	function stopTurn() {
@@ -1027,8 +1077,14 @@ startBooking();
 				body: JSON.stringify({ input }),
 				signal
 			});
-			let res = await sende(xsrfCookie() || await csrfToken(signal));
-			if (res.status === 403) res = await sende(await csrfToken(signal));
+			const token = xsrfCookie() || await csrfToken(signal);
+			signal.throwIfAborted();
+			let res = await sende(token);
+			if (res.status === 403) {
+				const refreshedToken = await csrfToken(signal);
+				signal.throwIfAborted();
+				res = await sende(refreshedToken);
+			}
 			signal.throwIfAborted();
 			if (!res.ok) throw new Error(res.status);
 			const mimeType = res.headers.get('Content-Type')?.split(';')[0] || 'audio/mpeg';
@@ -1216,6 +1272,7 @@ startBooking();
 	function renderWelcome(markdown, {
 		selectedOptions = [], answerValue = '', showBack = false, choices = true
 	} = {}) {
+		currentAssistantText = markdown;
 		text.replaceChildren();
 		const assistant = document.createElement('div');
 		assistant.className = 'chat-turn chat-assistant';
@@ -1256,6 +1313,11 @@ startBooking();
 		});
 		currentStepIndex = 0;
 		start.hidden = true;
+		if (bestaetigt) {
+			followupChat = true;
+			questionForm.hidden = false;
+			mic.hidden = false;
+		}
 		renderWelcome(welcome, { choices: !bestaetigt });
 		choiceReady = !bestaetigt;
 		try {
@@ -1305,7 +1367,10 @@ startBooking();
 		document.getElementById('dialog')?.scrollIntoView({ behavior: reducedMotion.matches ? 'auto' : 'smooth' });
 		choiceReady = false;
 		terminBestaetigt = true;
+		followupChat = true;
+		questionForm.hidden = false;
 		start.hidden = true;
+		currentAssistantText = nachricht;
 		text.textContent = '';
 		const assistant = document.createElement('div');
 		assistant.className = 'chat-turn chat-assistant';
@@ -1408,6 +1473,10 @@ startBooking();
 	function showPreviousQuestion() {
 		if (currentStepIndex <= 0) return;
 		stopTurn();
+		followupChat = false;
+		questionForm.hidden = true;
+		mic.hidden = true;
+		aktionenAngezeigt = false;
 		currentStepIndex--;
 		const step = steps[currentStepIndex];
 		umfrageAufSchrittZuruecksetzen(step.reply);
@@ -1467,6 +1536,16 @@ startBooking();
 		submitChatAnswer(form.elements.answer.value);
 	});
 
+	questionForm.addEventListener('submit', (event) => {
+		event.preventDefault();
+		const input = questionForm.elements.question;
+		const question = input.value.trim();
+		if (!followupChat || !question || activeTurn || state === 'thinking' || state === 'listening') return;
+		input.value = '';
+		stopTurn();
+		ask(question);
+	});
+
 	let aktionenAngezeigt = false;
 
 	function zeigeZusammenfassung(summary) {
@@ -1495,11 +1574,13 @@ startBooking();
 		weiterchatten.textContent = 'Mit mir weiterchatten';
 		weiterchatten.addEventListener('click', () => {
 			document.getElementById('voice-mic').hidden = false;
+			followupChat = true;
+			questionForm.hidden = false;
 			aktionen.remove();
 			const danke = document.createElement('p');
 			danke.className = 'chat-status';
-			danke.textContent = 'Mit diesen Hintergrundwissen kann ich nun gezielt auf Deine Fragen antworten. '
-				+ 'Klicke hierzu auf das Mikrofon, um sie zu stellen. '
+			danke.textContent = 'Mit diesem Hintergrundwissen kann ich nun gezielt auf Deine Fragen antworten. '
+				+ 'Gib Deine Frage ein oder klicke auf das Mikrofon, um sie zu stellen. '
 				+ 'Wenn Du fertig bist, klicke es erneut, um die Frage abzusenden.';
 			bereich.append(danke);
 		});
@@ -1512,44 +1593,43 @@ startBooking();
 		const controller = new AbortController();
 		choiceReady = false;
 		state = 'thinking';
-		const speechItems = [];
-		let speechClosed = false;
-		let speechWake;
+		let speechSession = null;
 		let speechTask = null;
-		async function* speechStream() {
-			while (true) {
-				if (speechClosed && controller.signal.aborted) {
-					return;
-				} else if (speechItems.length) {
-					yield speechItems.shift();
-				} else if (speechClosed) {
-					return;
-				} else {
-					await new Promise((resolve) => { speechWake = resolve; });
+		let reply = '';
+		function createSpeechSession() {
+			const session = { items: [], closed: false, wake: null };
+			async function* speechStream() {
+				while (true) {
+					if (session.items.length) yield session.items.shift();
+					else if (session.closed) return;
+					else await new Promise((resolve) => { session.wake = resolve; });
 				}
 			}
-		}
-		function wakeSpeech() {
-			const wake = speechWake;
-			speechWake = null;
-			wake?.();
+			const close = () => {
+				session.closed = true;
+				session.wake?.();
+				session.wake = null;
+			};
+			session.discard = () => { session.items.length = 0; close(); };
+			session.close = close;
+			speechSession = session;
+			speechTask = speak(speechStream(), turnId, session.discard);
+			speechTask.catch(() => close());
 		}
 		function enqueueSpeech(chunk) {
-			if (controller.signal.aborted || !speechEnabled) return;
-			speechItems.push(chunk);
-			if (!speechTask) speechTask = speak(speechStream(), turnId, discardSpeech);
-			speechTask.catch(() => closeSpeech());
-			wakeSpeech();
+			if (controller.signal.aborted || !speechEnabled || !chunk) return;
+			if (!speechSession || speechSession.closed) createSpeechSession();
+			speechSession.items.push(chunk);
+			speechSession.wake?.();
+			speechSession.wake = null;
 		}
 		function closeSpeech() {
-			speechClosed = true;
-			wakeSpeech();
+			speechSession?.close();
 		}
 		function discardSpeech() {
-			speechItems.length = 0;
-			closeSpeech();
+			speechSession?.discard();
 		}
-		const turn = { controller, closeSpeech: discardSpeech, userMessage: null };
+		const turn = { controller, closeSpeech: discardSpeech, enableSpeech: () => enqueueSpeech(reply), userMessage: null };
 		activeTurn = turn;
 		if (ausMultipleChoice) {
 			renderConversation(question, '');
@@ -1562,8 +1642,6 @@ startBooking();
 		const userMessage = { role: 'user', content: question };
 		turn.userMessage = userMessage;
 		history.push(userMessage);
-		let reply = '';
-
 		function renderReply() {
 			renderConversation(question, reply);
 		}
@@ -1647,17 +1725,17 @@ startBooking();
 			steps.push({
 				question,
 				reply: reply.trim(),
-				choices: !terminBestaetigt,
+				choices: !terminBestaetigt && !followupChat,
 				selectedOptions: [],
 				answerValue: '',
 				historyLength: history.length
 			});
 			currentStepIndex = steps.length - 1;
 			renderConversation(question, reply.trim(), {
-				choices: !terminBestaetigt,
-				showBack: currentStepIndex > 0
+				choices: !terminBestaetigt && !followupChat,
+				showBack: !terminBestaetigt && !followupChat && currentStepIndex > 0
 			});
-			choiceReady = !terminBestaetigt;
+			choiceReady = !terminBestaetigt && !followupChat;
 			if (zusammenfassung && !terminBestaetigt) zeigeZusammenfassung(zusammenfassung);
 			closeSpeech();
 			if (activeTurn?.controller === controller) activeTurn = null;
@@ -1701,6 +1779,7 @@ startBooking();
 			return;
 		}
 		choiceReady = false;
+		currentAssistantText = '';
 		stopTurn();
 		try {
 			const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
